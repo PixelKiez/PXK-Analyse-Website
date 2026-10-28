@@ -1,0 +1,282 @@
+<title>Pixelkiez Analyse</title>
+<meta name="description" content="Kostenlose Website-Analyse von Pixelkiez: Ladezeit, SEO, Barrierefreiheit, Datenschutz und KI-Sichtbarkeit in 30 Sekunden geprüft, mit klaren Aufgaben nach Wirkung sortiert.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/styles.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebApplication","name":"Pixelkiez Analyse","applicationCategory":"BusinessApplication","operatingSystem":"Web","inLanguage":"de","offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"},"publisher":{"@type":"Organization","name":"Pixelkiez","url":"https://pixelkiez.de/"}},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Brauchen Sie Zugriff auf meine Website?","acceptedAnswer":{"@type":"Answer","text":"Nein. Wir prüfen alles, was öffentlich erreichbar ist, so wie eine Suchmaschine."}},{"@type":"Question","name":"Ist die Analyse DSGVO-konform?","acceptedAnswer":{"@type":"Answer","text":"Ja. Die Analyse läuft auf Servern in Deutschland, und wir speichern keine personenbezogenen Daten Ihrer Besucher."}}]}]}</script>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+</svg>
+
+<header class="nav-wrap" id="nav">
+  <nav class="nav" aria-label="Hauptnavigation">
+    <a class="logo" href="#top">Pixelkiez<span>Analyse</span></a>
+    <div class="nav-links">
+      <a href="#report">Report</a>
+      <a href="#pruefungen">Prüfungen</a>
+      <a href="#pro">Pro</a>
+      <a href="#preise">Preise</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <a class="btn btn--ghost btn--sm" href="#">Anmelden</a>
+  </nav>
+</header>
+
+<main class="frame" id="top">
+  <section class="hero">
+    <span class="badge"><span class="pixel" aria-hidden="true"></span>Kostenlose Website-Analyse</span>
+    <h1 class="h1">Sehen Sie, was Ihre Website <em>ausbremst</em>.</h1>
+    <p class="lead">Geben Sie Ihre Adresse ein. Wir prüfen Ladezeit, SEO, Barrierefreiheit und Datenschutz und zeigen, was Sie zuerst beheben sollten.</p>
+    <form class="analyze" id="analyze" novalidate>
+      <label class="sr-only" for="url">Adresse Ihrer Website</label>
+      <div class="url-field">
+        <svg class="i"><use href="#i-globe"/></svg>
+        <input id="url" name="url" type="text" inputmode="url" autocomplete="url" placeholder="ihre-website.de">
+        <button class="btn btn--accent" type="submit">Analysieren <svg class="i"><use href="#i-arrow"/></svg></button>
+      </div>
+      <p class="form-error" id="url-error" hidden>Bitte geben Sie eine Adresse wie beispiel.de ein.</p>
+      <div class="facts">
+        <span><svg class="i"><use href="#i-check"/></svg>Kostenlos</span>
+        <span><svg class="i"><use href="#i-check"/></svg>Ohne Anmeldung</span>
+        <span><svg class="i"><use href="#i-check"/></svg>Ergebnis in 30 Sekunden</span>
+      </div>
+    </form>
+
+    <div class="result" id="result" hidden aria-live="polite">
+      <div id="result-loading">
+        <div class="result-status"><span id="result-phase">Seiten werden gecrawlt …</span><span id="result-domain-loading"></span></div>
+        <div class="progress" id="progress"><i></i></div>
+      </div>
+      <div id="result-body" hidden>
+        <div class="result-head">
+          <div class="ring ring--sm"><svg viewBox="0 0 64 64" aria-hidden="true"><circle class="track" cx="32" cy="32" r="28"/><circle class="val" id="result-ring" cx="32" cy="32" r="28" stroke-dasharray="175.93" stroke-dashoffset="175.93"/></svg><b class="num" id="result-score">0</b></div>
+          <div><small id="result-domain">kiez-kaffee.de</small><p id="result-verdict">Solide Basis mit Baustellen</p></div>
+          <span class="tag">Demo</span>
+        </div>
+        <ul class="issues">
+          <li><span class="sev sev--bad"></span><span>Großes Titelbild verzögert den Seitenaufbau</span><small id="result-lcp">LCP 4,1 s</small></li>
+          <li><span class="sev sev--bad"></span><span>Google Fonts werden ohne Einwilligung geladen</span><small>DSGVO</small></li>
+          <li><span class="sev sev--warn"></span><span id="result-meta">14 Seiten ohne Meta-Beschreibung</span><small>SEO</small></li>
+        </ul>
+        <a class="result-link" href="#report">So sieht der vollständige Report aus <svg class="i" width="16" height="16"><use href="#i-down"/></svg></a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section cw-peach" id="ablauf">
+    <div class="section-head"><p class="eyebrow">So funktioniert's</p><h2 class="h2">In drei Schritten zur To-do-Liste.</h2></div>
+    <div class="steps">
+      <div class="step"><span>01</span><h3>Adresse eingeben</h3><p>Eine URL genügt. Unterseiten und Sitemap finden wir selbst.</p></div>
+      <div class="step"><span>02</span><h3>Automatisch prüfen</h3><p>112 Prüfpunkte laufen parallel, in rund 30 Sekunden.</p></div>
+      <div class="step"><span>03</span><h3>Gezielt beheben</h3><p>Sie arbeiten die Liste von oben ab, sortiert nach Wirkung.</p></div>
+    </div>
+  </section>
+
+  <section class="section cw-white" id="report">
+    <div class="split">
+      <div class="split-copy">
+        <p class="eyebrow">Ihr Report</p>
+        <h2 class="h2">Ein Score. Klare Prioritäten.</h2>
+        <p class="text">Die Pixelkiez Analyse prüft Ihre Website so, wie Google, KI-Suchen und Ihre Besucher sie erleben. Sie sehen auf einen Blick, wo Ihre Seite steht und welche Probleme den größten Effekt haben.</p>
+        <ul class="checklist">
+          <li><svg class="i"><use href="#i-check"/></svg>Gesamt-Score von 0 bis 100</li>
+          <li><svg class="i"><use href="#i-check"/></svg>Fünf Einzelbereiche mit eigener Bewertung</li>
+          <li><svg class="i"><use href="#i-check"/></svg>Die wichtigsten Probleme zuerst</li>
+          <li><svg class="i"><use href="#i-check"/></svg>Vergleich mit Websites Ihrer Branche</li>
+        </ul>
+      </div>
+      <div class="card" aria-label="Beispiel-Report">
+        <div class="card-top"><span>kiez-kaffee.de</span><span class="tag">Beispiel</span></div>
+        <div class="score-row">
+          <div class="ring ring--lg"><svg viewBox="0 0 132 132" aria-hidden="true"><circle class="track" cx="66" cy="66" r="60"/><circle class="val" cx="66" cy="66" r="60" stroke-dasharray="376.99" stroke-dashoffset="113.1"/></svg><b class="num">70<small>von 100</small></b></div>
+          <div><h3>Solide Basis mit vier Baustellen</h3><p>48 Seiten · 112 Prüfungen · Branche Top 10 %: 91</p></div>
+        </div>
+        <div class="bars">
+          <div class="bar"><span>Performance</span><span class="bar-track"><i style="width:68%"></i></span><b class="num">68</b><span class="sev sev--warn"></span></div>
+          <div class="bar"><span>SEO</span><span class="bar-track"><i style="width:84%"></i></span><b class="num">84</b><span class="sev sev--warn"></span></div>
+          <div class="bar"><span>Barrierefreiheit</span><span class="bar-track"><i style="width:61%"></i></span><b class="num">61</b><span class="sev sev--warn"></span></div>
+          <div class="bar"><span>Datenschutz</span><span class="bar-track"><i style="width:94%"></i></span><b class="num">94</b><span class="sev sev--good"></span></div>
+          <div class="bar"><span>KI-Sichtbarkeit</span><span class="bar-track"><i style="width:43%"></i></span><b class="num">43</b><span class="sev sev--bad"></span></div>
+        </div>
+        <p class="eyebrow" style="margin-bottom:10px">Zuerst beheben</p>
+        <ul class="issues">
+          <li><span class="sev sev--bad"></span><span>Titelbild komprimieren</span><small>spart 1,4 s</small></li>
+          <li><span class="sev sev--bad"></span><span>Schriften lokal einbinden</span><small>DSGVO</small></li>
+          <li><span class="sev sev--warn"></span><span>Kontrast im Footer erhöhen</span><small>3,1 : 1 → 4,5 : 1</small></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="pruefungen">
+    <div class="section-head"><p class="eyebrow">Was wir prüfen</p><h2 class="h2">112 Prüfpunkte in fünf Bereichen.</h2><p class="text">Jeder Bereich bekommt eine eigene Bewertung. So sehen Sie, wo der größte Hebel liegt.</p></div>
+    <div class="spec">
+      <div class="spec-row"><div><h3>Performance</h3><span class="count">24 Prüfungen</span></div><p>Wie schnell Ihre Seiten auf dem Smartphone laden und reagieren. Wir finden die Bilder, Skripte und Schriften, die bremsen.</p><div class="pills"><span>LCP ≤ 2,5 s</span><span>INP ≤ 200 ms</span><span>CLS ≤ 0,1</span><span>Bildgrößen</span><span>Caching</span></div></div>
+      <div class="spec-row"><div><h3>SEO</h3><span class="count">31 Prüfungen</span></div><p>Ob Google Ihre Seiten findet, richtig versteht und gern anzeigt. Dazu gehören Indexierung, Titel, Beschreibungen und Links.</p><div class="pills"><span>Title &amp; Description</span><span>H1-Struktur</span><span>Canonicals</span><span>defekte Links</span><span>Sitemap</span></div></div>
+      <div class="spec-row"><div><h3>Barrierefreiheit</h3><span class="count">22 Prüfungen</span></div><p>Ob alle Menschen Ihre Website bedienen können, auch mit Screenreader oder nur per Tastatur. Wichtig für das Barrierefreiheitsstärkungsgesetz (BFSG).</p><div class="pills"><span>Kontrast ≥ 4,5 : 1</span><span>Alt-Texte</span><span>Formular-Labels</span><span>Tastatur-Fokus</span></div></div>
+      <div class="spec-row"><div><h3>Datenschutz &amp; Sicherheit</h3><span class="count">19 Prüfungen</span></div><p>Welche Drittanbieter vor der Einwilligung laden und ob Ihre Seite technisch abgesichert ist.</p><div class="pills"><span>Cookies vor Consent</span><span>externe Schriften</span><span>HTTPS</span><span>Security-Header</span></div></div>
+      <div class="spec-row"><div><h3>KI-Sichtbarkeit</h3><span class="count">16 Prüfungen</span></div><p>Ob ChatGPT, Perplexity und die KI-Antworten von Google Ihre Inhalte lesen und als Quelle nennen können.</p><div class="pills"><span>strukturierte Daten</span><span>llms.txt</span><span>Crawler-Zugriff</span><span>klare Antworten</span></div></div>
+    </div>
+  </section>
+
+  <section class="section cw-lilac" id="nutzen">
+    <div class="split split--reverse">
+      <div class="split-copy">
+        <p class="eyebrow">So nutzen Sie den Report</p>
+        <h2 class="h2">Jede Aufgabe erklärt, mit fertiger Lösung.</h2>
+        <div class="uses">
+          <div class="use"><span>01</span><div><h3>Mit den roten Punkten beginnen</h3><p>Kritische Probleme kosten Sie am meisten Besucher, Rankings oder Vertrauen.</p></div></div>
+          <div class="use"><span>02</span><div><h3>Aufgaben weitergeben</h3><p>Jede Aufgabe lässt sich als Link oder PDF an Ihre Agentur oder IT senden.</p></div></div>
+          <div class="use"><span>03</span><div><h3>Erneut prüfen</h3><p>Nach jeder Änderung zeigt ein neuer Check, ob Ihr Score steigt.</p></div></div>
+        </div>
+      </div>
+      <article class="card detail" aria-label="Beispiel einer Aufgabe im Report">
+        <div class="detail-top"><span class="sev sev--bad"></span><span>Kritisch</span><span class="tag">Performance</span></div>
+        <h3>Titelbild verzögert den Seitenaufbau</h3>
+        <dl>
+          <div><dt>Problem</dt><dd>Das Titelbild der Startseite ist 2,4 MB groß. Der wichtigste Inhalt erscheint erst nach 4,1 Sekunden.</dd></div>
+          <div><dt>Warum wichtig</dt><dd>Ab 2,5 Sekunden springen deutlich mehr Besucher ab, und Google bewertet die Seite schlechter.</dd></div>
+          <div><dt>Lösung</dt><dd>Bild auf 1.600 px Breite verkleinern, als WebP speichern und bevorzugt laden.</dd></div>
+          <div><dt>Betroffen</dt><dd class="mono">/ · /speisekarte · /kontakt</dd></div>
+          <div><dt>Aufwand</dt><dd>ca. 15 Minuten · spart 1,4 s</dd></div>
+        </dl>
+      </article>
+    </div>
+  </section>
+
+  <section class="section" id="fuer-wen">
+    <div class="section-head"><p class="eyebrow">Für wen</p><h2 class="h2">Für alle, die eine Website verantworten.</h2></div>
+    <div class="steps">
+      <div class="step"><h3>Unternehmen &amp; Selbstständige</h3><p>Sie wollen wissen, ob Ihre Website ihren Job macht, ohne Fachwissen. Der Report erklärt jedes Problem in Klartext.</p><small class="hint">Passend: Check oder Pro</small></div>
+      <div class="step"><h3>Marketing-Teams</h3><p>Sie brauchen Prioritäten für die nächsten Wochen und einen Verlauf, der den Fortschritt belegt.</p><small class="hint">Passend: Pro</small></div>
+      <div class="step"><h3>Agenturen</h3><p>Sie prüfen Kundenseiten vor dem Pitch oder nach dem Launch und geben Reports mit Ihrem Logo weiter.</p><small class="hint">Passend: Agentur</small></div>
+    </div>
+  </section>
+
+  <section class="section cw-lilac" id="pro">
+    <div class="section-head"><p class="eyebrow">Gratis-Check und Pro</p><h2 class="h2">Mit Pro bleibt Ihre Website in Form.</h2><p class="text">Websites ändern sich ständig: neue Inhalte, Plugins, Updates. Pro prüft jede Woche und meldet neue Fehler, bevor Ihre Besucher sie bemerken.</p></div>
+    <div class="pro-grid">
+      <div class="table-wrap">
+        <table class="ctable">
+          <thead><tr><th scope="col">Funktion</th><th scope="col">Check</th><th scope="col">Pro</th></tr></thead>
+          <tbody>
+            <tr><td>Score und fünf Bereiche</td><td><svg class="i"><use href="#i-check"/></svg></td><td><svg class="i"><use href="#i-check"/></svg></td></tr>
+            <tr><td>Probleme mit Lösung</td><td class="num">Top 3</td><td>Alle</td></tr>
+            <tr><td>Seiten pro Analyse</td><td class="num">50</td><td class="num">500</td></tr>
+            <tr><td>Report als PDF</td><td>–</td><td><svg class="i"><use href="#i-check"/></svg></td></tr>
+            <tr><td>Wöchentliche Prüfung</td><td>–</td><td><svg class="i"><use href="#i-check"/></svg></td></tr>
+            <tr><td>Verlauf und Branchenvergleich</td><td>–</td><td><svg class="i"><use href="#i-check"/></svg></td></tr>
+            <tr><td>E-Mail bei neuen Fehlern</td><td>–</td><td><svg class="i"><use href="#i-check"/></svg></td></tr>
+          </tbody>
+        </table>
+        <a class="btn btn--accent" href="#preise">Pro 14 Tage kostenlos testen <svg class="i"><use href="#i-arrow"/></svg></a>
+      </div>
+      <div class="card chart-card" aria-label="Beispiel Score-Verlauf in Pro">
+        <div class="card-top"><span>kiez-kaffee.de · Verlauf</span><span class="tag">Pro</span></div>
+        <div class="chart-kpi"><b class="num">91</b><span>+21 Punkte seit KW 30</span></div>
+        <svg class="chart" viewBox="0 0 560 196" role="img" aria-label="Score-Verlauf von 70 in KW 30 auf 91 in KW 41">
+          <line class="grid" x1="44" x2="548" y1="16" y2="16"/><line class="grid" x1="44" x2="548" y1="92" y2="92"/><line class="grid" x1="44" x2="548" y1="168" y2="168"/>
+          <text class="axis" x="36" y="20" text-anchor="end">100</text><text class="axis" x="36" y="96" text-anchor="end">80</text><text class="axis" x="36" y="172" text-anchor="end">60</text>
+          <line class="goal" x1="44" x2="548" y1="54" y2="54"/><text class="goal-label" x="50" y="47">Ziel 90</text>
+          <path class="line" d="M44,130 L89.8,126.2 L135.6,118.6 L181.5,114.8 L227.3,103.4 L273.1,95.8 L318.9,92 L364.7,80.6 L410.5,73 L456.4,65.4 L502.2,57.8 L548,50.2"/>
+          <circle class="start" cx="44" cy="130" r="4"/><text class="axis" x="52" y="148">70</text>
+          <circle class="end" cx="548" cy="50.2" r="6"/>
+          <text class="axis" x="44" y="190">KW 30</text><text class="axis" x="273.1" y="190" text-anchor="middle">KW 35</text><text class="axis" x="548" y="190" text-anchor="end">KW 41</text>
+        </svg>
+        <p class="alert"><svg class="i"><use href="#i-bell"/></svg><span><b>Neu seit gestern:</b> 2 defekte Links auf /speisekarte</span></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section cw-peach" id="warum">
+    <div class="section-head"><p class="eyebrow">Warum Pixelkiez</p><h2 class="h2">Gebaut von Leuten, die täglich Websites bauen.</h2></div>
+    <div class="why">
+      <div class="why-item"><h3>Klartext statt Fachbegriffe</h3><p>Jede Aufgabe ist so formuliert, dass Sie sie verstehen und direkt weitergeben können.</p></div>
+      <div class="why-item"><h3>Aus der Praxis in Berlin</h3><p>Hinter der Analyse steht das Pixelkiez-Team, das Websites für den Mittelstand plant, baut und betreut.</p></div>
+      <div class="why-item"><h3>Datenschutz aus Deutschland</h3><p>Server in Deutschland, keine Speicherung von Besucherdaten, Vertrag zur Auftragsverarbeitung inklusive.</p></div>
+      <div class="why-item"><h3>Bereit für BFSG und KI-Suche</h3><p>Wir prüfen auch, was viele Tools auslassen: Barrierefreiheit und Sichtbarkeit in KI-Antworten.</p></div>
+    </div>
+    <div class="crosssell"><p><b>Keine Zeit für die Umsetzung?</b> Pixelkiez behebt die Probleme für Sie, zum Festpreis.</p><a class="btn btn--ghost btn--sm" href="https://pixelkiez.de/">Umsetzung anfragen <svg class="i"><use href="#i-arrow"/></svg></a></div>
+  </section>
+
+  <section class="section cw-grey" id="preise">
+    <div class="section-head"><p class="eyebrow">Preise</p><h2 class="h2">Kostenlos starten. Erweitern, wenn Sie mehr brauchen.</h2></div>
+    <div class="plans">
+      <article class="plan">
+        <div class="plan-name">Check</div>
+        <div class="price"><b class="num">0 €</b></div>
+        <p>Der Schnellcheck für eine Adresse.</p>
+        <ul><li><svg class="i"><use href="#i-check"/></svg>Score und fünf Bereiche</li><li><svg class="i"><use href="#i-check"/></svg>Die drei wichtigsten Probleme</li><li><svg class="i"><use href="#i-check"/></svg>Eine Analyse pro Tag</li></ul>
+        <a class="btn btn--ghost btn--block" href="#top">Kostenlos analysieren</a>
+      </article>
+      <article class="plan plan--featured">
+        <div class="plan-name">Pro <em>Empfohlen</em></div>
+        <div class="price"><b class="num">29 €</b><span>pro Monat</span></div>
+        <p>Für Ihre eigene Website.</p>
+        <ul><li><svg class="i"><use href="#i-check"/></svg>Vollständiger Report als PDF</li><li><svg class="i"><use href="#i-check"/></svg>Wöchentliche Prüfung mit Verlauf</li><li><svg class="i"><use href="#i-check"/></svg>E-Mail bei neuen Fehlern</li><li><svg class="i"><use href="#i-check"/></svg>Bis 500 Seiten</li></ul>
+        <a class="btn btn--accent btn--block" href="#">14 Tage kostenlos testen</a>
+      </article>
+      <article class="plan">
+        <div class="plan-name">Agentur</div>
+        <div class="price"><b class="num">99 €</b><span>pro Monat</span></div>
+        <p>Für mehrere Kundenprojekte.</p>
+        <ul><li><svg class="i"><use href="#i-check"/></svg>Bis zu 10 Domains</li><li><svg class="i"><use href="#i-check"/></svg>Reports mit Ihrem Logo</li><li><svg class="i"><use href="#i-check"/></svg>Team-Zugänge</li></ul>
+        <a class="btn btn--ghost btn--block" href="#">Gespräch vereinbaren</a>
+      </article>
+    </div>
+    <p class="note">Entwurf: Preise und Beispielwerte sind Platzhalter.</p>
+  </section>
+
+  <section class="section cw-white" id="faq">
+    <div class="faq-grid">
+      <div class="section-head"><p class="eyebrow">Fragen</p><h2 class="h2">Gut zu wissen.</h2></div>
+      <div class="faq">
+        <details><summary>Brauchen Sie Zugriff auf meine Website?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Nein. Wir prüfen alles, was öffentlich erreichbar ist, so wie eine Suchmaschine. Sie installieren nichts und teilen keine Zugangsdaten.</p></details>
+        <details><summary>Welche Websites kann ich prüfen?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Jede öffentlich erreichbare Website, egal ob WordPress, Shopify, Wix, Webflow oder eine eigene Lösung.</p></details>
+        <details><summary>Wie entsteht der Score?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Jeder Bereich wird aus einzelnen Prüfungen berechnet und nach Wirkung gewichtet. Ein kritischer Fehler zählt mehr als viele kleine Hinweise. Ab 90 Punkten gilt ein Bereich als gut.</p></details>
+        <details><summary>Wie oft kann ich kostenlos prüfen?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Einmal pro Tag und Adresse. Mit Pro prüfen wir automatisch jede Woche, und Sie können jederzeit selbst neu prüfen.</p></details>
+        <details><summary>Ist die Analyse DSGVO-konform?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Ja. Die Analyse läuft auf Servern in Deutschland, und wir speichern keine personenbezogenen Daten Ihrer Besucher.</p></details>
+        <details><summary>Kann ich Pro jederzeit kündigen?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Ja, Pro und Agentur sind monatlich kündbar. Ihre Reports können Sie vorher als PDF herunterladen.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="tools">
+    <div class="section-head"><p class="eyebrow">Weitere kostenlose Checks</p><h2 class="h2">Einzelne Fragen schnell beantworten.</h2></div>
+    <div class="tools">
+      <a class="tool" href="#"><span><b>Ladezeit-Test</b>Wie schnell lädt meine Seite?</span><svg class="i"><use href="#i-arrow"/></svg></a>
+      <a class="tool" href="#"><span><b>Meta-Tag-Check</b>Wie sieht mein Google-Snippet aus?</span><svg class="i"><use href="#i-arrow"/></svg></a>
+      <a class="tool" href="#"><span><b>Kontrast-Check</b>Sind meine Farben gut lesbar?</span><svg class="i"><use href="#i-arrow"/></svg></a>
+      <a class="tool" href="#"><span><b>Cookie-Check</b>Was lädt vor der Einwilligung?</span><svg class="i"><use href="#i-arrow"/></svg></a>
+      <a class="tool" href="#"><span><b>Link-Check</b>Gibt es defekte Links?</span><svg class="i"><use href="#i-arrow"/></svg></a>
+      <a class="tool" href="#"><span><b>KI-Sichtbarkeits-Check</b>Kennt ChatGPT meine Seite?</span><svg class="i"><use href="#i-arrow"/></svg></a>
+    </div>
+  </section>
+
+  <section class="section closing cw-lilac">
+    <h2 class="h2">Bereit für den Check?</h2>
+    <button class="btn btn--accent" type="button" id="to-top">Website jetzt prüfen <svg class="i"><use href="#i-arrow"/></svg></button>
+  </section>
+
+  <footer class="cw-lilac">
+    <div class="footer-cols">
+      <div class="footer-brand"><a class="logo" href="#top">Pixelkiez<span>Analyse</span></a><p>Website-Analyse aus Berlin. Ein Produkt von Pixelkiez.</p></div>
+      <div><h4>Produkt</h4><ul><li><a href="#report">Report</a></li><li><a href="#pruefungen">Prüfungen</a></li><li><a href="#pro">Pro</a></li><li><a href="#preise">Preise</a></li></ul></div>
+      <div><h4>Kostenlose Checks</h4><ul><li><a href="#tools">Ladezeit-Test</a></li><li><a href="#tools">Meta-Tag-Check</a></li><li><a href="#tools">Kontrast-Check</a></li><li><a href="#tools">Cookie-Check</a></li></ul></div>
+      <div><h4>Pixelkiez</h4><ul><li><a href="https://pixelkiez.de/">Webdesign Berlin</a></li><li><a href="https://pixelkiez.de/">Umsetzung anfragen</a></li><li><a href="#">Kontakt</a></li></ul></div>
+    </div>
+    <div class="footer">
+      <span>© 2026 Pixelkiez · Webdesign Berlin</span>
+      <nav aria-label="Rechtliches"><a href="#">Impressum</a><a href="#">Datenschutz</a><a href="#">AGB</a></nav>
+    </div>
+  </footer>
+</main>
+
+<script src="assets/app.js"></script>

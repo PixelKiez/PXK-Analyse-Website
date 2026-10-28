@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pixelkiez Analyse</title>
+<meta name="description" content="Kostenlose Website-Analyse von Pixelkiez: Ladezeit, SEO, Barrierefreiheit, Datenschutz und KI-Sichtbarkeit in 30 Sekunden geprüft, mit klaren Aufgaben nach Wirkung sortiert.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Pixelkiez Analyse – Vision-Entwurf v2: hell und minimal. Farben und Schriften von pixelkiez.de */
+/* Layout: zentrierter Hero nur mit URL-Eingabe, darunter wenige ruhige Abschnitte in einem Haarlinien-Rahmen (Pixelkiez-Raster) */
+:root {
+  color-scheme: light;
+  --paper: #EFF0F1; --paper-2: #E6E7E9; --surface: #FFFFFF;
+  --ink: #0C0C0C; --ink-70: #2F3032; --ink-45: #646568;
+  --line: #C3C4C8; --line-soft: #D3D4D7;
+  --accent: #FE5B2A; --accent-hover: #E75326; --accent-text: #E75326; --accent-soft: #FFE6DD;
+  --good: #1E9E5A; --warn: #E8A317; --bad: #D92D20;
+  --font-sans: "Archivo", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", Menlo, monospace;
+  --r-pill: 999px; --r-card: 16px;
+  --section-y: clamp(72px, 10vw, 128px); --frame: 1280px; --gutter: clamp(16px, 4vw, 48px);
+  --ease: cubic-bezier(.23, 1, .32, 1);
+}
+
+/* Base */
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 400 17px/1.6 var(--font-sans); -webkit-font-smoothing: antialiased; }
+h1, h2, h3, p { margin: 0; }
+h1, h2, h3 { font-weight: 500; text-wrap: balance; }
+a { color: inherit; text-decoration: none; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 6px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--font-mono); }
+svg.i { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+.frame { max-width: var(--frame); margin-inline: auto; border-inline: 1px solid var(--line-soft); }
+@media (max-width: 1320px) { .frame { border-inline: 0; } }
+.section { padding: var(--section-y) var(--gutter); border-top: 1px solid var(--line-soft); }
+.eyebrow { font: 500 12px/1.4 var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-45); }
+.h2 { font-size: clamp(32px, 4.2vw, 52px); line-height: 1.05; letter-spacing: -.035em; }
+.text { color: var(--ink-45); max-width: 52ch; }
+.section-head { display: grid; gap: 16px; align-content: start; max-width: 720px; margin-bottom: clamp(40px, 5vw, 64px); }
+.faq-grid .section-head { margin-bottom: 0; }
+
+/* Farbflächen pro Abschnitt (Pixelkiez-Palette), Wechsel wie bei Sphere */
+.cw-white { background: var(--surface); }
+.cw-grey { background: var(--paper-2); }
+.cw-peach { background: var(--accent-soft); --line-soft: #F5CDBF; --line: #E9B4A2; --accent-text: #B4411E; }
+.cw-lilac { background: #EBE2FC; --line-soft: #D9CCF6; --line: #C8B5F0; --accent-text: #5B3FA6; }
+
+/* Navigation */
+.nav-wrap { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 14px); z-index: 50; padding-inline: var(--gutter); margin-top: 14px; }
+.nav { display: flex; align-items: center; gap: 24px; max-width: 1080px; margin-inline: auto; padding: 8px 8px 8px 24px; background: rgb(255 255 255 / .72); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); border: 1px solid var(--line-soft); border-radius: var(--r-pill); transition: max-width .3s var(--ease), padding .3s var(--ease); }
+.nav-wrap.is-scrolled .nav { max-width: 880px; padding-block: 5px; }
+.logo { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 600; letter-spacing: -.04em; }
+.logo span { padding-left: 10px; border-left: 1px solid var(--line); font: 500 12px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-45); }
+.nav-links { display: flex; gap: 2px; margin-inline: auto; }
+.nav-links a { padding: 8px 14px; border-radius: var(--r-pill); font-size: 15px; color: var(--ink-70); transition: background .2s; }
+.nav-links a:hover { background: var(--paper); }
+@media (max-width: 760px) { .nav-links { display: none; } .nav .btn { margin-left: auto; } }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 48px; padding: 0 22px; border: 1px solid transparent; border-radius: var(--r-pill); font-size: 15px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background .2s, border-color .2s, color .2s; }
+.btn svg { width: 16px; height: 16px; transition: transform .2s var(--ease); }
+.btn:hover svg { transform: translateX(3px); }
+.btn--accent { background: var(--accent); color: #0C0C0C; }
+.btn--accent:hover { background: var(--accent-hover); }
+.btn--ink { background: var(--ink); color: var(--paper); }
+.btn--ink:hover { background: var(--ink-70); }
+.btn--ghost { border-color: var(--line); background: transparent; }
+.btn--ghost:hover { border-color: var(--ink); }
+.btn--sm { height: 40px; padding: 0 18px; font-size: 14px; }
+.btn--block { width: 100%; }
+
+/* Hero */
+.hero { position: relative; display: grid; justify-items: center; gap: 28px; padding: clamp(96px, 14vw, 176px) var(--gutter) clamp(88px, 12vw, 152px); text-align: center; }
+.hero::before { content: ""; position: absolute; inset: 0; background: radial-gradient(42% 62% at 30% 0%, rgb(255 230 221 / .95), transparent 72%), radial-gradient(42% 62% at 70% 0%, rgb(235 226 252 / .95), transparent 72%); pointer-events: none; }
+.hero > * { position: relative; }
+.badge { display: inline-flex; align-items: center; gap: 10px; padding: 7px 14px; border: 1px solid var(--line-soft); border-radius: var(--r-pill); background: var(--surface); font: 500 12px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-70); }
+.pixel { width: 8px; height: 8px; background: var(--accent); animation: blink 2.4s steps(1) infinite; }
+@keyframes blink { 50% { opacity: .25; } }
+.h1 { max-width: 13ch; font-size: clamp(46px, 7.4vw, 104px); line-height: .98; letter-spacing: -.05em; }
+.h1 em { font-style: normal; color: var(--accent-text); }
+.hero .lead { max-width: 46ch; font-size: clamp(18px, 1.7vw, 21px); line-height: 1.5; color: var(--ink-45); }
+
+/* URL-Eingabe */
+.analyze { display: grid; gap: 14px; justify-items: center; width: 100%; max-width: 640px; margin-top: 12px; }
+.url-field { display: flex; align-items: center; gap: 12px; width: 100%; height: 68px; padding: 8px 8px 8px 24px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-pill); transition: border-color .2s, box-shadow .2s; }
+.url-field:focus-within { border-color: var(--ink); box-shadow: 0 0 0 5px var(--accent-soft); }
+.url-field > svg { flex: none; width: 20px; height: 20px; color: var(--ink-45); }
+.url-field input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; font-size: 18px; outline: none; }
+.url-field input::placeholder { color: var(--ink-45); }
+.url-field .btn { height: 52px; padding: 0 26px; }
+@media (max-width: 540px) {
+  .url-field { flex-wrap: wrap; height: auto; padding: 8px; border-radius: 30px; }
+  .url-field > svg { margin-left: 14px; }
+  .url-field input { height: 48px; }
+  .url-field .btn { width: 100%; }
+}
+.form-error { font-size: 14px; color: var(--bad); }
+.facts { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 22px; font: 400 13px var(--font-mono); color: var(--ink-45); }
+.facts span { display: inline-flex; align-items: center; gap: 8px; }
+.facts svg { width: 14px; height: 14px; color: var(--ink); }
+
+/* Ergebnis nach Eingabe */
+.result { width: 100%; max-width: 640px; padding: 24px; text-align: left; background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--r-card); animation: rise .5s var(--ease); }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+.result-status { display: flex; justify-content: space-between; gap: 12px; font: 400 13px var(--font-mono); color: var(--ink-70); }
+.progress { height: 3px; margin-top: 14px; border-radius: 2px; background: var(--paper-2); overflow: hidden; }
+.progress i { display: block; width: 0; height: 100%; background: var(--accent); }
+.progress.is-running i { animation: fill 2.2s var(--ease) forwards; }
+@keyframes fill { to { width: 100%; } }
+.result-head { display: flex; align-items: center; gap: 18px; }
+.result-head p { font-size: 18px; font-weight: 500; letter-spacing: -.02em; line-height: 1.3; }
+.result-head small { display: block; font: 400 13px var(--font-mono); color: var(--ink-45); }
+.tag { margin-left: auto; padding: 3px 9px; border-radius: 6px; background: var(--paper); font: 500 11px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-45); }
+.result .issues { margin-top: 18px; }
+.result-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 18px; font-size: 15px; font-weight: 500; }
+.result-link:hover { color: var(--accent-text); }
+
+/* Score-Ring, Balken, Probleme */
+.ring { position: relative; flex: none; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring .track { fill: none; stroke: var(--paper-2); }
+.ring .val { fill: none; stroke: var(--ink); stroke-linecap: round; transition: stroke-dashoffset 1.2s var(--ease); }
+.ring b { position: absolute; inset: 0; display: grid; place-content: center; font-weight: 600; letter-spacing: -.04em; }
+.ring--sm { width: 64px; height: 64px; } .ring--sm b { font-size: 21px; } .ring--sm circle { stroke-width: 6; }
+.ring--lg { width: 132px; height: 132px; } .ring--lg b { font-size: 42px; } .ring--lg circle { stroke-width: 8; }
+.ring b small { font: 400 11px var(--font-mono); letter-spacing: 0; color: var(--ink-45); text-align: center; }
+.issues { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line-soft); }
+.issues li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: baseline; padding: 13px 0; border-bottom: 1px solid var(--line-soft); font-size: 15px; }
+.issues small { font: 400 12px var(--font-mono); color: var(--ink-45); white-space: nowrap; }
+.sev { width: 8px; height: 8px; border-radius: 50%; transform: translateY(-1px); }
+.sev--bad { background: var(--bad); } .sev--warn { background: var(--warn); } .sev--good { background: var(--good); }
+@media (max-width: 480px) { .issues small { display: none; } }
+
+/* Zwei-Spalter (Text + Karte) */
+.split { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: clamp(40px, 6vw, 96px); align-items: center; }
+.split--reverse { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+.split--reverse .split-copy { order: 2; }
+@media (max-width: 960px) { .split, .split--reverse { grid-template-columns: minmax(0, 1fr); } .split--reverse .split-copy { order: 0; } }
+.split-copy { display: grid; gap: 20px; align-content: start; }
+.checklist { display: grid; gap: 12px; margin: 8px 0 0; padding: 0; list-style: none; }
+.checklist li { display: flex; gap: 12px; align-items: baseline; }
+.checklist svg { flex: none; width: 18px; height: 18px; transform: translateY(3px); }
+.card { min-width: 0; padding: clamp(20px, 3vw, 36px); background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--r-card); }
+.card-top { display: flex; align-items: center; gap: 12px; padding-bottom: 20px; border-bottom: 1px solid var(--line-soft); font: 400 13px var(--font-mono); color: var(--ink-70); }
+.score-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 28px; align-items: center; padding: 28px 0; }
+@media (max-width: 520px) { .score-row { grid-template-columns: minmax(0, 1fr); } }
+.score-row h3 { font-size: 22px; letter-spacing: -.02em; line-height: 1.25; }
+.score-row p { margin-top: 6px; font: 400 13px var(--font-mono); color: var(--ink-45); }
+.bars { display: grid; gap: 12px; margin-bottom: 28px; }
+.bar { display: grid; grid-template-columns: 9.5em minmax(0, 1fr) 2.2em 8px; gap: 14px; align-items: center; font-size: 14px; }
+.bar-track { height: 4px; border-radius: 2px; background: var(--paper-2); }
+.bar-track i { display: block; height: 100%; border-radius: 2px; background: var(--ink); }
+.bar b { font-weight: 600; text-align: right; }
+@media (max-width: 480px) { .bar { grid-template-columns: 7.5em minmax(0, 1fr) 2em 8px; gap: 10px; font-size: 13px; } }
+
+/* Ablauf */
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.step { display: grid; gap: 14px; align-content: start; padding: 4px clamp(20px, 3vw, 40px); border-left: 1px solid var(--line-soft); }
+.step:first-child { padding-left: 0; border-left: 0; }
+.step span { font: 500 13px var(--font-mono); color: var(--accent-text); }
+.step h3 { font-size: 24px; letter-spacing: -.025em; }
+.step p { color: var(--ink-45); }
+@media (max-width: 860px) {
+  .steps { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+  .step { padding: 24px 0 0; border-left: 0; border-top: 1px solid var(--line-soft); }
+  .step:first-child { padding-top: 0; border-top: 0; }
+}
+
+/* Prüfbereiche */
+.spec { border-bottom: 1px solid var(--line-soft); }
+.spec-row { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 5fr) minmax(0, 4fr); gap: clamp(20px, 3vw, 40px); align-items: start; padding: 28px 0; border-top: 1px solid var(--line-soft); }
+.spec-row h3 { font-size: 22px; letter-spacing: -.02em; line-height: 1.25; }
+.spec-row p { color: var(--ink-45); }
+.count { display: block; margin-top: 6px; font: 400 12px var(--font-mono); color: var(--ink-45); }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.pills span { padding: 4px 11px; border: 1px solid var(--line); border-radius: var(--r-pill); font: 400 12px var(--font-mono); color: var(--ink-70); white-space: nowrap; }
+@media (max-width: 860px) { .spec-row { grid-template-columns: minmax(0, 1fr); gap: 12px; } }
+
+/* Report nutzen */
+.uses { display: grid; margin-top: 8px; border-bottom: 1px solid var(--line-soft); }
+.use { display: grid; grid-template-columns: 2.5em minmax(0, 1fr); gap: 12px; padding: 20px 0; border-top: 1px solid var(--line-soft); }
+.use > span { font: 500 13px/1.9 var(--font-mono); color: var(--accent-text); }
+.use h3 { font-size: 19px; letter-spacing: -.015em; }
+.use p { margin-top: 4px; font-size: 15px; color: var(--ink-45); }
+.detail h3 { margin: 18px 0 8px; font-size: 24px; letter-spacing: -.025em; line-height: 1.2; }
+.detail-top { display: flex; align-items: center; gap: 10px; font: 500 12px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-70); }
+.detail dl { margin: 0; }
+.detail dl div { display: grid; grid-template-columns: 8.5em minmax(0, 1fr); gap: 16px; padding: 14px 0; border-top: 1px solid var(--line-soft); }
+.detail dt { font: 400 12px/1.9 var(--font-mono); color: var(--ink-45); }
+.detail dd { margin: 0; font-size: 15px; }
+.detail dd.mono { font-size: 13px; }
+@media (max-width: 480px) { .detail dl div { grid-template-columns: minmax(0, 1fr); gap: 2px; } }
+
+/* Pro */
+.pro-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: clamp(32px, 5vw, 72px); align-items: start; }
+@media (max-width: 960px) { .pro-grid { grid-template-columns: minmax(0, 1fr); } }
+.table-wrap { display: grid; gap: 28px; justify-items: start; overflow-x: auto; }
+.ctable { width: 100%; border-collapse: collapse; font-size: 15px; }
+.ctable th { padding: 0 0 12px; font: 500 12px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-45); text-align: left; }
+.ctable td { padding: 13px 0; border-top: 1px solid var(--line); }
+.ctable th + th, .ctable td + td { width: 5.5em; text-align: center; }
+.ctable td + td { color: var(--ink-45); }
+.ctable td:last-child { color: var(--ink); font-weight: 500; }
+.ctable svg { width: 17px; height: 17px; vertical-align: -3px; color: var(--ink); }
+.chart-card .card-top { padding-bottom: 16px; }
+.chart-kpi { display: flex; align-items: baseline; gap: 12px; padding: 20px 0 8px; }
+.chart-kpi b { font-size: 44px; font-weight: 600; letter-spacing: -.04em; line-height: 1; }
+.chart-kpi span { font: 400 13px var(--font-mono); color: var(--good); }
+.chart { display: block; width: 100%; height: auto; }
+.chart .grid { stroke: var(--line-soft); stroke-width: 1; }
+.chart .axis { fill: var(--ink-45); font: 400 11px var(--font-mono); }
+.chart .goal { stroke: var(--good); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.chart .goal-label { fill: var(--good); font: 500 11px var(--font-mono); }
+.chart .line { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .start { fill: var(--ink); }
+.chart .end { fill: var(--accent); stroke: var(--surface); stroke-width: 3; }
+.alert { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 14px 16px; border-radius: 12px; background: var(--paper); font-size: 14px; color: var(--ink-70); }
+.alert svg { flex: none; width: 18px; height: 18px; color: var(--ink); }
+.alert b { color: var(--ink); font-weight: 600; }
+
+/* Zielgruppen, Gründe, Querverweis */
+.hint { margin-top: 4px; font: 400 12px var(--font-mono); color: var(--ink-45); }
+.why { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: clamp(32px, 6vw, 96px); border-bottom: 1px solid var(--line-soft); }
+@media (max-width: 760px) { .why { grid-template-columns: minmax(0, 1fr); } }
+.why-item { display: grid; gap: 8px; align-content: start; padding: 28px 0; border-top: 1px solid var(--line-soft); }
+.why-item h3 { font-size: 21px; letter-spacing: -.02em; }
+.why-item p { color: var(--ink-45); }
+.crosssell { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-top: 40px; padding: 20px 24px; background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--r-card); }
+.crosssell p { color: var(--ink-45); }
+.crosssell b { color: var(--ink); font-weight: 600; }
+
+/* Weitere Checks */
+.tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: clamp(24px, 4vw, 48px); }
+@media (max-width: 960px) { .tools { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .tools { grid-template-columns: minmax(0, 1fr); } }
+.tool { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px 0; border-top: 1px solid var(--line-soft); }
+.tool span { display: grid; gap: 2px; font-size: 15px; color: var(--ink-45); }
+.tool b { font-size: 17px; font-weight: 500; color: var(--ink); }
+.tool svg { flex: none; width: 18px; height: 18px; transition: transform .2s var(--ease), color .2s; }
+.tool:hover svg { transform: translateX(4px); color: var(--accent-text); }
+
+/* Preise */
+.plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 960px) { .plans { grid-template-columns: minmax(0, 1fr); max-width: 480px; } }
+.plan { display: grid; grid-template-rows: auto auto auto 1fr auto; gap: 18px; padding: 32px; background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--r-card); }
+.plan--featured { border: 1.5px solid var(--ink); }
+.plan-name { display: flex; justify-content: space-between; align-items: center; font-size: 17px; font-weight: 600; }
+.plan-name em { padding: 3px 10px; border-radius: var(--r-pill); background: var(--accent); font: 500 11px var(--font-mono); font-style: normal; letter-spacing: .08em; text-transform: uppercase; color: #0C0C0C; }
+.price { display: flex; align-items: baseline; gap: 8px; }
+.price b { font-size: 48px; font-weight: 500; letter-spacing: -.045em; line-height: 1; }
+.price span, .plan > p { font-size: 15px; color: var(--ink-45); }
+.plan ul { display: grid; gap: 10px; align-content: start; margin: 0; padding: 18px 0 0; list-style: none; border-top: 1px solid var(--line-soft); font-size: 15px; }
+.plan li { display: flex; gap: 10px; }
+.plan li svg { flex: none; width: 17px; height: 17px; margin-top: 4px; }
+.note { margin-top: 24px; font: 400 13px var(--font-mono); color: var(--ink-45); }
+
+/* FAQ */
+.faq-grid { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: clamp(32px, 6vw, 96px); }
+@media (max-width: 860px) { .faq-grid { grid-template-columns: minmax(0, 1fr); } }
+.faq { border-top: 1px solid var(--line-soft); }
+.faq details { border-bottom: 1px solid var(--line-soft); }
+.faq summary { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 22px 0; list-style: none; font-size: 19px; font-weight: 500; letter-spacing: -.015em; cursor: pointer; }
+.faq summary::-webkit-details-marker { display: none; }
+.plus { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 50%; transition: transform .4s var(--ease), border-color .2s; }
+.faq summary:hover .plus { border-color: var(--ink); }
+.plus svg { width: 14px; height: 14px; }
+.faq details[open] .plus { transform: rotate(45deg); }
+.faq details p { max-width: 62ch; padding: 0 56px 24px 0; color: var(--ink-45); }
+@media (max-width: 520px) { .faq details p { padding-right: 0; } }
+
+/* Abschluss + Footer */
+.closing { display: grid; justify-items: center; gap: 24px; text-align: center; }
+.footer-cols { display: grid; grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr)); gap: 32px; padding: clamp(56px, 7vw, 88px) var(--gutter) 48px; border-top: 1px solid var(--line-soft); }
+@media (max-width: 860px) { .footer-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); } .footer-brand { grid-column: 1 / -1; } }
+.footer-brand { display: grid; gap: 14px; align-content: start; }
+.footer-brand p { max-width: 30ch; font-size: 15px; color: var(--ink-45); }
+.footer-cols h4 { margin: 0 0 14px; font: 500 12px var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-45); }
+.footer-cols ul { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; font-size: 15px; }
+.footer-cols a:hover, .footer a:hover { color: var(--accent-text); }
+.footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 32px; padding: 24px var(--gutter) 32px; border-top: 1px solid var(--line-soft); font-size: 14px; color: var(--ink-45); }
+.footer nav { display: flex; flex-wrap: wrap; gap: 24px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+</style>
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebApplication","name":"Pixelkiez Analyse","applicationCategory":"BusinessApplication","operatingSystem":"Web","inLanguage":"de","offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"},"publisher":{"@type":"Organization","name":"Pixelkiez","url":"https://pixelkiez.de/"}},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Brauchen Sie Zugriff auf meine Website?","acceptedAnswer":{"@type":"Answer","text":"Nein. Wir prüfen alles, was öffentlich erreichbar ist, so wie eine Suchmaschine."}},{"@type":"Question","name":"Ist die Analyse DSGVO-konform?","acceptedAnswer":{"@type":"Answer","text":"Ja. Die Analyse läuft auf Servern in Deutschland, und wir speichern keine personenbezogenen Daten Ihrer Besucher."}}]}]}</script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+</svg>
+
+<header class="nav-wrap" id="nav">
+  <nav class="nav" aria-label="Hauptnavigation">
+    <a class="logo" href="#top">Pixelkiez<span>Analyse</span></a>
+    <div class="nav-links">
+      <a href="#report">Report</a>
+      <a href="#pruefungen">Prüfungen</a>
+      <a href="#pro">Pro</a>
+      <a href="#preise">Preise</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <a class="btn btn--ghost btn--sm" href="#">Anmelden</a>
+  </nav>
+</header>
+
+<main class="frame" id="top">
+  <section class="hero">
+    <span class="badge"><span class="pixel" aria-hidden="true"></span>Kostenlose Website-Analyse</span>
+    <h1 class="h1">Sehen Sie, was Ihre Website <em>ausbremst</em>.</h1>
+    <p class="lead">Geben Sie Ihre Adresse ein. Wir prüfen Ladezeit, SEO, Barrierefreiheit und Datenschutz und zeigen, was Sie zuerst beheben sollten.</p>
+    <form class="analyze" id="analyze" novalidate>
+      <label class="sr-only" for="url">Adresse Ihrer Website</label>
+      <div class="url-field">
+        <svg class="i"><use href="#i-globe"/></svg>
+        <input id="url" name="url" type="text" inputmode="url" autocomplete="url" placeholder="ihre-website.de">
+        <button class="btn btn--accent" type="submit">Analysieren <svg class="i"><use href="#i-arrow"/></svg></button>
+      </div>
+      <p class="form-error" id="url-error" hidden>Bitte geben Sie eine Adresse wie beispiel.de ein.</p>
+      <div class="facts">
+        <span><svg class="i"><use href="#i-check"/></svg>Kostenlos</span>
+        <span><svg class="i"><use href="#i-check"/></svg>Ohne Anmeldung</span>
+        <span><svg class="i"><use href="#i-check"/></svg>Ergebnis in 30 Sekunden</span>
+      </div>
+    </form>
+
+    <div class="result" id="result" hidden aria-live="polite">
+      <div id="result-loading">
+        <div class="result-status"><span id="result-phase">Seiten werden gecrawlt …</span><span id="result-domain-loading"></span></div>
+        <div class="progress" id="progress"><i></i></div>
+      </div>
+      <div id="result-body" hidden>
+        <div class="result-head">
+          <div class="ring ring--sm"><svg viewBox="0 0 64 64" aria-hidden="true"><circle class="track" cx="32" cy="32" r="28"/><circle class="val" id="result-ring" cx="32" cy="32" r="28" stroke-dasharray="175.93" stroke-dashoffset="175.93"/></svg><b class="num" id="result-score">0</b></div>
+          <div><small id="result-domain">kiez-kaffee.de</small><p id="result-verdict">Solide Basis mit Baustellen</p></div>
+          <span class="tag">Demo</span>
+        </div>
+        <ul class="issues">
+          <li><span class="sev sev--bad"></span><span>Großes Titelbild verzögert den Seitenaufbau</span><small id="result-lcp">LCP 4,1 s</small></li>
+          <li><span class="sev sev--bad"></span><span>Google Fonts werden ohne Einwilligung geladen</span><small>DSGVO</small></li>
+          <li><span class="sev sev--warn"></span><span id="result-meta">14 Seiten ohne Meta-Beschreibung</span><small>SEO</small></li>
+        </ul>
+        <a class="result-link" href="#report">So sieht der vollständige Report aus <svg class="i" width="16" height="16"><use href="#i-down"/></svg></a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section cw-peach" id="ablauf">
+    <div class="section-head"><p class="eyebrow">So funktioniert's</p><h2 class="h2">In drei Schritten zur To-do-Liste.</h2></div>
+    <div class="steps">
+      <div class="step"><span>01</span><h3>Adresse eingeben</h3><p>Eine URL genügt. Unterseiten und Sitemap finden wir selbst.</p></div>
+      <div class="step"><span>02</span><h3>Automatisch prüfen</h3><p>112 Prüfpunkte laufen parallel, in rund 30 Sekunden.</p></div>
+      <div class="step"><span>03</span><h3>Gezielt beheben</h3><p>Sie arbeiten die Liste von oben ab, sortiert nach Wirkung.</p></div>
+    </div>
+  </section>
+
+  <section class="section cw-white" id="report">
+    <div class="split">
+      <div class="split-copy">
+        <p class="eyebrow">Ihr Report</p>
+        <h2 class="h2">Ein Score. Klare Prioritäten.</h2>
+        <p class="text">Die Pixelkiez Analyse prüft Ihre Website so, wie Google, KI-Suchen und Ihre Besucher sie erleben. Sie sehen auf einen Blick, wo Ihre Seite steht und welche Probleme den größten Effekt haben.</p>
+        <ul class="checklist">
+          <li><svg class="i"><use href="#i-check"/></svg>Gesamt-Score von 0 bis 100</li>
+          <li><svg class="i"><use href="#i-check"/></svg>Fünf Einzelbereiche mit eigener Bewertung</li>
+          <li><svg class="i"><use href="#i-check"/></svg>Die wichtigsten Probleme zuerst</li>
+          <li><svg class="i"><use href="#i-check"/></svg>Vergleich mit Websites Ihrer Branche</li>
+        </ul>
+      </div>
+      <div class="card" aria-label="Beispiel-Report">
+        <div class="card-top"><span>kiez-kaffee.de</span><span class="tag">Beispiel</span></div>
+        <div class="score-row">
+          <div class="ring ring--lg"><svg viewBox="0 0 132 132" aria-hidden="true"><circle class="track" cx="66" cy="66" r="60"/><circle class="val" cx="66" cy="66" r="60" stroke-dasharray="376.99" stroke-dashoffset="113.1"/></svg><b class="num">70<small>von 100</small></b></div>
+          <div><h3>Solide Basis mit vier Baustellen</h3><p>48 Seiten · 112 Prüfungen · Branche Top 10 %: 91</p></div>
+        </div>
+        <div class="bars">
+          <div class="bar"><span>Performance</span><span class="bar-track"><i style="width:68%"></i></span><b class="num">68</b><span class="sev sev--warn"></span></div>
+          <div class="bar"><span>SEO</span><span class="bar-track"><i style="width:84%"></i></span><b class="num">84</b><span class="sev sev--warn"></span></div>
+          <div class="bar"><span>Barrierefreiheit</span><span class="bar-track"><i style="width:61%"></i></span><b class="num">61</b><span class="sev sev--warn"></span></div>
+          <div class="bar"><span>Datenschutz</span><span class="bar-track"><i style="width:94%"></i></span><b class="num">94</b><span class="sev sev--good"></span></div>
+          <div class="bar"><span>KI-Sichtbarkeit</span><span class="bar-track"><i style="width:43%"></i></span><b class="num">43</b><span class="sev sev--bad"></span></div>
+        </div>
+        <p class="eyebrow" style="margin-bottom:10px">Zuerst beheben</p>
+        <ul class="issues">
+          <li><span class="sev sev--bad"></span><span>Titelbild komprimieren</span><small>spart 1,4 s</small></li>
+          <li><span class="sev sev--bad"></span><span>Schriften lokal einbinden</span><small>DSGVO</small></li>
+          <li><span class="sev sev--warn"></span><span>Kontrast im Footer erhöhen</span><small>3,1 : 1 → 4,5 : 1</small></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="pruefungen">
+    <div class="section-head"><p class="eyebrow">Was wir prüfen</p><h2 class="h2">112 Prüfpunkte in fünf Bereichen.</h2><p class="text">Jeder Bereich bekommt eine eigene Bewertung. So sehen Sie, wo der größte Hebel liegt.</p></div>
+    <div class="spec">
+      <div class="spec-row"><div><h3>Performance</h3><span class="count">24 Prüfungen</span></div><p>Wie schnell Ihre Seiten auf dem Smartphone laden und reagieren. Wir finden die Bilder, Skripte und Schriften, die bremsen.</p><div class="pills"><span>LCP ≤ 2,5 s</span><span>INP ≤ 200 ms</span><span>CLS ≤ 0,1</span><span>Bildgrößen</span><span>Caching</span></div></div>
+      <div class="spec-row"><div><h3>SEO</h3><span class="count">31 Prüfungen</span></div><p>Ob Google Ihre Seiten findet, richtig versteht und gern anzeigt. Dazu gehören Indexierung, Titel, Beschreibungen und Links.</p><div class="pills"><span>Title &amp; Description</span><span>H1-Struktur</span><span>Canonicals</span><span>defekte Links</span><span>Sitemap</span></div></div>
+      <div class="spec-row"><div><h3>Barrierefreiheit</h3><span class="count">22 Prüfungen</span></div><p>Ob alle Menschen Ihre Website bedienen können, auch mit Screenreader oder nur per Tastatur. Wichtig für das Barrierefreiheitsstärkungsgesetz (BFSG).</p><div class="pills"><span>Kontrast ≥ 4,5 : 1</span><span>Alt-Texte</span><span>Formular-Labels</span><span>Tastatur-Fokus</span></div></div>
+      <div class="spec-row"><div><h3>Datenschutz &amp; Sicherheit</h3><span class="count">19 Prüfungen</span></div><p>Welche Drittanbieter vor der Einwilligung laden und ob Ihre Seite technisch abgesichert ist.</p><div class="pills"><span>Cookies vor Consent</span><span>externe Schriften</span><span>HTTPS</span><span>Security-Header</span></div></div>
+      <div class="spec-row"><div><h3>KI-Sichtbarkeit</h3><span class="count">16 Prüfungen</span></div><p>Ob ChatGPT, Perplexity und die KI-Antworten von Google Ihre Inhalte lesen und als Quelle nennen können.</p><div class="pills"><span>strukturierte Daten</span><span>llms.txt</span><span>Crawler-Zugriff</span><span>klare Antworten</span></div></div>
+    </div>
+  </section>
+
+  <section class="section cw-lilac" id="nutzen">
+    <div class="split split--reverse">
+      <div class="split-copy">
+        <p class="eyebrow">So nutzen Sie den Report</p>
+        <h2 class="h2">Jede Aufgabe erklärt, mit fertiger Lösung.</h2>
+        <div class="uses">
+          <div class="use"><span>01</span><div><h3>Mit den roten Punkten beginnen</h3><p>Kritische Probleme kosten Sie am meisten Besucher, Rankings oder Vertrauen.</p></div></div>
+          <div class="use"><span>02</span><div><h3>Aufgaben weitergeben</h3><p>Jede Aufgabe lässt sich als Link oder PDF an Ihre Agentur oder IT senden.</p></div></div>
+          <div class="use"><span>03</span><div><h3>Erneut prüfen</h3><p>Nach jeder Änderung zeigt ein neuer Check, ob Ihr Score steigt.</p></div></div>
+        </div>
+      </div>
+      <article class="card detail" aria-label="Beispiel einer Aufgabe im Report">
+        <div class="detail-top"><span class="sev sev--bad"></span><span>Kritisch</span><span class="tag">Performance</span></div>
+        <h3>Titelbild verzögert den Seitenaufbau</h3>
+        <dl>
+          <div><dt>Problem</dt><dd>Das Titelbild der Startseite ist 2,4 MB groß. Der wichtigste Inhalt erscheint erst nach 4,1 Sekunden.</dd></div>
+          <div><dt>Warum wichtig</dt><dd>Ab 2,5 Sekunden springen deutlich mehr Besucher ab, und Google bewertet die Seite schlechter.</dd></div>
+          <div><dt>Lösung</dt><dd>Bild auf 1.600 px Breite verkleinern, als WebP speichern und bevorzugt laden.</dd></div>
+          <div><dt>Betroffen</dt><dd class="mono">/ · /speisekarte · /kontakt</dd></div>
+          <div><dt>Aufwand</dt><dd>ca. 15 Minuten · spart 1,4 s</dd></div>
+        </dl>
+      </article>
+    </div>
+  </section>
+
+  <section class="section" id="fuer-wen">
+    <div class="section-head"><p class="eyebrow">Für wen</p><h2 class="h2">Für alle, die eine Website verantworten.</h2></div>
+    <div class="steps">
+      <div class="step"><h3>Unternehmen &amp; Selbstständige</h3><p>Sie wollen wissen, ob Ihre Website ihren Job macht, ohne Fachwissen. Der Report erklärt jedes Problem in Klartext.</p><small class="hint">Passend: Check oder Pro</small></div>
+      <div class="step"><h3>Marketing-Teams</h3><p>Sie brauchen Prioritäten für die nächsten Wochen und einen Verlauf, der den Fortschritt belegt.</p><small class="hint">Passend: Pro</small></div>
+      <div class="step"><h3>Agenturen</h3><p>Sie prüfen Kundenseiten vor dem Pitch oder nach dem Launch und geben Reports mit Ihrem Logo weiter.</p><small class="hint">Passend: Agentur</small></div>
+    </div>
+  </section>
+
+  <section class="section cw-lilac" id="pro">
+    <div class="section-head"><p class="eyebrow">Gratis-Check und Pro</p><h2 class="h2">Mit Pro bleibt Ihre Website in Form.</h2><p class="text">Websites ändern sich ständig: neue Inhalte, Plugins, Updates. Pro prüft jede Woche und meldet neue Fehler, bevor Ihre Besucher sie bemerken.</p></div>
+    <div class="pro-grid">
+      <div class="table-wrap">
+        <table class="ctable">
+          <thead><tr><th scope="col">Funktion</th><th scope="col">Check</th><th scope="col">Pro</th></tr></thead>
+          <tbody>
+            <tr><td>Score und fünf Bereiche</td><td><svg class="i"><use href="#i-check"/></svg></td><td><svg class="i"><use href="#i-check"/></svg></td></tr>
+            <tr><td>Probleme mit Lösung</td><td class="num">Top 3</td><td>Alle</td></tr>
+            <tr><td>Seiten pro Analyse</td><td class="num">50</td><td class="num">500</td></tr>
+            <tr><td>Report als PDF</td><td>–</td><td><svg class="i"><use href="#i-check"/></svg></td></tr>
+            <tr><td>Wöchentliche Prüfung</td><td>–</td><td><svg class="i"><use href="#i-check"/></svg></td></tr>
+            <tr><td>Verlauf und Branchenvergleich</td><td>–</td><td><svg class="i"><use href="#i-check"/></svg></td></tr>
+            <tr><td>E-Mail bei neuen Fehlern</td><td>–</td><td><svg class="i"><use href="#i-check"/></svg></td></tr>
+          </tbody>
+        </table>
+        <a class="btn btn--accent" href="#preise">Pro 14 Tage kostenlos testen <svg class="i"><use href="#i-arrow"/></svg></a>
+      </div>
+      <div class="card chart-card" aria-label="Beispiel Score-Verlauf in Pro">
+        <div class="card-top"><span>kiez-kaffee.de · Verlauf</span><span class="tag">Pro</span></div>
+        <div class="chart-kpi"><b class="num">91</b><span>+21 Punkte seit KW 30</span></div>
+        <svg class="chart" viewBox="0 0 560 196" role="img" aria-label="Score-Verlauf von 70 in KW 30 auf 91 in KW 41">
+          <line class="grid" x1="44" x2="548" y1="16" y2="16"/><line class="grid" x1="44" x2="548" y1="92" y2="92"/><line class="grid" x1="44" x2="548" y1="168" y2="168"/>
+          <text class="axis" x="36" y="20" text-anchor="end">100</text><text class="axis" x="36" y="96" text-anchor="end">80</text><text class="axis" x="36" y="172" text-anchor="end">60</text>
+          <line class="goal" x1="44" x2="548" y1="54" y2="54"/><text class="goal-label" x="50" y="47">Ziel 90</text>
+          <path class="line" d="M44,130 L89.8,126.2 L135.6,118.6 L181.5,114.8 L227.3,103.4 L273.1,95.8 L318.9,92 L364.7,80.6 L410.5,73 L456.4,65.4 L502.2,57.8 L548,50.2"/>
+          <circle class="start" cx="44" cy="130" r="4"/><text class="axis" x="52" y="148">70</text>
+          <circle class="end" cx="548" cy="50.2" r="6"/>
+          <text class="axis" x="44" y="190">KW 30</text><text class="axis" x="273.1" y="190" text-anchor="middle">KW 35</text><text class="axis" x="548" y="190" text-anchor="end">KW 41</text>
+        </svg>
+        <p class="alert"><svg class="i"><use href="#i-bell"/></svg><span><b>Neu seit gestern:</b> 2 defekte Links auf /speisekarte</span></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section cw-peach" id="warum">
+    <div class="section-head"><p class="eyebrow">Warum Pixelkiez</p><h2 class="h2">Gebaut von Leuten, die täglich Websites bauen.</h2></div>
+    <div class="why">
+      <div class="why-item"><h3>Klartext statt Fachbegriffe</h3><p>Jede Aufgabe ist so formuliert, dass Sie sie verstehen und direkt weitergeben können.</p></div>
+      <div class="why-item"><h3>Aus der Praxis in Berlin</h3><p>Hinter der Analyse steht das Pixelkiez-Team, das Websites für den Mittelstand plant, baut und betreut.</p></div>
+      <div class="why-item"><h3>Datenschutz aus Deutschland</h3><p>Server in Deutschland, keine Speicherung von Besucherdaten, Vertrag zur Auftragsverarbeitung inklusive.</p></div>
+      <div class="why-item"><h3>Bereit für BFSG und KI-Suche</h3><p>Wir prüfen auch, was viele Tools auslassen: Barrierefreiheit und Sichtbarkeit in KI-Antworten.</p></div>
+    </div>
+    <div class="crosssell"><p><b>Keine Zeit für die Umsetzung?</b> Pixelkiez behebt die Probleme für Sie, zum Festpreis.</p><a class="btn btn--ghost btn--sm" href="https://pixelkiez.de/">Umsetzung anfragen <svg class="i"><use href="#i-arrow"/></svg></a></div>
+  </section>
+
+  <section class="section cw-grey" id="preise">
+    <div class="section-head"><p class="eyebrow">Preise</p><h2 class="h2">Kostenlos starten. Erweitern, wenn Sie mehr brauchen.</h2></div>
+    <div class="plans">
+      <article class="plan">
+        <div class="plan-name">Check</div>
+        <div class="price"><b class="num">0 €</b></div>
+        <p>Der Schnellcheck für eine Adresse.</p>
+        <ul><li><svg class="i"><use href="#i-check"/></svg>Score und fünf Bereiche</li><li><svg class="i"><use href="#i-check"/></svg>Die drei wichtigsten Probleme</li><li><svg class="i"><use href="#i-check"/></svg>Eine Analyse pro Tag</li></ul>
+        <a class="btn btn--ghost btn--block" href="#top">Kostenlos analysieren</a>
+      </article>
+      <article class="plan plan--featured">
+        <div class="plan-name">Pro <em>Empfohlen</em></div>
+        <div class="price"><b class="num">29 €</b><span>pro Monat</span></div>
+        <p>Für Ihre eigene Website.</p>
+        <ul><li><svg class="i"><use href="#i-check"/></svg>Vollständiger Report als PDF</li><li><svg class="i"><use href="#i-check"/></svg>Wöchentliche Prüfung mit Verlauf</li><li><svg class="i"><use href="#i-check"/></svg>E-Mail bei neuen Fehlern</li><li><svg class="i"><use href="#i-check"/></svg>Bis 500 Seiten</li></ul>
+        <a class="btn btn--accent btn--block" href="#">14 Tage kostenlos testen</a>
+      </article>
+      <article class="plan">
+        <div class="plan-name">Agentur</div>
+        <div class="price"><b class="num">99 €</b><span>pro Monat</span></div>
+        <p>Für mehrere Kundenprojekte.</p>
+        <ul><li><svg class="i"><use href="#i-check"/></svg>Bis zu 10 Domains</li><li><svg class="i"><use href="#i-check"/></svg>Reports mit Ihrem Logo</li><li><svg class="i"><use href="#i-check"/></svg>Team-Zugänge</li></ul>
+        <a class="btn btn--ghost btn--block" href="#">Gespräch vereinbaren</a>
+      </article>
+    </div>
+    <p class="note">Entwurf: Preise und Beispielwerte sind Platzhalter.</p>
+  </section>
+
+  <section class="section cw-white" id="faq">
+    <div class="faq-grid">
+      <div class="section-head"><p class="eyebrow">Fragen</p><h2 class="h2">Gut zu wissen.</h2></div>
+      <div class="faq">
+        <details><summary>Brauchen Sie Zugriff auf meine Website?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Nein. Wir prüfen alles, was öffentlich erreichbar ist, so wie eine Suchmaschine. Sie installieren nichts und teilen keine Zugangsdaten.</p></details>
+        <details><summary>Welche Websites kann ich prüfen?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Jede öffentlich erreichbare Website, egal ob WordPress, Shopify, Wix, Webflow oder eine eigene Lösung.</p></details>
+        <details><summary>Wie entsteht der Score?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Jeder Bereich wird aus einzelnen Prüfungen berechnet und nach Wirkung gewichtet. Ein kritischer Fehler zählt mehr als viele kleine Hinweise. Ab 90 Punkten gilt ein Bereich als gut.</p></details>
+        <details><summary>Wie oft kann ich kostenlos prüfen?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Einmal pro Tag und Adresse. Mit Pro prüfen wir automatisch jede Woche, und Sie können jederzeit selbst neu prüfen.</p></details>
+        <details><summary>Ist die Analyse DSGVO-konform?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Ja. Die Analyse läuft auf Servern in Deutschland, und wir speichern keine personenbezogenen Daten Ihrer Besucher.</p></details>
+        <details><summary>Kann ich Pro jederzeit kündigen?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Ja, Pro und Agentur sind monatlich kündbar. Ihre Reports können Sie vorher als PDF herunterladen.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="tools">
+    <div class="section-head"><p class="eyebrow">Weitere kostenlose Checks</p><h2 class="h2">Einzelne Fragen schnell beantworten.</h2></div>
+    <div class="tools">
+      <a class="tool" href="#"><span><b>Ladezeit-Test</b>Wie schnell lädt meine Seite?</span><svg class="i"><use href="#i-arrow"/></svg></a>
+      <a class="tool" href="#"><span><b>Meta-Tag-Check</b>Wie sieht mein Google-Snippet aus?</span><svg class="i"><use href="#i-arrow"/></svg></a>
+      <a class="tool" href="#"><span><b>Kontrast-Check</b>Sind meine Farben gut lesbar?</span><svg class="i"><use href="#i-arrow"/></svg></a>
+      <a class="tool" href="#"><span><b>Cookie-Check</b>Was lädt vor der Einwilligung?</span><svg class="i"><use href="#i-arrow"/></svg></a>
+      <a class="tool" href="#"><span><b>Link-Check</b>Gibt es defekte Links?</span><svg class="i"><use href="#i-arrow"/></svg></a>
+      <a class="tool" href="#"><span><b>KI-Sichtbarkeits-Check</b>Kennt ChatGPT meine Seite?</span><svg class="i"><use href="#i-arrow"/></svg></a>
+    </div>
+  </section>
+
+  <section class="section closing cw-lilac">
+    <h2 class="h2">Bereit für den Check?</h2>
+    <button class="btn btn--accent" type="button" id="to-top">Website jetzt prüfen <svg class="i"><use href="#i-arrow"/></svg></button>
+  </section>
+
+  <footer class="cw-lilac">
+    <div class="footer-cols">
+      <div class="footer-brand"><a class="logo" href="#top">Pixelkiez<span>Analyse</span></a><p>Website-Analyse aus Berlin. Ein Produkt von Pixelkiez.</p></div>
+      <div><h4>Produkt</h4><ul><li><a href="#report">Report</a></li><li><a href="#pruefungen">Prüfungen</a></li><li><a href="#pro">Pro</a></li><li><a href="#preise">Preise</a></li></ul></div>
+      <div><h4>Kostenlose Checks</h4><ul><li><a href="#tools">Ladezeit-Test</a></li><li><a href="#tools">Meta-Tag-Check</a></li><li><a href="#tools">Kontrast-Check</a></li><li><a href="#tools">Cookie-Check</a></li></ul></div>
+      <div><h4>Pixelkiez</h4><ul><li><a href="https://pixelkiez.de/">Webdesign Berlin</a></li><li><a href="https://pixelkiez.de/">Umsetzung anfragen</a></li><li><a href="#">Kontakt</a></li></ul></div>
+    </div>
+    <div class="footer">
+      <span>© 2026 Pixelkiez · Webdesign Berlin</span>
+      <nav aria-label="Rechtliches"><a href="#">Impressum</a><a href="#">Datenschutz</a><a href="#">AGB</a></nav>
+    </div>
+  </footer>
+</main>
+
+<script>
+/* Pixelkiez Analyse – Vision-Entwurf v2. Die Analyse ist eine Demo mit Beispieldaten. */
+(() => {
+  const $ = s => document.querySelector(s);
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const fmt = (n, d = 0) => n.toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
+
+  /* Navigation schrumpft beim Scrollen */
+  const nav = $('#nav');
+  const onScroll = () => nav.classList.toggle('is-scrolled', scrollY > 24);
+  addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  /* Tippender Platzhalter im URL-Feld */
+  const input = $('#url');
+  const words = ['ihre-website.de', 'mein-shop.de', 'kanzlei-mueller.de', 'praxis-am-kiez.berlin'];
+  if (!reduce) {
+    let w = 0, c = words[0].length, dir = -1;
+    const step = () => {
+      const word = words[w];
+      c += dir;
+      input.placeholder = word.slice(0, c);
+      let delay = dir > 0 ? 75 : 35;
+      if (c >= word.length) { dir = -1; delay = 2000; }
+      else if (c <= 0) { dir = 1; w = (w + 1) % words.length; delay = 350; }
+      setTimeout(step, delay);
+    };
+    setTimeout(step, 2500);
+  }
+
+  /* Demo-Daten: festes Beispiel oder aus der Domain abgeleitete Werte */
+  const BASE = { domain: 'kiez-kaffee.de', score: 70, lcp: 4.1, meta: 14 };
+  const hash = s => [...s].reduce((h, ch) => (Math.imul(h, 31) + ch.charCodeAt(0)) >>> 0, 7);
+  const dataFor = domain => {
+    if (domain === BASE.domain) return BASE;
+    const h = hash(domain);
+    return { domain, score: 38 + (h % 55), lcp: 2.7 + (h % 30) / 10, meta: 3 + (h % 21) };
+  };
+  const verdict = s => (s >= 90 ? 'Stark aufgestellt' : s >= 50 ? 'Solide Basis mit Baustellen' : 'Dringender Handlungsbedarf');
+
+  const countUp = (el, to, dur = 1200) => {
+    if (reduce) { el.textContent = fmt(to); return; }
+    const t0 = performance.now();
+    const tick = t => {
+      const p = Math.min(1, (t - t0) / dur);
+      el.textContent = fmt(Math.round(to * (1 - Math.pow(1 - p, 4))));
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
+
+  /* Formular: Adresse prüfen, Demo-Ergebnis unter dem Feld zeigen */
+  const result = $('#result'), loading = $('#result-loading'), body = $('#result-body');
+  const progress = $('#progress'), phase = $('#result-phase'), ring = $('#result-ring');
+  const phases = ['Seiten werden gecrawlt …', 'Ladezeit wird gemessen …', 'Barrierefreiheit wird geprüft …', 'Datenschutz wird geprüft …'];
+  const normalize = v => v.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split(/[/?#]/)[0];
+  const valid = v => /^[a-z0-9äöüß-]+(\.[a-z0-9äöüß-]+)+$/.test(v);
+  let runId = 0;
+
+  $('#analyze').addEventListener('submit', e => {
+    e.preventDefault();
+    const domain = normalize(input.value) || BASE.domain;
+    const error = $('#url-error');
+    error.hidden = valid(domain);
+    if (!error.hidden) { input.focus(); return; }
+
+    const id = ++runId;
+    const d = dataFor(domain);
+    const wait = reduce ? 0 : 2300;
+    result.hidden = false; loading.hidden = false; body.hidden = true;
+    $('#result-domain-loading').textContent = d.domain;
+    progress.classList.remove('is-running'); progress.offsetWidth; progress.classList.add('is-running');
+    phases.forEach((p, i) => setTimeout(() => { if (id === runId) phase.textContent = p; }, (wait / phases.length) * i));
+
+    setTimeout(() => {
+      if (id !== runId) return;
+      $('#result-domain').textContent = d.domain;
+      $('#result-verdict').textContent = verdict(d.score);
+      $('#result-lcp').textContent = `LCP ${fmt(d.lcp, 1)} s`;
+      $('#result-meta').textContent = `${d.meta} Seiten ohne Meta-Beschreibung`;
+      loading.hidden = true; body.hidden = false;
+      ring.style.transition = 'none'; ring.style.strokeDashoffset = 175.93; ring.getBoundingClientRect(); ring.style.transition = '';
+      requestAnimationFrame(() => { ring.style.strokeDashoffset = 175.93 * (1 - d.score / 100); });
+      countUp($('#result-score'), d.score);
+    }, wait);
+  });
+
+  /* Abschluss-Button: zurück zum Feld */
+  $('#to-top').addEventListener('click', () => {
+    scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+    setTimeout(() => input.focus({ preventScroll: true }), reduce ? 0 : 600);
+  });
+})();
+</script>
+</body>
+</html>
