@@ -1,17 +1,21 @@
-/* Pixelkiez Analyse – Vision-Entwurf v2. Die Analyse ist eine Demo mit Beispieldaten. */
+/* Pixelkiez Analyse – statische Vorschau (PXK-154).
+   Keine Analyse, kein Score, keine Übertragung und keine Speicherung der Eingabe. */
 (() => {
   const $ = s => document.querySelector(s);
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const fmt = (n, d = 0) => n.toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
 
   /* Navigation schrumpft beim Scrollen */
   const nav = $('#nav');
-  const onScroll = () => nav.classList.toggle('is-scrolled', scrollY > 24);
-  addEventListener('scroll', onScroll, { passive: true });
-  onScroll();
+  if (nav) {
+    const onScroll = () => nav.classList.toggle('is-scrolled', scrollY > 24);
+    addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  }
+
+  const form = $('#analyze'), input = $('#url');
+  if (!form || !input) return;
 
   /* Tippender Platzhalter im URL-Feld */
-  const input = $('#url');
   const words = ['ihre-website.de', 'mein-shop.de', 'kanzlei-mueller.de', 'praxis-am-kiez.berlin'];
   if (!reduce) {
     let w = 0, c = words[0].length, dir = -1;
@@ -27,65 +31,40 @@
     setTimeout(step, 2500);
   }
 
-  /* Demo-Daten: festes Beispiel oder aus der Domain abgeleitete Werte */
-  const BASE = { domain: 'kiez-kaffee.de', score: 70, lcp: 4.1, meta: 14 };
-  const hash = s => [...s].reduce((h, ch) => (Math.imul(h, 31) + ch.charCodeAt(0)) >>> 0, 7);
-  const dataFor = domain => {
-    if (domain === BASE.domain) return BASE;
-    const h = hash(domain);
-    return { domain, score: 38 + (h % 55), lcp: 2.7 + (h % 30) / 10, meta: 3 + (h % 21) };
-  };
-  const verdict = s => (s >= 90 ? 'Stark aufgestellt' : s >= 50 ? 'Solide Basis mit Baustellen' : 'Dringender Handlungsbedarf');
-
-  const countUp = (el, to, dur = 1200) => {
-    if (reduce) { el.textContent = fmt(to); return; }
-    const t0 = performance.now();
-    const tick = t => {
-      const p = Math.min(1, (t - t0) / dur);
-      el.textContent = fmt(Math.round(to * (1 - Math.pow(1 - p, 4))));
-      if (p < 1) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  };
-
-  /* Formular: Adresse prüfen, Demo-Ergebnis unter dem Feld zeigen */
-  const result = $('#result'), loading = $('#result-loading'), body = $('#result-body');
-  const progress = $('#progress'), phase = $('#result-phase'), ring = $('#result-ring');
-  const phases = ['Seiten werden gecrawlt …', 'Ladezeit wird gemessen …', 'Barrierefreiheit wird geprüft …', 'Datenschutz wird geprüft …'];
+  /* Formular: gültige Adresse zeigt nur den Vorschau-Hinweis. Es wird nichts gesendet, geprüft oder gespeichert. */
+  const PREVIEW = 'Vorschau – es wurde keine Anfrage versendet und keine Website geprüft.';
+  const error = $('#url-error'), result = $('#result'), loading = $('#result-loading'), body = $('#result-body');
+  const phase = $('#result-phase'), domain = $('#result-domain-loading'), progress = $('#progress');
   const normalize = v => v.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split(/[/?#]/)[0];
   const valid = v => /^[a-z0-9äöüß-]+(\.[a-z0-9äöüß-]+)+$/.test(v);
-  let runId = 0;
 
-  $('#analyze').addEventListener('submit', e => {
+  form.addEventListener('submit', e => {
     e.preventDefault();
-    const domain = normalize(input.value) || BASE.domain;
-    const error = $('#url-error');
-    error.hidden = valid(domain);
-    if (!error.hidden) { input.focus(); return; }
-
-    const id = ++runId;
-    const d = dataFor(domain);
-    const wait = reduce ? 0 : 2300;
-    result.hidden = false; loading.hidden = false; body.hidden = true;
-    $('#result-domain-loading').textContent = d.domain;
-    progress.classList.remove('is-running'); progress.offsetWidth; progress.classList.add('is-running');
-    phases.forEach((p, i) => setTimeout(() => { if (id === runId) phase.textContent = p; }, (wait / phases.length) * i));
-
-    setTimeout(() => {
-      if (id !== runId) return;
-      $('#result-domain').textContent = d.domain;
-      $('#result-verdict').textContent = verdict(d.score);
-      $('#result-lcp').textContent = `LCP ${fmt(d.lcp, 1)} s`;
-      $('#result-meta').textContent = `${d.meta} Seiten ohne Meta-Beschreibung`;
-      loading.hidden = true; body.hidden = false;
-      ring.style.transition = 'none'; ring.style.strokeDashoffset = 175.93; ring.getBoundingClientRect(); ring.style.transition = '';
-      requestAnimationFrame(() => { ring.style.strokeDashoffset = 175.93 * (1 - d.score / 100); });
-      countUp($('#result-score'), d.score);
-    }, wait);
+    const ok = valid(normalize(input.value));
+    error.hidden = ok;
+    if (!ok) {
+      result.hidden = true;
+      input.setAttribute('aria-invalid', 'true');
+      input.setAttribute('aria-describedby', 'url-error');
+      input.focus();
+      return;
+    }
+    input.removeAttribute('aria-invalid');
+    input.removeAttribute('aria-describedby');
+    /* Alte Ring-/Fortschrittselemente bleiben als Layoutreferenz im Markup, werden aber nie als Ergebnis gezeigt. */
+    body.hidden = true;
+    progress.hidden = true;
+    domain.textContent = '';
+    phase.textContent = '';
+    loading.hidden = false;
+    result.hidden = false;
+    /* Text erst nach dem Einblenden setzen, damit die Live-Region den Hinweis ansagt */
+    requestAnimationFrame(() => { phase.textContent = PREVIEW; });
   });
 
   /* Abschluss-Button: zurück zum Feld */
-  $('#to-top').addEventListener('click', () => {
+  const toTop = $('#to-top');
+  if (toTop) toTop.addEventListener('click', () => {
     scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
     setTimeout(() => input.focus({ preventScroll: true }), reduce ? 0 : 600);
   });
