@@ -81,6 +81,8 @@ async function open(path, { js = true, width = 1440, height = 900, reducedMotion
   page.on('pageerror', e => errors.push(String(e)));
   page.on('dialog', d => { errors.push(`Dialog: ${d.message()}`); d.dismiss(); });
   await page.goto(origin + path, { waitUntil: 'networkidle' });
+  /* Webfonts (display=swap) können nach networkidle noch angewendet werden; Pixel- und Layoutvergleiche brauchen den Endzustand */
+  if (js) await page.evaluate(() => document.fonts.ready);
   return { context, page, requests, errors, blocked };
 }
 
