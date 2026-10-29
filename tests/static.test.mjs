@@ -76,14 +76,17 @@ const bodyEls = html => {
   return H.elements(body).filter(e => e.tag !== 'script' && !H.closest(e.parent, x => x.tag === 'script'));
 };
 const ownText = el => H.norm(el.children.filter(c => c.text !== undefined).map(c => c.text).join(' '));
+/* Im verborgenen Alt-Ergebnisblock #result sind seit Auftrag 05 (Freigabe 29.10.2026) nur Textänderungen erlaubt;
+   Tags, Attribute, Klassen, IDs und SVG-Geometrie werden dort weiterhin wie im übrigen Hero verglichen. */
 const heroTextAllowed = el =>
   H.hasClass(el, 'badge') || H.hasClass(el, 'lead') ||
   (el.tag === 'button' && el.attrs.get('type') === 'submit') ||
-  (el.tag === 'span' && el.parent && H.hasClass(el.parent, 'facts'));
+  (el.tag === 'span' && el.parent && H.hasClass(el.parent, 'facts')) ||
+  !!H.closest(el, e => e.attrs.get('id') === 'result');
 
 /* Vergleicht das Element-Skelett von vision.html und index.html.
    Erlaubt: Textänderungen außerhalb des Hero; href/aria-label außerhalb des Hero;
-   im Hero nur Badge/Lead/Button/Facts-Text und das Entfernen von name="url". */
+   im Hero nur Badge/Lead/Button/Facts-Text, Text im verborgenen #result und das Entfernen von name="url". */
 function structureProblems(visionHtml, indexHtml) {
   const p = [];
   const v = bodyEls(visionHtml), i = bodyEls(indexHtml);
@@ -157,11 +160,21 @@ const NEGATED_ONLY = [
 ];
 const NEGATION = /\b(kein|keine|keinen|keiner|keines|ohne|nicht|nein|weder)\b/i;
 
-/* Alle für Nutzer, Screenreader oder Suchmaschinen sichtbaren Texte einer Seite. */
+/* Text eines Teilbaums einschließlich hidden-Bereichen (steht im Quelltext und kann per JavaScript eingeblendet werden).
+   Anders als H.visibleText trennt jedes Element mit Leerzeichen, damit \b-Muster an Elementgrenzen greifen. */
+const allText = node => {
+  if (node.text !== undefined) return node.text;
+  if (['script', 'style', 'symbol', 'template'].includes(node.tag)) return ' ';
+  return ` ${node.children.map(allText).join(' ')} `;
+};
+const outermostHidden = node => H.hiddenTrees(node).filter(e => !H.closest(e.parent, x => x.attrs.has('hidden')));
+
+/* Alle für Nutzer, Screenreader oder Suchmaschinen sichtbaren Texte einer Seite, dazu der Text verborgener Bereiche. */
 function claimSurfaces(html) {
   const { root } = H.parse(html);
   const body = H.byTag(root, 'body')[0] || root;
   const out = [['sichtbarer Text', H.norm(H.visibleText(body))]];
+  for (const e of outermostHidden(body)) out.push([`verborgener Text #${e.attrs.get('id') || e.tag}`, H.norm(allText(e))]);
   const title = H.byTag(root, 'title')[0];
   if (title) out.push(['title', H.norm(H.textOf(title))]);
   for (const m of H.byTag(root, 'meta')) if (m.attrs.get('name') === 'description') out.push(['meta description', m.attrs.get('content')]);
@@ -191,6 +204,23 @@ function claimProblems(surfaces) {
     }
   }
   return p;
+}
+
+/* Alt-Inhalte der früheren Scan-Simulation, die im verborgenen Ergebnisblock #result nicht mehr stehen dürfen (Auftrag 05).
+   Ergänzt die allgemeine T12-Liste: z. B. „ohne Einwilligung … DSGVO“ besteht dort wegen der Verneinung. */
+const RESULT_LEGACY = [
+  ['Scan', /gecrawlt|crawl|Seiten werden|wird gemessen/i],
+  ['Domain', /\b[\wäöüß-]+\.(de|com|net|org|eu|berlin|example)\b/i],
+  ['Score/Messwert', /\d/],
+  ['DSGVO', /DSGVO|Einwilligung|Google Fonts/i],
+  ['Befund', /Titelbild|Seitenaufbau|\bLCP\b|Meta-Beschreibung|\bSEO\b|Solide Basis|Baustellen/i],
+  ['Demo/Report', /\bDemo\b|vollständige Report/i],
+];
+function resultBlockProblems(html) {
+  const result = H.byId(H.parse(html).root, 'result');
+  if (!result) return ['#result fehlt'];
+  const text = H.norm(allText(result));
+  return RESULT_LEGACY.filter(([, re]) => re.test(text)).map(([kind, re]) => `${kind}: "${text.match(re)[0]}"`);
 }
 
 const APP_FORBIDDEN = [
@@ -326,6 +356,13 @@ test('T2/T14 Negativproben: sechster Balken, Hero-Klasse, H1 und Hero-Attribut w
     'Hero-Attribut': index.replace('placeholder="ihre-website.de"', 'placeholder="musterfirma.example"'),
     'Hero-Fehlertext': index.replace('Bitte geben Sie eine Adresse wie beispiel.de ein.', 'Ungültig.'),
     'Grafikgeometrie': index.replace('stroke-dashoffset="113.1"', 'stroke-dashoffset="50"'),
+    /* #result: Text frei, Struktur weiterhin geschützt */
+    'Ergebnis-Klasse': index.replace('<div class="result-head">', '<div class="result-head neu">'),
+    'Ergebnis-ID': index.replace('id="result-verdict"', 'id="result-urteil"'),
+    'Ergebnis-Element entfernt': index.replace('<span class="tag">Vorschau</span>', ''),
+    'Ergebnis-Element ergänzt': index.replace('<span class="tag">Vorschau</span>', '<span class="tag">Vorschau</span><span class="tag">neu</span>'),
+    'Ergebnis-Ringgeometrie': index.replace('r="28" stroke-dasharray="175.93" stroke-dashoffset="175.93"', 'r="28" stroke-dasharray="175.93" stroke-dashoffset="80"'),
+    'Ergebnis eingeblendet': index.replace('<div id="result-body" hidden>', '<div id="result-body">'),
   };
   for (const [name, html] of Object.entries(mutations)) {
     assert.notEqual(html, index, name);
@@ -420,7 +457,39 @@ test('T12 keine Abo-, Preis-, Scan-, Monitoring- oder Garantie-Aussagen in Text,
   assert.deepEqual(claimProblems([['app.js-Texte', literals]]), []);
   const hidden = H.hiddenTrees(H.parse(read('index.html')).root);
   assert.deepEqual(hidden.map(e => e.attrs.get('id')), ['url-error', 'result', 'result-body'], 'versteckte Inhalte nur in Fehlermeldung und Ergebnisbereich');
-  t.diagnostic(`Restbefund (nie angezeigt, hidden, Hero-geschützt): ${H.norm(H.textOf(H.byId(H.parse(read('index.html')).root, 'result-body')))}`);
+  const surfaces = claimSurfaces(read('index.html')).map(([where]) => where);
+  assert.ok(surfaces.includes('verborgener Text #url-error') && surfaces.includes('verborgener Text #result'), `verborgene Bereiche werden mitgeprüft: ${surfaces.join(', ')}`);
+});
+
+test('T12 verborgener Alt-Ergebnisblock #result enthält keine Scan-, Domain-, Score-, DSGVO- oder Befundtexte', t => {
+  const html = read('index.html');
+  assert.deepEqual(resultBlockProblems(html), []);
+  t.diagnostic(`#result (hidden, nie als Ergebnis angezeigt): ${H.norm(allText(H.byId(H.parse(html).root, 'result')))}`);
+});
+
+test('T12 Negativproben: alte Texte im verborgenen Ergebnisblock werden erkannt', () => {
+  const html = read('index.html');
+  assert.deepEqual(resultBlockProblems(base('index.html')).map(p => p.split(':')[0]), RESULT_LEGACY.map(([kind]) => kind), 'Base-#result enthält alle Alt-Inhalte');
+  const once = (from, to) => {
+    assert.equal(html.split(from).length, 2, `genau ein Vorkommen: ${from}`);
+    return html.replace(from, to);
+  };
+  const reinserted = {
+    'Scan': once('>Vorschau – keine Website geprüft<', '>Seiten werden gecrawlt …<'),
+    'Domain': once('>Keine Anfrage versendet<', '>kiez-kaffee.de<'),
+    'Score/Messwert': once('id="result-score">–<', 'id="result-score">0<'),
+    'DSGVO': once('<span>Keine Befunde ermittelt</span><small>–</small>', '<span>Google Fonts werden ohne Einwilligung geladen</span><small>DSGVO</small>'),
+    'Befund': once('>Keine Analyse durchgeführt<', '>Solide Basis mit Baustellen<'),
+    'Demo/Report': once('<span class="tag">Vorschau</span>', '<span class="tag">Demo</span>'),
+  };
+  for (const [kind, mutated] of Object.entries(reinserted)) {
+    assert.ok(resultBlockProblems(mutated).some(p => p.startsWith(`${kind}:`)), `wieder eingesetzter Alt-Text "${kind}" wurde nicht erkannt`);
+  }
+  /* Die allgemeine T12-Prüfung erfasst verborgene Texte jetzt ebenfalls (vorher nur sichtbarer Text) */
+  for (const kind of ['Scan', 'Domain', 'Demo/Report']) {
+    const found = claimProblems(claimSurfaces(reinserted[kind]));
+    assert.ok(found.some(p => p.startsWith('verborgener Text #result')), `T12 erkennt "${kind}" im verborgenen Block nicht: ${found.join('; ')}`);
+  }
 });
 
 test('T12 Negativprobe: Base-index.html und Base-app.js werden als unwahr erkannt', () => {

@@ -216,7 +216,7 @@ test('T6 unterschiedliche Domains erzeugen identischen, zahlenfreien Hinweis ohn
       verdict: document.querySelector('#result-verdict').textContent,
     })));
   }
-  for (const s of seen) assert.deepEqual(s, { text: PREVIEW, score: '0', offsetAttr: '175.93', offsetStyle: '', verdict: 'Solide Basis mit Baustellen' });
+  for (const s of seen) assert.deepEqual(s, { text: PREVIEW, score: '–', offsetAttr: '175.93', offsetStyle: '', verdict: 'Keine Analyse durchgeführt' });
   assert.ok(!/\d/.test(seen[0].text), 'keine Zahlen im Hinweis');
   assert.deepEqual(errors, []);
   await context.close();
@@ -310,6 +310,68 @@ test('T9 Breiten-Sweep 320–1440 px (8-px-Schritte, dicht an den Umbrüchen): k
     assert.deepEqual(over, [], `${path}: Überlauf`);
     await context.close();
   }
+});
+
+/* ---------- T9 Mobilnavigation: Button innerhalb der Navigationspille ---------- */
+
+/* Ein fehlender Dokumentüberlauf allein beweist nicht, dass der Button innerhalb der Pille liegt: gemessen wird gegen deren Rahmen. */
+const navFit = page => page.evaluate(() => {
+  const nav = document.querySelector('.nav'), btn = document.querySelector('.nav .btn');
+  const n = nav.getBoundingClientRect(), b = btn.getBoundingClientRect(), cs = getComputedStyle(nav);
+  return {
+    label: btn.textContent.trim(),
+    overPill: +(b.right - n.right).toFixed(1),
+    overPadding: +(b.right - (n.right - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingRight))).toFixed(1),
+    readable: b.width > 0 && b.left >= n.left && b.right <= innerWidth && btn.scrollWidth <= btn.clientWidth && getComputedStyle(btn).visibility === 'visible',
+  };
+});
+
+test('T9 Mobilnavigation: Button bei 320/390/768/1440 px innerhalb der Navigationspille, Hero-Geometrie wie vision.html', { skip }, async t => {
+  const notes = [];
+  for (const [path, oldLabel] of [['/index.html', 'Methodik'], ['/pruefkriterien.html', 'Startseite']]) {
+    for (const width of VIEWPORTS) {
+      const { context, page, errors } = await open(path, { width, height: 800 });
+      const name = `${path.slice(1, -5)}-${width}`;
+      const r = await navFit(page);
+      notes.push(`${name} "${r.label}": Rand ${r.overPill} px, Innenabstand ${r.overPadding} px`);
+      assert.ok(r.overPill <= 0, `${name}: Button ragt ${r.overPill} px über die Navigationspille`);
+      assert.equal(r.readable, true, `${name}: Beschriftung vollständig sichtbar`);
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) <= 0, `${name}: Dokumentüberlauf`);
+      if (width === 320) {
+        /* Negativprobe: mit der bisherigen Beschriftung ragt der Button über die Pille, ohne dass das Dokument überläuft */
+        await page.evaluate(l => { document.querySelector('.nav .btn').textContent = l; }, oldLabel);
+        const old = await navFit(page);
+        notes.push(`${name} Negativprobe "${oldLabel}": Rand +${old.overPill} px`);
+        assert.ok(old.overPill > 0, `${name}: Negativprobe "${oldLabel}" nicht erkannt`);
+      }
+      assert.deepEqual(errors, [], name);
+      await context.close();
+    }
+  }
+  /* Verbleibender Befund (nur Dokumentation): 1-px-Sweep in den Bereichen, in denen der Button die Pille berührt oder überragt */
+  const widths = [];
+  for (const [a, b] of [[320, 346], [756, 800]]) for (let w = a; w <= b; w++) widths.push(w);
+  for (const path of ['/vision.html', '/index.html', '/pruefkriterien.html']) {
+    const { context, page } = await open(path, { width: 320, height: 800 });
+    const over = [];
+    for (const w of widths) {
+      await page.setViewportSize({ width: w, height: 800 });
+      const r = await navFit(page);
+      if (r.overPill > 0) over.push(`${w}:+${r.overPill}`);
+    }
+    notes.push(`${path.slice(1)} Überstand über die Pille im Sweep: ${over.join(' ') || 'keiner'}`);
+    await context.close();
+  }
+  for (const width of VIEWPORTS) {
+    const v = await open('/vision.html', { width, height: 800 }), i = await open('/index.html', { width, height: 800 });
+    for (const sel of ['.hero h1', '.url-field']) {
+      const [a, b] = [await v.page.locator(sel).first().boundingBox(), await i.page.locator(sel).first().boundingBox()];
+      const r = o => ['x', 'y', 'width', 'height'].map(k => Math.round(o[k]));
+      assert.deepEqual(r(b), r(a), `${width} ${sel}: Hero-Geometrie`);
+    }
+    await v.context.close(); await i.context.close();
+  }
+  t.diagnostic(`Navigation: ${notes.join(' | ')}`);
 });
 
 /* ---------- T2 / T14 Design im Browser: berechnete Styles gegen vision.html ---------- */
