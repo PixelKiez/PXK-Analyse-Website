@@ -1,0 +1,7 @@
+# PXK-154 – Dateien, die ein späteres öffentliches Release-Artefakt enthalten darf (RG1).
+# Alles andere, insbesondere vision.html, DESIGN.md, STRUCTURE.md und tests/, wird nicht ausgeliefert.
+# Hosting und Deploy-Weg sind offen (D-10); der echte HTTP-404/410-Nachweis für /vision.html bleibt Release-Gate.
+index.html
+pruefkriterien.html
+assets/styles.css
+assets/app.js
