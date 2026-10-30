@@ -203,6 +203,29 @@ test('Scrollen: Inhalte blenden beim Hineinscrollen ein; oben nichts versteckt; 
   }
 });
 
+test('Pfirsich-Punkte nur in den freien Flächen links und rechts des Rahmens, über die ganze Seitenhöhe, auf allen Seiten', { skip }, async () => {
+  for (const path of ['/index.html', '/pruefkriterien.html', '/impressum.html', '/anfrage.php']) {
+    for (const width of [1920, 1440, 1280, 390]) {
+      const { context, page } = await open(path, { width, height: 900 });
+      const m = await page.evaluate(() => {
+        const side = which => { const s = getComputedStyle(document.body, which); return { width: parseFloat(s.width), height: parseFloat(s.height), image: s.backgroundImage, events: s.pointerEvents }; };
+        const frame = document.querySelector('.frame').getBoundingClientRect();
+        return { left: side('::before'), right: side('::after'), gap: frame.left, doc: document.documentElement.scrollHeight, overflow: document.documentElement.scrollWidth - innerWidth };
+      });
+      const label = `${path} ${width}`;
+      assert.ok(m.overflow <= 0, `${label}: kein Überlauf`);
+      for (const side of [m.left, m.right]) {
+        assert.ok(side.width <= Math.max(0, m.gap), `${label}: Punkte nur neben dem Rahmen (${side.width} ≤ ${m.gap})`);
+        if (m.gap > 40) {
+          assert.ok(side.width > 0 && /radial-gradient/.test(side.image) && side.events === 'none', `${label}: Punktraster sichtbar`);
+          assert.ok(side.height >= m.doc - 20, `${label}: über die ganze Seitenhöhe`);
+        } else assert.equal(side.width, 0, `${label}: ohne freie Fläche keine Punkte`);
+      }
+      await context.close();
+    }
+  }
+});
+
 test('Tastatur: ungültige Eingabe bleibt im Feld; gültige Anfrage komplett per Tab/Enter/Leertaste bis zur Referenz (mobil und Desktop)', { skip }, async () => {
   for (const width of [390, 1440]) {
     app.exec('DELETE FROM notifications; DELETE FROM orders; DELETE FROM rate_limits;');

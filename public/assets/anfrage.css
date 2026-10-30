@@ -77,3 +77,15 @@ section[id] { scroll-margin-top: 88px; }
 /* Sanftes Einblenden beim Scrollen; die Klassen setzt app.js (nicht bei „Bewegung reduzieren“) */
 .reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s var(--ease), transform .7s var(--ease); transition-delay: var(--reveal-delay, 0ms); }
 .reveal.is-visible { opacity: 1; transform: none; }
+
+/* Freie Flächen links und rechts des Seitenrahmens (nur breiter als --frame): feines Raster aus Pfirsich-Punkten,
+   das über die ganze Seite mitläuft. Rein dekorativ, hinter dem Inhalt, nicht anklickbar. */
+body { position: relative; min-height: 100vh; }   /* auch kurze Seiten: Punkte bis zum unteren Bildschirmrand */
+body::before, body::after {
+  content: ""; position: absolute; top: 0; bottom: 0; z-index: -1; pointer-events: none;
+  width: max(0px, calc((100% - var(--frame)) / 2 - 16px));
+  background-image: radial-gradient(circle, rgb(254 91 42 / .32) 1.6px, transparent 2px);
+  background-size: 22px 22px;
+}
+body::before { left: 0; background-position: right 4px top 6px; }
+body::after { right: 0; background-position: left 4px top 6px; }
