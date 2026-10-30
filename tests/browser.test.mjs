@@ -97,7 +97,7 @@ test('Mobile Hauptansicht: kein horizontaler Überlauf, Formular sichtbar, Navig
 });
 
 test('Hero beim Öffnen: Überschrift, Text und Website-Eingabe vollständig im ersten Bildschirm und kontrastreich (Desktop und Mobil)', { skip }, async () => {
-  /* Alles inklusive Hinweiszeilen sichtbar; beim sehr kleinen 320×568 mindestens Überschrift, Text, Eingabe und Button */
+  /* Alles inklusive Faktenzeile sichtbar; beim sehr kleinen 320×568 mindestens Überschrift, Text, Eingabe und Button */
   const full = ['1920x1080', '1440x900', '1366x768', '1280x720', '1024x768', '768x1024', '390x844', '375x667', '360x740', '360x640'];
   const contrast = (a, b) => {
     const lum = c => { const [r, g, bl] = c.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number).map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }); return .2126 * r + .7152 * g + .0722 * bl; };
@@ -112,12 +112,12 @@ test('Hero beim Öffnen: Überschrift, Text und Website-Eingabe vollständig im 
       const input = document.querySelector('#url');
       return {
         vh: innerHeight, nav: b('#nav'), h1Top: document.querySelector('.hero .h1').getBoundingClientRect().top,
-        h1: b('.hero .h1'), lead: b('.hero .lead'), field: b('.url-field'), button: b('.url-field .btn'), facts: b('.hero .facts'), hint: b('.hero .form-hint'),
+        h1: b('.hero .h1'), lead: b('.hero .lead'), field: b('.url-field'), button: b('.url-field .btn'), facts: b('.hero .facts'),
         leadColor: getComputedStyle(document.querySelector('.hero .lead')).color, bodyBg: getComputedStyle(document.body).backgroundColor,
         placeholder: getComputedStyle(input, '::placeholder').color, fieldBg: getComputedStyle(input.closest('.url-field')).backgroundColor,
       };
     });
-    const must = full.includes(size) ? ['h1', 'lead', 'field', 'button', 'facts', 'hint'] : ['h1', 'lead', 'field', 'button'];
+    const must = full.includes(size) ? ['h1', 'lead', 'field', 'button', 'facts'] : ['h1', 'lead', 'field', 'button'];
     for (const k of must) assert.ok(m[k] <= m.vh, `${size}: ${k} endet bei ${Math.round(m[k])} px, sichtbar sind ${m.vh} px`);
     assert.ok(m.h1Top >= m.nav, `${size}: Überschrift liegt nicht unter der Navigation`);
     assert.ok(contrast(m.leadColor, m.bodyBg) >= 7, `${size}: Lauftext kontrastreich`);

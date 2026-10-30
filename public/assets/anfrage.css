@@ -19,7 +19,6 @@
 .consent { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; font-size: 15px; cursor: pointer; }
 .consent input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--ink); }
 .consent input:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
-.form-hint { font: 400 13px var(--font-mono); color: var(--ink-45); text-align: center; }
 .report-pages .page-no { font: 500 12px/1.9 var(--font-mono); color: var(--ink-70); }
 .report-pages { border-top: 0; }
 
@@ -32,8 +31,7 @@
 .hero .url-field { border-color: var(--ink-45); box-shadow: 0 10px 30px rgb(12 12 12 / .08); }
 .hero .url-field input { color: var(--ink); }
 .hero .url-field input::placeholder { color: var(--ink-70); }
-.hero .facts, .hero .form-hint { color: var(--ink-70); }
-.hero .form-hint { text-wrap: balance; }
+.hero .facts { color: var(--ink-70); }
 @media (max-width: 620px) {
   .hero .h1 { font-size: clamp(34px, min(12vw, 6.2svh), 46px); }
   .hero .lead { font-size: clamp(16px, 2.3svh, 18px); }
