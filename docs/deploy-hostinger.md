@@ -126,7 +126,7 @@ DELETE FROM orders WHERE created_at < UTC_TIMESTAMP() - INTERVAL <tage> DAY;
 B=https://<domain>
 curl -sI "http://<domain>/index.html" | grep -i '^location: https://'                 # HTTP → HTTPS
 curl -sI "$B/index.html"  | grep -iE 'strict-transport|x-frame-options|content-security'
-curl -sI "$B/anfrage.php" | grep -iE 'set-cookie: __Host-pxwa=.*secure.*httponly.*samesite=lax|content-security|cache-control: no-store'
+curl -s -D - -o /dev/null "$B/anfrage.php" | grep -iE 'set-cookie: __Host-pxwa=.*secure.*httponly.*samesite=lax|content-security|cache-control: no-store'   # GET; HEAD ergibt 405
 for p in vision.html DESIGN.md STRUCTURE.md server/config.php .htaccess .git/HEAD tests/server.test.mjs; do
   curl -s -o /dev/null -w "%{http_code} $p\n" "$B/$p"; done                           # erwartet 403 oder 404, nie 200
 php ~/domains/<domain>/bin/send-notifications.php                                     # erwartet: 0 versendet, 0 fehlgeschlagen.
