@@ -65,7 +65,7 @@ async function tabTo(page, pred, max = 40) {
   for (let i = 0; i < max; i++) {
     await page.keyboard.press('Tab');
     /* styles.css setzt bei reduzierter Bewegung transition-duration .01ms für alle Eigenschaften – kurz warten, bis die Outline steht */
-    await page.waitForTimeout(30);
+    await page.waitForTimeout(80);
     const f = await focusInfo(page);
     if (pred(f)) return f;
   }

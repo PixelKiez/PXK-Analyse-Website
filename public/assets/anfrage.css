@@ -51,3 +51,12 @@
 .showcase-note { margin-top: 14px; text-align: center; font: 400 12px var(--font-mono); color: var(--ink-45); }
 /* Zweites Video rechts neben dem Text im Abschnitt „Ihr Bericht“ (Spalte aus .split) */
 .report-media { min-width: 0; margin: 0; }
+
+/* Startseite: Schritte („So funktioniert's“) als lila Karten, Bereiche („Was wir prüfen“) als Pfirsich-Karten.
+   Farben und Linien kommen aus .cw-lilac bzw. .cw-peach (styles.css). */
+.steps--cards { gap: clamp(12px, 1.6vw, 20px); }
+.steps--cards .step, .steps--cards .step:first-child { padding: clamp(22px, 2.6vw, 32px); border: 1px solid var(--line-soft); border-radius: clamp(14px, 2vw, 24px); }
+.steps--cards .step p, .spec--cards .spec-row p { color: var(--ink-70); }
+.spec--cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(12px, 1.6vw, 20px); border-bottom: 0; }
+.spec--cards .spec-row { grid-template-columns: minmax(0, 1fr); gap: 14px; align-content: start; padding: clamp(22px, 2.6vw, 32px); border: 1px solid var(--line-soft); border-radius: clamp(14px, 2vw, 24px); }
+@media (max-width: 860px) { .spec--cards { grid-template-columns: minmax(0, 1fr); } }
