@@ -13,6 +13,7 @@ Platzhalter: `<domain>` (z. B. eine Subdomain), `<user>` (Hostinger-Benutzer `u�
 - [ ] `public/datenschutz.html` fertigstellen (derzeit „in Vorbereitung“): Google als Anmeldedienst, gespeicherte Daten,
       Speicherdauer, Hosting bei Hostinger, Google Fonts. Danach `privacy.version` auf den Stand der Erklärung setzen.
 - [ ] Speicherdauer der Aufträge festlegen (Abschnitt 8)
+- [ ] Video aus dem Railway-Bucket ausliefern (Abschnitt 11). Lokal liegt nur eine Testkopie in `public/media/` (git-ignoriert).
 - [ ] `noindex` bleibt gesetzt, bis eine eigene Release-Freigabe es aufhebt
 
 ## 1. Laufzeit
@@ -148,3 +149,16 @@ Anschließend die Testdaten löschen:
 - **Vorherige Version**: Artefakt des vorherigen SHA wie in Abschnitt 2 entpacken und `public_html`, `server` und `bin`
   ersetzen. `server/config.php` und `var/` bleiben, die Datenbank bleibt unverändert (das Schema ist nur additiv).
 - Erstes Deploy: Den in Abschnitt 2 gesicherten Inhalt von `public_html` zurückkopieren. Aufträge vorher exportieren.
+
+## 11. Video unter dem Hero (Railway)
+
+Railway-Buckets sind privat; es gibt keine öffentlichen Bucket-URLs. Ausgeliefert wird über einen öffentlichen Dienst
+im selben Railway-Projekt, der aus dem Bucket liest (z. B. Vorlage „Blob Butler“) und eine feste Domain hat.
+
+1. Bucket anlegen und `360-pixelkiez-hero-loop-1080p.mp4` sowie `360-pixelkiez-hero-loop-poster.jpg` hochladen.
+2. Auslieferungsdienst mit Domain `<media-domain>` bereitstellen. Pflicht für iPhone/Safari: Antworten auf
+   Range-Anfragen mit `206 Partial Content` und `Accept-Ranges: bytes`. Prüfung:
+   `curl -s -o /dev/null -D - -H 'Range: bytes=0-1023' https://<media-domain>/360-pixelkiez-hero-loop-1080p.mp4 | head -5`
+3. In `public/index.html` `poster` und `<source src>` auf `https://<media-domain>/…` setzen und in der Meta-CSP
+   `media-src 'self' https://<media-domain>; img-src 'self' https://<media-domain>` ergänzen.
+4. Railway als Anbieter in `datenschutz.html` aufnehmen (beim Abruf geht die IP-Adresse an Railway).

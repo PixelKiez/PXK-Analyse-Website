@@ -126,6 +126,39 @@ test('Hero beim Öffnen: Überschrift, Text und Website-Eingabe vollständig im 
   }
 });
 
+test('Video unter dem Hero: mittig, abgerundet, ohne Bedienelemente, startet beim Hineinscrollen und läuft in Schleife', { skip }, async () => {
+  const state = page => page.evaluate(() => {
+    const v = document.querySelector('.showcase-video'), f = v.closest('.showcase-frame'), r = f.getBoundingClientRect(), cs = getComputedStyle(f);
+    return { paused: v.paused, time: v.currentTime, loop: v.loop, muted: v.muted, controls: v.controls, inline: v.playsInline,
+      top: r.top, left: r.left, right: innerWidth - r.right, width: r.width, vw: innerWidth, vh: innerHeight, radius: parseFloat(cs.borderTopLeftRadius), overflow: cs.overflow };
+  });
+  for (const [width, height] of [[1440, 900], [390, 844]]) {
+    const { context, page, errors, blocked } = await open('/index.html', { width, height, reducedMotion: 'no-preference' });
+    const before = await state(page);
+    assert.ok(before.top >= before.vh - 1, `${width}: Video liegt unter dem ersten Bildschirm`);
+    assert.equal(before.paused, true, `${width}: läuft vor dem Scrollen noch nicht`);
+    await page.evaluate(() => scrollBy(0, 250));
+    await page.waitForFunction(() => { const v = document.querySelector('.showcase-video'); return !v.paused && v.currentTime > 0.3; }, null, { timeout: 5000 });
+    const m = await state(page);
+    assert.deepEqual([m.loop, m.muted, m.controls, m.inline], [true, true, false, true], `${width}: Schleife, stumm, ohne Bedienelemente`);
+    assert.ok(Math.abs(m.left - m.right) <= 1, `${width}: mittig (${m.left} / ${m.right})`);
+    assert.ok(m.width <= 960 && m.width < m.vw, `${width}: nicht über die ganze Breite (${m.width})`);
+    assert.ok(m.radius >= 12 && m.overflow === 'hidden', `${width}: abgerundete Ecken`);
+    /* Schleife: kurz vor dem Ende springt das Video wieder an den Anfang */
+    await page.evaluate(() => { const v = document.querySelector('.showcase-video'); v.currentTime = v.duration - 0.3; });
+    await page.waitForFunction(() => { const v = document.querySelector('.showcase-video'); return !v.paused && v.currentTime < 2; }, null, { timeout: 5000 });
+    assert.deepEqual(errors, [], `${width}: Konsolenfehler`);
+    assert.deepEqual(blocked, [], `${width}: unerwartete Fremd-Requests`);
+    await context.close();
+  }
+  /* Bewegung reduzieren (Betriebssystem): Standbild statt automatischer Wiedergabe */
+  const { context, page } = await open('/index.html', { width: 1440, height: 900, reducedMotion: 'reduce' });
+  await page.evaluate(() => scrollBy(0, 400));
+  await page.waitForTimeout(800);
+  assert.equal((await state(page)).paused, true);
+  await context.close();
+});
+
 test('Tastatur: ungültige Eingabe bleibt im Feld; gültige Anfrage komplett per Tab/Enter/Leertaste bis zur Referenz (mobil und Desktop)', { skip }, async () => {
   for (const width of [390, 1440]) {
     app.exec('DELETE FROM notifications; DELETE FROM orders; DELETE FROM rate_limits;');

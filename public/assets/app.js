@@ -13,6 +13,14 @@
     onScroll();
   }
 
+  /* Video unter dem Hero: startet, sobald es ins Bild scrollt, und läuft dann in Schleife.
+     Außerhalb des Bildes angehalten (spart Akku und Daten); bei „Bewegung reduzieren“ bleibt das Standbild. */
+  const video = $('.showcase-video');
+  if (video && !reduce && 'IntersectionObserver' in window) {
+    /* intersectionRatio > 0: Ein Video, das nur an den unteren Bildschirmrand stößt, gilt noch nicht als sichtbar */
+    new IntersectionObserver(([e]) => { if (e.intersectionRatio > 0) video.play().catch(() => {}); else video.pause(); }, { threshold: [0, 0.01] }).observe(video);
+  }
+
   const form = $('#analyze'), input = $('#url');
   if (!form || !input) return;
 

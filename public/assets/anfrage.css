@@ -46,3 +46,10 @@
 
 /* Längerer Name 360°Pixelkiez: auf schmalen Handys entfällt der Zusatz „Analyse“ im Navigationslogo, damit der Button in der Pille bleibt */
 @media (max-width: 379px) { .nav .logo span { display: none; } }
+
+/* Video unter dem Hero: zentriertes Widget mit abgerundeten Ecken, nicht über die ganze Breite */
+.showcase { padding: 0 var(--gutter) clamp(56px, 8vw, 104px); }
+.showcase-media { width: min(100%, 960px); margin: 0 auto; }
+.showcase-frame { overflow: hidden; isolation: isolate; border-radius: clamp(14px, 2vw, 24px); background: #0E1416; box-shadow: 0 24px 60px rgb(12 12 12 / .16); }
+.showcase-video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; }
+.showcase-note { margin-top: 14px; text-align: center; font: 400 12px var(--font-mono); color: var(--ink-45); }

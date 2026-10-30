@@ -5,3 +5,6 @@ server/config.php
 var/
 *.sqlite
 *.sqlite-*
+# Videos: Quelldatei und lokale Testkopie; produktiv kommt das Video aus dem Railway-Bucket
+/*.mp4
+public/media/

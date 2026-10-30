@@ -194,7 +194,8 @@ test('Design: styles.css unverändert gegenüber vision.html; alle verwendeten K
 
 test('Release-Grenze: public/ enthält nur ausgelieferte Dateien; Konfiguration und Laufzeitdaten sind ausgeschlossen', () => {
   const walk = d => readdirSync(d).flatMap(f => statSync(join(d, f)).isDirectory() ? walk(join(d, f)) : [relative(join(ROOT, 'public'), join(d, f))]);
-  const files = walk(join(ROOT, 'public')).filter(f => !f.endsWith('.DS_Store')).sort();
+  /* Git-ignorierte Dateien (z. B. lokale Videokopie in public/media/) gelangen nicht ins Artefakt (git archive) */
+  const files = walk(join(ROOT, 'public')).filter(f => !f.endsWith('.DS_Store') && spawnSync('git', ['check-ignore', '-q', join('public', f)], { cwd: ROOT }).status !== 0).sort();
   assert.deepEqual(files, ['.htaccess', 'anfrage.php', 'assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'auth/callback.php', 'datenschutz.html', 'impressum.html', 'index.html', 'pruefkriterien.html']);
   for (const f of ['anfrage.php', 'auth/callback.php']) assert.ok(!/(new\s+PDO|curl_init|SmtpMailer)/.test(read('public/' + f)), `${f}: nur Einstieg, Logik außerhalb des Webroots`);
   for (const f of ['server/config.php', 'var/pxwa.sqlite', 'var/google-jwks.json']) assert.equal(spawnSync('git', ['check-ignore', '-q', f], { cwd: ROOT }).status, 0, `${f} ist ignoriert`);
