@@ -18,7 +18,7 @@ const pw = await (async () => {
   const dir = process.env.PXK_PLAYWRIGHT;
   try { return dir ? await import(pathToFileURL(join(dir, 'index.mjs')).href) : await import('playwright'); } catch { return null; }
 })();
-const skip = !pw ? 'NOT_RUN: Playwright nicht verfügbar (PXK_PLAYWRIGHT setzen)' : !(phpAvailable && sqliteAvailable) ? 'NOT_RUN: php/sqlite3 fehlt' : false;
+const skip = !pw ? 'NOT_RUN: Playwright nicht verfügbar (PXK_PLAYWRIGHT setzen)' : !(phpAvailable && sqliteAvailable) ? 'NOT_RUN: php/pdo_sqlite fehlt' : false;
 
 let google, smtp, app, browser;
 before(async () => {

@@ -106,7 +106,7 @@ final class View
 <header class="nav-wrap" id="nav">
   <nav class="nav" aria-label="Hauptnavigation">
     <a class="logo" href="' . $b . '/index.html#top">Pixelkiez<span>Analyse</span></a>
-    <div class="nav-links"><a href="' . $b . '/index.html#bereiche">Bereiche</a><a href="' . $b . '/index.html#bericht">Bericht</a><a href="' . $b . '/index.html#faq">FAQ</a></div>
+    <div class="nav-links"><a href="' . $b . '/index.html#bericht">Bericht</a><a href="' . $b . '/index.html#bereiche">Bereiche</a><a href="' . $b . '/index.html#angebot">Angebot</a><a href="' . $b . '/index.html#faq">FAQ</a></div>
     <a class="btn btn--ghost btn--sm" href="' . $b . '/index.html">Start</a>
   </nav>
 </header>

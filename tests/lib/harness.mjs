@@ -1,5 +1,6 @@
 /* Lokale Test-Umgebung für die PXWA-Serverkomponente – nur Mocks, keine echten Provider.
    - php -S mit eigener Test-Konfiguration (SQLite, Sessions und Schlüssel-Cache in einem Temp-Verzeichnis)
+   - optional MySQL/MariaDB statt SQLite: PXK_MYSQL_DSN, PXK_MYSQL_USER, PXK_MYSQL_PASS (Testdatenbank, Tabellen werden neu angelegt)
    - Mock-Google: Token-Endpunkt (prüft client_secret, redirect_uri, PKCE, Einmal-Code) und JWKS mit Testschlüssel
    - Mock-SMTP: zählt angenommene Nachrichten, kann temporäre Fehler (451) liefern
    Die Google-Autorisierungsseite selbst wird nicht nachgebaut: Tests lesen state/nonce/code_challenge aus der
@@ -8,7 +9,7 @@ import http from 'node:http';
 import net from 'node:net';
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { generateKeyPairSync, createHash, sign, randomBytes } from 'node:crypto';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,7 +21,18 @@ export const NOTIFY_TO = 'kontakt@pixelkiez.de';
 export const CUSTOMER = 'kunde@beispiel-kunde.de';
 
 export const phpAvailable = spawnSync('php', ['-v']).status === 0;
-export const sqliteAvailable = spawnSync('sqlite3', ['-version']).status === 0;
+/* Datenbankzugriff der Tests läuft über PDO (php -r), kein sqlite3-CLI nötig */
+export const sqliteAvailable = phpAvailable && spawnSync('php', ['-r', 'exit(extension_loaded("pdo_sqlite") ? 0 : 1);']).status === 0;
+const MYSQL = process.env.PXK_MYSQL_DSN ? { dsn: process.env.PXK_MYSQL_DSN, user: process.env.PXK_MYSQL_USER || '', pass: process.env.PXK_MYSQL_PASS || '' } : null;
+export const dbDriver = MYSQL ? 'mysql' : 'sqlite';
+
+/* SQL über PDO ausführen. mode "query" liefert Zeilen als JSON, "exec" führt eine oder mehrere Anweisungen aus. */
+const PDO_HELPER = `[, $dsn, $user, $pass, $mode, $sql] = $argv;
+$pdo = new PDO($dsn, $user === '' ? null : $user, $pass === '' ? null : $pass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC, PDO::ATTR_EMULATE_PREPARES => false, PDO::ATTR_STRINGIFY_FETCHES => false]);
+if ($mode === 'query') { echo json_encode($pdo->query($sql)->fetchAll()); exit; }
+if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') { $pdo->exec($sql); exit; }
+foreach (array_filter(array_map('trim', explode(';', $sql))) as $s) { $pdo->exec($s); }`;
+const pdo = (db, mode, sql) => execFileSync('php', ['-r', PDO_HELPER, '--', db.dsn, db.user, db.pass, mode, sql], { encoding: 'utf8' });
 
 const b64url = b => Buffer.from(b).toString('base64url');
 const freePort = () => new Promise(r => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => r(p)); }); });
@@ -34,6 +46,7 @@ export function mockGoogle() {
   const jwk = { ...key.publicKey.export({ format: 'jwk' }), kid: 'test-key-1', alg: 'RS256', use: 'sig' };
   const codes = new Map();
   const log = { token: [], certs: 0 };
+  const state = { outage: false };   // true: Token- und Schlüssel-Endpunkt antworten mit 503 (Störung bei Google)
   let redirectUri = '';
 
   const idToken = ({ nonce, claims = {}, mode }) => {
@@ -53,6 +66,10 @@ export function mockGoogle() {
     req.on('data', c => { body += c; });
     req.on('end', () => {
       const url = new URL(req.url, 'http://mock');
+      if (state.outage && ['/certs', '/token'].includes(url.pathname)) {
+        res.writeHead(503, { 'content-type': 'text/plain' });
+        return res.end('Service Unavailable');
+      }
       if (req.method === 'GET' && url.pathname === '/certs') {
         log.certs++;
         res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'public, max-age=3600' });
@@ -85,7 +102,7 @@ export function mockGoogle() {
   });
 
   return {
-    log, codes,
+    log, codes, state,
     async start() { this.port = await listen(server); this.origin = `http://127.0.0.1:${this.port}`; return this; },
     setRedirectUri(u) { redirectUri = u; },
     issueCode({ nonce, challenge, redirectUri: ru, claims, mode }) {
@@ -147,20 +164,27 @@ export function mockSmtp() {
 
 /* ---------- PHP-Server mit Test-Konfiguration ---------- */
 
-export async function startApp({ google, smtp, authEndpoint }) {
+/* scheme 'https': Basis-URL https://127.0.0.1:PORT, php -S antwortet weiter über HTTP. So lassen sich __Host-Cookie,
+   Secure-Flag und HSTS prüfen; der Browser-Transport (TLS) selbst ist damit nicht getestet.
+   db: 'auto' (MySQL, falls PXK_MYSQL_DSN gesetzt, sonst SQLite) | 'sqlite' | 'unreachable' (Datenbank nicht erreichbar)
+   config: false startet ohne Konfigurationsdatei. */
+export async function startApp({ google, smtp, authEndpoint, scheme = 'http', db: dbMode = 'auto', config: withConfig = true }) {
   const dir = mkdtempSync(join(tmpdir(), 'pxwa-test-'));
   const port = await freePort();
-  const base = `http://127.0.0.1:${port}`;
-  const db = join(dir, 'pxwa.sqlite');
+  const url = `http://127.0.0.1:${port}`;
+  const base = `${scheme}://127.0.0.1:${port}`;
+  const file = join(dir, 'pxwa.sqlite');
+  const db = dbMode === 'auto' && MYSQL ? MYSQL
+    : { dsn: 'sqlite:' + (dbMode === 'unreachable' ? join(dir, 'fehlt', 'pxwa.sqlite') : file), user: '', pass: '' };
   const config = join(dir, 'config.php');
   const sessions = join(dir, 'sessions');
   execFileSync('mkdir', ['-p', sessions]);
   const php = v => JSON.stringify(v).replace(/\$/g, '\\$');
-  writeFileSync(config, `<?php return [
+  if (withConfig) writeFileSync(config, `<?php return [
   'env' => 'local',
   'base_url' => ${php(base)},
   'google' => ['client_id' => ${php(CLIENT_ID)}, 'client_secret' => ${php(CLIENT_SECRET)}, 'token_endpoint' => ${php(google.origin + '/token')}, 'jwks_uri' => ${php(google.origin + '/certs')}${authEndpoint ? `, 'auth_endpoint' => ${php(authEndpoint)}` : ''}],
-  'db' => ['dsn' => ${php('sqlite:' + db)}],
+  'db' => ['dsn' => ${php(db.dsn)}, 'user' => ${php(db.user)}, 'pass' => ${php(db.pass)}],
   'mail' => ['host' => '127.0.0.1', 'port' => ${smtp.port}, 'encryption' => 'none', 'username' => 'pxwa-test', 'password' => 'test-only', 'from' => 'analyse@pixelkiez.de', 'notify_to' => ${php(NOTIFY_TO)}, 'timeout' => 5],
   'data_dir' => ${php(dir)},
   'session_dir' => ${php(sessions)},
@@ -169,20 +193,27 @@ export async function startApp({ google, smtp, authEndpoint }) {
 ];\n`);
   google.setRedirectUri(`${base}/auth/callback.php`);
   const env = { ...process.env, PXWA_CONFIG: config };
-  const migrate = spawnSync('php', [join(ROOT, 'bin/migrate.php')], { env, encoding: 'utf8' });
-  if (migrate.status !== 0) throw new Error('Migration fehlgeschlagen: ' + migrate.stderr);
+  const driver = db.dsn.split(':')[0];
+  if (withConfig && dbMode !== 'unreachable') {
+    if (driver === 'mysql') pdo(db, 'exec', 'DROP TABLE IF EXISTS notifications; DROP TABLE IF EXISTS orders; DROP TABLE IF EXISTS rate_limits');
+    const migrate = spawnSync('php', [join(ROOT, 'bin/migrate.php')], { env, encoding: 'utf8' });
+    if (migrate.status !== 0) throw new Error('Migration fehlgeschlagen: ' + migrate.stderr);
+  }
   const proc = spawn('php', ['-S', `127.0.0.1:${port}`, '-t', join(ROOT, 'public')], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let logs = '';
   proc.stdout.on('data', d => { logs += d; });
   proc.stderr.on('data', d => { logs += d; });
   for (let i = 0; i < 50; i++) {
-    try { await fetch(base + '/index.html'); break; } catch { await new Promise(r => setTimeout(r, 100)); }
+    try { await fetch(url + '/index.html'); break; } catch { await new Promise(r => setTimeout(r, 100)); }
   }
+  const sql = q => JSON.parse(pdo(db, 'query', q) || '[]');
   return {
-    base, db, dir, sessions, env,
+    base, url, driver, dir, sessions, env,
     logs: () => logs,
-    sql: q => JSON.parse(execFileSync('sqlite3', ['-json', db, q], { encoding: 'utf8' }) || '[]'),
-    exec: q => execFileSync('sqlite3', [db, q], { encoding: 'utf8' }),
+    sql,
+    exec: q => pdo(db, 'exec', q),
+    /* Gesamter gespeicherter Inhalt: bei SQLite die Datei selbst (inkl. freigegebener Seiten), sonst alle Tabellen */
+    dump: () => driver === 'sqlite' ? readFileSync(file).toString('latin1') : JSON.stringify(['orders', 'notifications', 'rate_limits'].map(t => sql(`SELECT * FROM ${t}`))),
     migrate: () => spawnSync('php', [join(ROOT, 'bin/migrate.php')], { env, encoding: 'utf8' }),
     /* asynchron: der Mock-SMTP läuft im selben Node-Prozess und muss währenddessen antworten können */
     cron: () => new Promise(resolve => {
@@ -198,8 +229,9 @@ export async function startApp({ google, smtp, authEndpoint }) {
 
 /* ---------- HTTP-Client mit Cookie-Speicher (wie ein Browser, ohne JavaScript) ---------- */
 
+/* url: Transportadresse; origin: Origin-Header für Formulare (abweichend bei https-Basis-URL über php -S) */
 export class Client {
-  constructor(base) { this.base = base; this.cookies = new Map(); this.setCookies = []; }
+  constructor(url, { origin } = {}) { this.base = url; this.origin = origin ?? url; this.cookies = new Map(); this.setCookies = []; }
   async req(method, path, { form, headers = {} } = {}) {
     const h = { ...headers };
     if (this.cookies.size) h.cookie = [...this.cookies].map(([k, v]) => `${k}=${v}`).join('; ');
@@ -207,7 +239,7 @@ export class Client {
     if (form) {
       body = new URLSearchParams(form).toString();
       h['content-type'] = 'application/x-www-form-urlencoded';
-      if (!('origin' in h)) h.origin = this.base;
+      if (!('origin' in h)) h.origin = this.origin;
       if (h.origin === null) delete h.origin;
     }
     const res = await fetch(new URL(path, this.base), { method, headers: h, body, redirect: 'manual' });

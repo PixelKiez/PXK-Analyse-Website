@@ -38,6 +38,10 @@ return [
     // Verzeichnis außerhalb von public_html für Schlüssel-Cache (Google-Zertifikate). Muss beschreibbar sein.
     'data_dir' => '/home/BENUTZER/domains/DOMAIN/var',
 
+    // Eigenes Session-Verzeichnis außerhalb von public_html (Sessions enthalten E-Mail-Adresse und Google-Kennung).
+    // Muss existieren und beschreibbar sein; weglassen = PHP-Standardpfad des Hosters.
+    'session_dir' => '/home/BENUTZER/domains/DOMAIN/var/sessions',
+
     // Zufallswert mit mindestens 32 Zeichen, z. B. `php -r 'echo bin2hex(random_bytes(32));'`.
     // Dient nur zum Pseudonymisieren von IP-Adressen im Rate-Limiting.
     'secret' => '',

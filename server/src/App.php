@@ -150,8 +150,13 @@ final class App
             return;
         }
         if ($r['result'] === OrderService::CREATED) {
-            /* Auftrag ist gespeichert. Mailfehler ändern daran nichts; die Benachrichtigung wird dann per Cron wiederholt. */
-            $this->notifier()->deliver($r['order_id']);
+            /* Auftrag ist gespeichert. Mail- oder Datenbankfehler beim Versand ändern daran nichts und dürfen keine
+               Fehlerseite auslösen; die Benachrichtigung bleibt in der Outbox und wird per Cron wiederholt. */
+            try {
+                $this->notifier()->deliver($r['order_id']);
+            } catch (\Throwable $e) {
+                error_log('PXWA: Benachrichtigung zu ' . $r['reference'] . ' nicht sofort versendet (' . get_class($e) . '), Cron wiederholt');
+            }
         }
         $_SESSION['done'] = [
             'reference' => $r['reference'], 'url' => $pending['url'], 'email' => $identity['email'], 'idem' => $_SESSION['idem'],

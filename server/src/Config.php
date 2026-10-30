@@ -96,6 +96,11 @@ final class Config
         if ($dir === '' || !is_dir($dir) || !is_writable($dir)) {
             $missing[] = 'data_dir';
         }
+        /* Ein konfiguriertes, aber fehlendes Session-Verzeichnis würde jede Anmeldung still verlieren */
+        $sessionDir = $this->c['session_dir'] ?? null;
+        if ($sessionDir !== null && (!is_string($sessionDir) || !is_dir($sessionDir) || !is_writable($sessionDir))) {
+            $missing[] = 'session_dir';
+        }
         if (strlen((string) ($this->c['secret'] ?? '')) < 32) {
             $missing[] = 'secret';
         }

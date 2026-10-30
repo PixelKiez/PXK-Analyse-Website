@@ -1,13 +1,15 @@
 /* PXWA – Integrationstests der Serverkomponente gegen einen echten PHP-Server (php -S) mit lokalen Mocks.
-   Ausführen im Repo-Root:  node --test tests/server.test.mjs   (benötigt php ≥ 8.1 mit pdo_sqlite, openssl, curl, intl und sqlite3)
+   Ausführen im Repo-Root:  node --test tests/server.test.mjs   (benötigt php ≥ 8.1 mit pdo_sqlite, openssl, curl, intl)
+   MySQL/MariaDB statt SQLite: PXK_MYSQL_DSN='mysql:host=…;port=…;dbname=…;charset=utf8mb4' PXK_MYSQL_USER=… PXK_MYSQL_PASS=…
+   (nur eine Testdatenbank angeben – die Tabellen werden gelöscht und neu angelegt).
    Echte Provider (Google, Hostinger-SMTP, Hostinger-Datenbank) werden hier NICHT getestet. */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { mockGoogle, mockSmtp, startApp, Client, login, confirm, field, decodeMail, phpAvailable, sqliteAvailable, CLIENT_ID, CUSTOMER, NOTIFY_TO } from './lib/harness.mjs';
+import { mockGoogle, mockSmtp, startApp, Client, login, confirm, field, decodeMail, phpAvailable, sqliteAvailable, ROOT, CLIENT_ID, CUSTOMER, NOTIFY_TO } from './lib/harness.mjs';
 
-const skip = phpAvailable && sqliteAvailable ? false : 'NOT_RUN: php oder sqlite3 nicht verfügbar';
+const skip = phpAvailable && sqliteAvailable ? false : 'NOT_RUN: php oder pdo_sqlite nicht verfügbar';
 let google, smtp, app;
 
 before(async () => {
@@ -199,7 +201,7 @@ test('Erfolgreiche Annahme: genau ein Auftrag, genau eine interne Benachrichtigu
   assert.match(text, new RegExp(ref)); assert.match(text, /https:\/\/www\.musterfirma\.de/); assert.match(text, new RegExp(CUSTOMER.replace('.', '\\.')));
   assert.deepEqual(app.sql('SELECT status, attempts FROM notifications'), [{ status: 'sent', attempts: 1 }]);
   /* Keine Tokens in Datenbank, Sessions oder Log */
-  const dbRaw = readFileSync(app.db).toString('latin1');
+  const dbRaw = app.dump();
   const sessions = readdirSync(app.sessions).map(f => readFileSync(join(app.sessions, f), 'utf8')).join('\n');
   for (const [where, s] of [['Datenbank', dbRaw], ['Sessions', sessions], ['Log', app.logs()]]) {
     assert.ok(!s.includes('mock-access-token') && !/eyJ[A-Za-z0-9_-]{10,}\./.test(s), `${where}: kein Access- oder ID-Token`);
@@ -294,6 +296,190 @@ test('Fehlgeschlagener Mailversand: Auftrag bleibt gespeichert und bestätigt; C
   assert.equal(smtp.state.accepted.length, 1, 'keine Doppel-Mail');
   n = app.sql('SELECT status, attempts FROM notifications')[0];
   assert.deepEqual(n, { status: 'sent', attempts: 2 });
+});
+
+test('Benachrichtigung scheitert nach der Speicherung an der Datenbank: Annahme bleibt bestätigt, keine Fehlerseite, Cron versendet genau einmal', { skip }, async () => {
+  reset();
+  const c = new Client(app.base);
+  await login(c, google);
+  /* Auftrag und Outbox-Eintrag werden gespeichert; erst das Beanspruchen der Benachrichtigung (UPDATE) schlägt fehl */
+  app.exec(app.driver === 'mysql'
+    ? "CREATE TRIGGER pxwa_test_block BEFORE UPDATE ON notifications FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'pxwa test'"
+    : "CREATE TRIGGER pxwa_test_block BEFORE UPDATE ON notifications BEGIN SELECT RAISE(ABORT, 'pxwa test'); END");
+  let res;
+  try {
+    ({ res } = await confirm(c));
+  } finally {
+    app.exec('DROP TRIGGER pxwa_test_block');
+  }
+  assert.equal(res.status, 303, 'Auftrag ist gespeichert – keine Fehlerseite, die zu erneutem Absenden verleitet');
+  const done = await c.req('GET', '/anfrage.php');
+  assert.match(done.text, /Ihre Anfrage liegt bei uns/);
+  assert.equal(orders().length, 1);
+  assert.equal(smtp.state.accepted.length, 0);
+  assert.deepEqual(app.sql('SELECT status, attempts FROM notifications'), [{ status: 'pending', attempts: 0 }], 'Benachrichtigung bleibt fällig');
+  assert.ok(!app.logs().includes(CUSTOMER) && !app.logs().includes('musterfirma'));
+  const run = await app.cron();
+  assert.match(run.stdout, /1 versendet, 0 fehlgeschlagen/);
+  assert.equal(smtp.state.accepted.length, 1, 'genau eine Mail');
+  assert.match(decodeMail(smtp.state.accepted[0].data).text, new RegExp(orders()[0].reference));
+});
+
+test('Störungen: fehlende Tabelle, nicht erreichbare Datenbank, fehlende Konfiguration, Google-Ausfall → ehrliche Fehlerseite, keine Annahme', { skip }, async () => {
+  reset();
+  /* Tabelle fehlt (z. B. Migration nicht gelaufen): Start wird nicht zu Google weitergeleitet */
+  app.exec('ALTER TABLE rate_limits RENAME TO rate_limits_off');
+  try {
+    const r = await new Client(app.base).req('POST', '/anfrage.php', { form: { action: 'start', website: 'musterfirma.de' } });
+    assert.equal(r.status, 503);
+    assert.match(r.text, /konnte nicht verarbeitet werden/);
+    assert.equal(r.location, null, 'keine Weiterleitung zu Google');
+  } finally {
+    app.exec('ALTER TABLE rate_limits_off RENAME TO rate_limits');
+  }
+  /* Google-Token-Endpunkt gestört: Anmeldung wird nicht bestätigt, keine Identität, keine Annahme */
+  google.state.outage = true;
+  try {
+    const g = new Client(app.base);
+    const { callback } = await login(g, google);
+    assert.equal(callback.status, 401);
+    assert.match(callback.text, /Anmeldung nicht bestätigt/);
+    assert.equal((await confirm(g)).res.status, 403);
+  } finally {
+    google.state.outage = false;
+  }
+  assert.match(app.logs(), /Google-Anmeldung abgelehnt: token_exchange/);
+  assert.equal(orders().length, 0);
+  assert.equal(smtp.state.accepted.length, 0);
+  /* Datenbank nicht erreichbar bzw. Konfiguration fehlt: eigene Instanzen */
+  const g2 = await mockGoogle().start();
+  const noDb = await startApp({ google: g2, smtp, db: 'unreachable' });
+  const noConfig = await startApp({ google: g2, smtp, config: false });
+  try {
+    assert.equal((await fetch(noDb.url + '/anfrage.php')).status, 200, 'Eingabeseite braucht keine Datenbank');
+    const r = await new Client(noDb.url).req('POST', '/anfrage.php', { form: { action: 'start', website: 'musterfirma.de' } });
+    assert.equal(r.status, 503);
+    assert.match(r.text, /konnte nicht verarbeitet werden/);
+    assert.equal(r.location, null);
+    assert.match(noDb.logs(), /PXWA: Datenbankverbindung fehlgeschlagen/);
+    for (const method of ['GET', 'POST']) {
+      const n = await new Client(noConfig.url).req(method, '/anfrage.php', method === 'POST' ? { form: { action: 'start', website: 'musterfirma.de' } } : {});
+      assert.equal(n.status, 503, method);
+      assert.match(n.text, /Anfragen sind im Moment nicht möglich/);
+    }
+    assert.equal((await fetch(noConfig.url + '/index.html')).status, 200, 'statische Seiten bleiben erreichbar');
+    assert.match(noConfig.logs(), /PXWA: Konfigurationsdatei fehlt/);
+    for (const l of [noDb.logs(), noConfig.logs()]) assert.ok(!l.includes('musterfirma') && !/PHP (Warning|Notice|Deprecated|Fatal)/.test(l));
+  } finally {
+    await noDb.stop(); await noConfig.stop(); await g2.stop();
+  }
+});
+
+test('Kein Identitäts- oder Session-Spoofing: Formularfelder überschreiben keine Identität, fremde oder fixierte Session-IDs tragen keine Anmeldung', { skip }, async () => {
+  reset();
+  /* Vom Angreifer erfundene Session-ID wird nicht übernommen (session.use_strict_mode) */
+  const invented = 'pxwaangreifer0123456789abcdefgh';
+  const v1 = new Client(app.base);
+  v1.cookies.set('pxwa', invented);
+  await v1.req('GET', '/anfrage.php');
+  assert.notEqual(v1.cookies.get('pxwa'), invented, 'erfundene Session-ID wird ersetzt');
+  /* Session-Fixation: Angreifer schiebt eine echte, gültige Session-ID unter; nach dem Login gilt sie nicht mehr */
+  const attacker = new Client(app.base);
+  await attacker.req('GET', '/anfrage.php');
+  const victim = new Client(app.base);
+  victim.cookies.set('pxwa', attacker.cookies.get('pxwa'));
+  await login(victim, google);
+  assert.notEqual(victim.cookies.get('pxwa'), attacker.cookies.get('pxwa'), 'neue Session-ID nach dem Login');
+  const stolen = await attacker.req('GET', '/anfrage.php');
+  assert.ok(!/name="idem"/.test(stolen.text) && !stolen.text.includes(CUSTOMER), 'alte Session-ID trägt keine Anmeldung');
+  assert.equal((await confirm(attacker)).res.status, 403);
+  /* Untergeschobene Formularfelder ändern weder E-Mail, Google-Kennung, Website noch Referenz */
+  const page = await victim.req('GET', '/anfrage.php');
+  const res = await victim.req('POST', '/anfrage.php', { form: {
+    action: 'confirm', csrf: field(page.text, 'csrf'), idem: field(page.text, 'idem'), zustimmung: '1',
+    email: 'angreifer@beispiel-kunde.de', sub: '999', google_sub: '999', website: 'https://andere-firma.de', url: 'https://andere-firma.de', reference: 'PXA-AAAA-AAAA', 'identity[email]': 'angreifer@beispiel-kunde.de',
+  } });
+  assert.equal(res.status, 303);
+  const [o] = orders();
+  assert.deepEqual([o.email, o.google_sub, o.website_url], [CUSTOMER, '100000000000000000001', 'https://musterfirma.de']);
+  assert.notEqual(o.reference, 'PXA-AAAA-AAAA');
+  assert.equal(smtp.state.accepted.length, 1);
+  assert.deepEqual(smtp.state.accepted[0].rcpt, [NOTIFY_TO]);
+  assert.ok(!decodeMail(smtp.state.accepted[0].data).text.includes('angreifer'));
+});
+
+test('HTTPS-Basis-URL: __Host-Session-Cookie (Secure, HttpOnly, SameSite=Lax, Path=/, ohne Domain), HSTS und Sicherheits-Header; Ablauf funktioniert', { skip }, async () => {
+  reset();
+  const g = await mockGoogle().start();
+  const s = await startApp({ google: g, smtp, scheme: 'https', db: 'sqlite' });
+  try {
+    const c = new Client(s.url, { origin: s.base });
+    const first = await c.req('GET', '/anfrage.php');
+    const [cookie] = first.headers.getSetCookie();
+    assert.match(cookie, /^__Host-pxwa=[^;]+;/);
+    assert.match(cookie, /;\s*path=\/(;|$)/i);
+    assert.match(cookie, /;\s*secure(;|$)/i);
+    assert.match(cookie, /;\s*HttpOnly(;|$)/i);
+    assert.match(cookie, /;\s*SameSite=Lax(;|$)/i);
+    assert.ok(!/domain=|expires=|max-age=/i.test(cookie), 'kein Domain-Attribut, nur Sitzungsdauer');
+    const h = first.headers;
+    assert.equal(h.get('strict-transport-security'), 'max-age=31536000');
+    assert.match(h.get('content-security-policy'), /^default-src 'none';.*form-action 'self' https:\/\/accounts\.google\.com;.*frame-ancestors 'none'; base-uri 'none'$/);
+    assert.equal(h.get('x-frame-options'), 'DENY');
+    assert.equal(h.get('x-content-type-options'), 'nosniff');
+    assert.equal(h.get('referrer-policy'), 'same-origin');
+    assert.equal(h.get('cross-origin-opener-policy'), 'same-origin');
+    assert.match(h.get('permissions-policy'), /camera=\(\)/);
+    assert.equal(h.get('cache-control'), 'no-store');
+    assert.equal(h.get('x-powered-by'), null);
+    assert.equal(h.get('access-control-allow-origin'), null, 'keine CORS-Freigabe');
+    /* Formular-POST mit http-Origin passt nicht zur https-Basis-URL */
+    const plain = await new Client(s.url).req('POST', '/anfrage.php', { form: { action: 'start', website: 'musterfirma.de' } });
+    assert.equal(plain.status, 403);
+    const sid0 = c.cookies.get('__Host-pxwa');
+    const { callback } = await login(c, g);
+    assert.equal(callback.status, 303);
+    assert.equal(callback.location, `${s.base}/anfrage.php`);
+    assert.ok(c.cookies.get('__Host-pxwa') && c.cookies.get('__Host-pxwa') !== sid0, 'Session-Wechsel auch mit __Host-Cookie');
+    assert.equal((await confirm(c)).res.status, 303);
+    assert.equal(s.sql('SELECT COUNT(*) AS n FROM orders')[0].n, 1);
+    assert.equal(smtp.state.accepted.length, 1);
+    assert.ok(c.setCookies.every(x => /;\s*secure/i.test(x) && /^__Host-/.test(x)), 'alle Cookies Secure mit __Host-Präfix');
+  } finally {
+    await s.stop(); await g.stop();
+    smtp.state.accepted.length = 0;
+  }
+});
+
+test('Öffentliche Routen: Dateien außerhalb von public/ werden über HTTP nicht ausgeliefert (php -S; LiteSpeed-Verhalten nicht geprüft)', { skip }, async () => {
+  /* php -S liefert für unbekannte Pfade die index.html aus – geprüft wird daher, dass der Inhalt der Datei nicht ankommt */
+  const markers = {
+    '/vision.html': readFileSync(join(ROOT, 'vision.html'), 'utf8').slice(0, 400),
+    '/DESIGN.md': readFileSync(join(ROOT, 'DESIGN.md'), 'utf8').slice(0, 200),
+    '/STRUCTURE.md': readFileSync(join(ROOT, 'STRUCTURE.md'), 'utf8').slice(0, 200),
+    '/server/bootstrap.php': 'spl_autoload_register',
+    '/server/config.example.php': 'client_secret',
+    '/server/schema/mysql.sql': 'CREATE TABLE',
+    '/bin/migrate.php': 'migrate()',
+    '/tests/server.test.mjs': 'node:test',
+    '/.git/HEAD': 'ref: refs/heads/',
+    '/.gitignore': 'server/config.php',
+  };
+  for (const [path, marker] of Object.entries(markers)) {
+    const text = await (await fetch(app.url + path, { redirect: 'manual' })).text();
+    assert.ok(!text.includes(marker), `${path} wird nicht ausgeliefert`);
+  }
+  for (const path of ['/index.html', '/pruefkriterien.html', '/assets/styles.css', '/assets/anfrage.css', '/assets/app.js']) {
+    assert.equal((await fetch(app.url + path)).status, 200, path);
+  }
+});
+
+test('Hauptnavigation: Anfrageseiten verlinken dieselben Bereiche in derselben Reihenfolge wie die Methodikseite', { skip }, async () => {
+  const links = html => [...(html.match(/<div class="nav-links">([\s\S]*?)<\/div>/) || ['', ''])[1].matchAll(/href="([^"]+)">([^<]+)</g)].map(m => [m[1].replace(/^.*index\.html/, 'index.html'), m[2]]);
+  const methodik = links(await (await fetch(app.url + '/pruefkriterien.html')).text());
+  const anfrage = links((await new Client(app.base).req('GET', '/anfrage.php')).text);
+  assert.ok(methodik.length >= 4);
+  assert.deepEqual(anfrage, methodik);
 });
 
 test('Rate-Limiting: zu viele Anfragestarts von einer IP werden mit 429 gebremst', { skip }, async () => {
