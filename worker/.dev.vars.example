@@ -1,0 +1,7 @@
+# Vorlage für worker/.dev.vars (nur lokal mit `wrangler dev`, per .gitignore ausgeschlossen). Echte Werte NIE in Git.
+# In Produktion kommen diese Werte ausschließlich über `npx wrangler secret put <NAME>`.
+ENV=local
+BASE_URL=http://localhost:8787
+GOOGLE_CLIENT_SECRET=
+SECRET=
+MAIL_API_TOKEN=

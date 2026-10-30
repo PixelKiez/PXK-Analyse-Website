@@ -1,17 +1,23 @@
-/* PXWA – statische Prüfungen ohne Abhängigkeiten (Node ≥ 20). Ausführen im Repo-Root: node --test tests/static.test.mjs
+/* PXWA – statische Prüfungen (Node ≥ 22). Ausführen im Repo-Root: node --test tests/static.test.mjs
    Prüft Inhalte (kostenloses Angebot, vier Bereiche, sieben PDF-Seiten, GEO & AI Visibility), Methodik, Links,
-   unveränderte Design-Quelle, Release-Grenze public/, Secrets und den Scope der Serverkomponente. */
+   unveränderte Design-Quelle, Release-Grenzen (Railway-Artefakt, Worker), Secrets und den Scope des API-Workers. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { join, relative } from 'node:path';
 import * as H from './lib/html.mjs';
-import { ROOT } from './lib/harness.mjs';
+import { ROOT, artifactFiles, MIGRATION } from './lib/harness.mjs';
 
 const read = p => readFileSync(join(ROOT, p), 'utf8');
 const git = (...a) => execFileSync('git', a, { cwd: ROOT, encoding: 'utf8' });
 const PAGES = ['public/index.html', 'public/pruefkriterien.html', 'public/impressum.html', 'public/datenschutz.html'];
+const VIEW = 'worker/src/view.ts';
+const WORKER_SRC = readdirSync(join(ROOT, 'worker/src')).filter(f => f.endsWith('.ts')).map(f => 'worker/src/' + f);
+/* Alle Dateien, die committet würden (versioniert oder neu, nicht ignoriert) */
+const repoFiles = () => git('ls-files', '--cached', '--others', '--exclude-standard').split('\n').filter(f => f && existsSync(join(ROOT, f)));
+/* Text der serverseitig gerenderten Seiten: String- und Template-Literale aus view.ts ohne Platzhalter und Tags */
+const viewText = () => [...read(VIEW).matchAll(/'((?:[^'\\]|\\.)*)'|`((?:[^`\\]|\\.)*)`/g)].map(m => (m[1] ?? m[2]).replace(/\$\{[^}]*\}/g, ' ').replace(/<[^>]+>/g, ' ')).join(' ');
 const REFERENCE_ZIP = process.env.PXK_REFERENCE_ZIP || join(ROOT, '..', 'pxwa-quellen-klein.zip');
 
 const AREAS = ['SEO & Auffindbarkeit', 'Performance & Technik', 'GEO & AI Visibility', 'UX, Barrierefreiheit & Vertrauen'];
@@ -95,14 +101,16 @@ test('Startseite: kostenloses Angebot, vier Bereiche, sieben PDF-Seiten, GEO & A
   assert.equal(H.byClass(root, 'plan--featured').length, 1);
   assert.match(txt(H.byClass(root, 'plan--featured')[0]), /0 €/);
   const form = H.byId(root, 'analyze');
-  assert.equal(form.attrs.get('action'), 'anfrage.php'); assert.equal(form.attrs.get('method'), 'post');
+  assert.equal(form.attrs.get('action'), '/api/anfrage', 'Formular geht an den API-Worker (Cloudflare-Route /api/*)'); assert.equal(form.attrs.get('method'), 'post');
   assert.deepEqual(H.find(form, e => e.attrs.has('name')).map(e => e.attrs.get('name')), ['action', 'website']);
 });
 
 test('Wahrheitsgemäße Aussagen: kein Premium/Checkout/Abo/Dashboard/Score, keine Garantien, keine DSGVO-Behauptung, keine Vorschau-Reste', () => {
   for (const page of PAGES) assert.deepEqual(claimProblems(surfaces(read(page))), [], page);
-  const view = [...read('server/src/View.php').matchAll(/'((?:[^'\\]|\\.)*)'/g)].map(m => m[1].replace(/<[^>]+>/g, ' ')).join(' ');
-  assert.deepEqual(claimProblems([['View.php', view]]), []);
+  assert.deepEqual(claimProblems([['view.ts', viewText()]]), []);
+  for (const s of ['Kostenlose Website-Analyse', '0 €, kein Abo, keine Folgekosten', 'PDF mit sieben Seiten', 'keinen Zugriff auf Ihr Postfach', 'nicht automatisch abgerufen oder gescannt']) {
+    assert.ok(viewText().includes(s), `view.ts enthält "${s}"`);
+  }
   /* Negativprobe: der alte Stand mit Free/Premium wird erkannt */
   const old = git('show', '98d21094619a53c28f56609ecbef13f94859ae58:index.html');
   const found = claimProblems(surfaces(old)).join('\n');
@@ -154,15 +162,15 @@ test('Links: interne Anker gültig, keine Links zu pixelkiez.de, nur mailto als 
       if (frag) assert.ok(H.byId(H.parse(pages[target]).root, frag), `${page}: Anker ${href} fehlt`);
     }
   }
-  /* Auch serverseitig gerenderte Seiten und Konfigurationsvorlage verweisen nicht auf die Webdesign-Website */
-  for (const f of [...PAGES, 'server/src/View.php', 'server/config.example.php']) {
+  /* Auch serverseitig gerenderte Seiten und Konfigurationsvorlagen verweisen nicht auf die Webdesign-Website */
+  for (const f of [...PAGES, VIEW, 'worker/wrangler.toml', 'worker/.dev.vars.example', 'deploy/railway/Caddyfile']) {
     assert.ok(!/https?:\/\/(www\.)?pixelkiez\.de/i.test(read(f)), `${f}: kein Link zu pixelkiez.de`);
     assert.ok(!/Webdesign/i.test(read(f)), `${f}: kein Bezug auf Webdesign`);
   }
 });
 
 test('Eigenständige Website 360°Pixelkiez: Name in Titel, Logo und Footer; Impressum und Datenschutz als eigene Seiten', () => {
-  const view = read('server/src/View.php');
+  const view = read(VIEW);
   for (const page of PAGES) {
     const { root } = H.parse(read(page));
     assert.match(H.textOf(H.byTag(root, 'title')[0]), /360°Pixelkiez/, `${page}: Titel`);
@@ -172,7 +180,7 @@ test('Eigenständige Website 360°Pixelkiez: Name in Titel, Logo und Footer; Imp
     assert.match(H.norm(H.textOf(H.byClass(root, 'footer')[0])), /© 2026 360°Pixelkiez/, `${page}: Copyright`);
   }
   assert.match(view, /© 2026 360°Pixelkiez/);
-  assert.match(view, /href="' \. \$b \. '\/impressum\.html">Impressum<\/a><a href="' \. \$b \. '\/datenschutz\.html">Datenschutz<\/a>/);
+  assert.ok(view.includes('<a href="${b}/impressum.html">Impressum</a><a href="${b}/datenschutz.html">Datenschutz</a>'), 'Anfrageseiten: Impressum und Datenschutz');
   const imprint = H.norm(H.textOf(H.byTag(H.parse(read('public/impressum.html')).root, 'main')[0]));
   for (const s of ['§ 5 Digitale-Dienste-Gesetz (DDG)', 'Vincent Schnetzer', '360°Pixelkiez', 'Edelhofdamm 74', '13465 Berlin', 'kontakt@pixelkiez.de', '§ 18 Abs. 2 MStV', 'Verbraucherschlichtungsstelle']) {
     assert.ok(imprint.includes(s), `Impressum enthält "${s}"`);
@@ -189,52 +197,87 @@ test('Design: styles.css unverändert gegenüber vision.html; alle verwendeten K
   const css = read('public/assets/styles.css') + read('public/assets/anfrage.css');
   const classes = new Set();
   for (const p of PAGES) for (const e of H.elements(H.byTag(H.parse(read(p)).root, 'body')[0])) for (const c of (e.attrs.get('class') || '').split(/\s+/).filter(Boolean)) classes.add(c);
-  for (const m of read('server/src/View.php').matchAll(/class="([^"]+)"/g)) for (const c of m[1].split(/\s+/)) classes.add(c);
+  for (const m of read(VIEW).matchAll(/class="([^"]+)"/g)) for (const c of m[1].split(/\s+/)) classes.add(c);
   const unknown = [...classes].filter(c => !new RegExp(`\\.${c.replace(/-/g, '\\-')}(?![\\w-])`).test(css));
   assert.deepEqual(unknown, []);
 });
 
-test('Release-Grenze: public/ enthält nur ausgelieferte Dateien; Konfiguration und Laufzeitdaten sind ausgeschlossen', () => {
-  const walk = d => readdirSync(d).flatMap(f => statSync(join(d, f)).isDirectory() ? walk(join(d, f)) : [relative(join(ROOT, 'public'), join(d, f))]);
-  /* Git-ignorierte Dateien (z. B. lokale Videokopie in public/media/) gelangen nicht ins Artefakt (git archive) */
-  const files = walk(join(ROOT, 'public')).filter(f => !f.endsWith('.DS_Store') && spawnSync('git', ['check-ignore', '-q', join('public', f)], { cwd: ROOT }).status !== 0).sort();
-  assert.deepEqual(files, ['.htaccess', 'anfrage.php', 'assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'auth/callback.php', 'datenschutz.html', 'impressum.html', 'index.html', 'pruefkriterien.html']);
-  for (const f of ['anfrage.php', 'auth/callback.php']) assert.ok(!/(new\s+PDO|curl_init|SmtpMailer)/.test(read('public/' + f)), `${f}: nur Einstieg, Logik außerhalb des Webroots`);
-  for (const f of ['server/config.php', 'var/pxwa.sqlite', 'var/google-jwks.json']) assert.equal(spawnSync('git', ['check-ignore', '-q', f], { cwd: ROOT }).status, 0, `${f} ist ignoriert`);
-  assert.ok(!git('ls-files').split('\n').includes('server/config.php'));
-  const ht = read('public/.htaccess');
-  assert.match(ht, /Options -Indexes/); assert.match(ht, /RewriteRule \(\^\|\/\)\\\. - \[F\]/); assert.match(ht, /https:\/\/%\{HTTP_HOST\}/);
+test('Release-Grenze Frontend (Railway): Artefakt enthält nur public/ ohne Medien; Caddy mit festem Digest; keine PHP-Laufzeit', () => {
+  assert.deepEqual(artifactFiles(), ['assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'datenschutz.html', 'impressum.html', 'index.html', 'pruefkriterien.html']);
+  assert.deepEqual(repoFiles().filter(f => /\.(php|phtml)$|(^|\/)\.htaccess$|^(server|bin)\//.test(f)), [], 'keine PHP-Komponenten mehr im Release');
+  const ignore = read('.dockerignore').split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+  assert.deepEqual(ignore, ['*', '!public/', '!deploy/railway/Caddyfile', 'public/media/', '**/.DS_Store'], 'Build-Kontext nur mit ausgelieferten Dateien');
+  const docker = read('deploy/railway/Dockerfile');
+  assert.match(docker, /^FROM caddy:[\d.]+-alpine@sha256:[0-9a-f]{64}$/m, 'Basis-Image per Digest fixiert');
+  assert.deepEqual([...docker.matchAll(/^COPY .*$/gm)].map(m => m[0]), ['COPY deploy/railway/Caddyfile /etc/caddy/Caddyfile', 'COPY --chown=root:root public/ /srv/']);
+  assert.match(docker, /^USER nobody$/m, 'läuft nicht als root');
+  const railway = JSON.parse(read('railway.json'));
+  assert.equal(railway.build.builder, 'DOCKERFILE');
+  assert.equal(railway.build.dockerfilePath, 'deploy/railway/Dockerfile');
+  const caddy = read('deploy/railway/Caddyfile');
+  assert.match(caddy, /admin off/); assert.ok(!/\bbrowse\b|reverse_proxy|php_fastcgi|\blog\b/.test(caddy), 'kein Verzeichnis-Listing, kein Proxy, keine PHP-Ausführung, kein Zugriffslog (Cookies)');
+  assert.match(caddy, /handle \/api\/\* \{[^}]*respond "Anfragen sind im Moment nicht möglich\." 503/s, '/api/* ohne Worker-Route: 503');
+  for (const f of ['.dev.vars', 'worker/.dev.vars', '.wrangler/state/v3/d1/x.sqlite', 'node_modules/x', 'public/media/360-pixelkiez-video-1080p.mp4']) {
+    assert.equal(spawnSync('git', ['check-ignore', '-q', f], { cwd: ROOT }).status, 0, `${f} ist ignoriert`);
+  }
+});
+
+test('Release-Grenze API (Cloudflare Worker): nur eigene Route, keine workers.dev-Adresse, D1-Binding, Cron, keine aktive Route ohne Freigabe', () => {
+  const w = read('worker/wrangler.toml');
+  const active = w.split('\n').filter(l => !l.trim().startsWith('#')).join('\n');
+  assert.match(active, /^main = "src\/index\.ts"$/m);
+  assert.match(active, /^workers_dev = false$/m); assert.match(active, /^preview_urls = false$/m);
+  assert.ok(!/^\s*(routes?|route)\s*=/m.test(active), 'Route bleibt bis zur Freigabe der Domain auskommentiert');
+  assert.match(w, /# routes = \[\{ pattern = "<freigegebene-domain>\/api\/\*"/);
+  assert.match(active, /\[\[d1_databases\]\]\s*\nbinding = "DB"\s*\ndatabase_name = "pxwa"/);
+  assert.match(w, /--jurisdiction eu/, 'D1 in EU-Jurisdiktion anlegen');
+  assert.match(active, /crons = \["\*\/5 \* \* \* \*"\]/);
+  assert.match(active, /^ENV = "production"$/m); assert.match(active, /^MAIL_NOTIFY_TO = "kontakt@pixelkiez\.de"$/m);
+  assert.match(read('worker/src/config.ts'), /export const AUTHORIZED_MAIL_API_HOSTS: readonly string\[\] = \[\];/, 'kein Mail-Anbieter freigegeben, solange keine menschliche Freigabe vorliegt');
+});
+
+test('D1-Schema: nur die nötigen Tabellen und Spalten (Datenminimierung), keine Tokens', () => {
+  const tables = Object.fromEntries([...MIGRATION.matchAll(/CREATE TABLE IF NOT EXISTS (\w+) \(([\s\S]*?)\n\);/g)].map(([, name, body]) => [name,
+    body.split('\n').map(l => l.trim().split(/\s+/)[0]).filter(c => c && !['PRIMARY'].includes(c))]));
+  assert.deepEqual(tables, {
+    orders: ['id', 'reference', 'idempotency_key', 'google_sub', 'email', 'website_url', 'privacy_version', 'status', 'created_at'],
+    notifications: ['id', 'order_id', 'status', 'attempts', 'next_attempt_at', 'locked_until', 'last_error', 'sent_at', 'created_at'],
+    rate_limits: ['bucket', 'window_start', 'hits'],
+    sessions: ['id_hash', 'data', 'version', 'created_at', 'expires_at'],
+  });
+  assert.ok(!/token|password|ip_address/i.test(MIGRATION.replace(/^\s*--.*$/gm, '')));
 });
 
 test('Keine Secrets im Repository', () => {
-  const tracked = git('ls-files').split('\n').filter(f => f && !f.startsWith('tests/') && existsSync(join(ROOT, f)));
   const hits = [];
-  for (const f of tracked) {
+  for (const f of repoFiles().filter(f => !f.startsWith('tests/') && !f.startsWith('node_modules/'))) {
     const s = readFileSync(join(ROOT, f), 'utf8');
     if (/-----BEGIN (RSA |EC )?PRIVATE KEY-----/.test(s)) hits.push(`${f}: privater Schlüssel`);
     if (/GOCSPX-[A-Za-z0-9_-]{10,}/.test(s)) hits.push(`${f}: Google-Client-Secret`);
-    for (const m of s.matchAll(/'(client_secret|password|pass|secret)'\s*=>\s*'([^']+)'/g)) hits.push(`${f}: ${m[1]} gesetzt`);
+    if (/\b(re|sk|key|pm|xkeysib)[_-][A-Za-z0-9_-]{20,}/.test(s)) hits.push(`${f}: API-Schlüssel`);
   }
   assert.deepEqual(hits, []);
-  const example = read('server/config.example.php');
-  assert.match(example, /'client_secret' => ''/); assert.match(example, /'password' => ''/);
+  const vars = read('worker/wrangler.toml').split('[vars]')[1].split('\n[')[0];
+  assert.ok(!/^\s*(GOOGLE_CLIENT_SECRET|SECRET|MAIL_API_TOKEN)\s*=/m.test(vars), 'Secrets nie als [vars]');
+  assert.match(read('worker/.dev.vars.example'), /^GOOGLE_CLIENT_SECRET=$/m); assert.match(read('worker/.dev.vars.example'), /^MAIL_API_TOKEN=$/m); assert.match(read('worker/.dev.vars.example'), /^SECRET=$/m);
 });
 
-test('Scope der Serverkomponente: nur openid email, kein PDF, keine Kunden-Mail, kein Abruf der Kundenwebsite, keine Tokens im Browser', () => {
-  const src = readdirSync(join(ROOT, 'server/src')).map(f => read('server/src/' + f)).join('\n') + read('bin/send-notifications.php');
-  assert.match(read('server/src/GoogleOidc.php'), /'scope' => 'openid email'/);
-  const literals = [...src.matchAll(/'((?:[^'\\]|\\.)*)'/g)].map(m => m[1]).join('\n');
-  assert.ok(!/gmail|mail\.google\.com|userinfo|googleapis\.com\/auth/i.test(literals), 'keine zusätzlichen Google-Berechtigungen');
-  assert.ok(!/application\/pdf|%PDF|fpdf|tcpdf|dompdf|mpdf|wkhtmltopdf/i.test(src), 'keine PDF-Erzeugung');
-  const sends = [...src.matchAll(/->send\(([^,]+),/g)].map(m => m[1].trim());
-  assert.deepEqual(sends, ['$this->notifyTo'], 'einziger Mailversand geht an die interne Adresse');
-  assert.ok(!/website_url[^;\n]*(curl|file_get_contents|fopen|get\()/.test(src) && !/->get\(\$(url|website)/.test(src), 'Kundenwebsite wird nicht abgerufen');
+test('Scope des API-Workers: nur openid email, kein PDF, keine Kunden-Mail, kein Abruf der Kundenwebsite, keine Tokens im Browser', () => {
+  const src = WORKER_SRC.map(read).join('\n');
+  assert.match(read('worker/src/oidc.ts'), /scope: 'openid email'/);
+  /* Code ohne Kommentare (Kommentare nennen die ausgeschlossenen Rechte ausdrücklich) */
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
+  assert.ok(!/gmail|mail\.google\.com|userinfo|googleapis\.com\/auth/i.test(code), 'keine zusätzlichen Google-Berechtigungen');
+  assert.ok(!/application\/pdf|%PDF|pdf-lib|pdfkit|jspdf|puppeteer|@cloudflare\/puppeteer/i.test(src), 'keine PDF-Erzeugung');
+  assert.deepEqual([...src.matchAll(/\.send\(\{\s*to:\s*([^,]+),/g)].map(m => m[1].trim()), ['this.notifyTo'], 'einziger Mailversand geht an die interne Adresse');
+  assert.deepEqual([...src.matchAll(/\bfetch\(([^,)]+)[,)]/g)].map(m => m[1].trim()).sort(), ['this.cfg.apiUrl', 'this.g.jwksUri', 'this.g.tokenEndpoint'], 'ausgehende Aufrufe nur an Google und die Mail-API, nie an die Kundenwebsite');
+  assert.ok(!/\b(?:log|console\.(?:log|error|warn))\([^)]*\b(email|website_url|websiteUrl|idToken|id_token|access_token|code|verifier)\b/.test(src), 'keine personenbezogenen Daten oder Tokens im Log');
   assert.ok(!/localStorage|sessionStorage|indexedDB|document\.cookie|fetch\(/.test(read('public/assets/app.js')), 'app.js speichert und sendet nichts selbst');
 });
 
-test('PHP-Syntax (php -l) aller Serverdateien', t => {
-  if (spawnSync('php', ['-v']).status !== 0) { t.skip('NOT_RUN: php nicht verfügbar'); return; }
-  const files = ['server/bootstrap.php', 'server/config.example.php', 'public/anfrage.php', 'public/auth/callback.php', 'bin/migrate.php', 'bin/send-notifications.php',
-    ...readdirSync(join(ROOT, 'server/src')).map(f => 'server/src/' + f)];
-  for (const f of files) assert.equal(spawnSync('php', ['-l', join(ROOT, f)]).status, 0, f);
+test('TypeScript: Worker ohne Typfehler (tsc --noEmit, strict)', t => {
+  const tsc = join(ROOT, 'node_modules/.bin/tsc');
+  if (!existsSync(tsc)) { t.skip('NOT_RUN: typescript fehlt (npm ci)'); return; }
+  const r = spawnSync(tsc, ['-p', join(ROOT, 'worker/tsconfig.json')], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
 });

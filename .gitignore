@@ -1,10 +1,11 @@
 .DS_Store
-# Echte Serverkonfiguration mit Zugangsdaten – nie committen
-server/config.php
-# Laufzeitdaten (SQLite, Schlüssel-Cache, Sessions)
-var/
-*.sqlite
-*.sqlite-*
+# Abhängigkeiten und lokale Wrangler-/Miniflare-Daten
+node_modules/
+.wrangler/
+# Lokale Worker-Secrets (wrangler dev) – nie committen
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
 # Videos: Quelldatei und lokale Testkopie; produktiv kommt das Video aus dem Railway-Bucket
 /*.mp4
 public/media/

@@ -1,15 +1,17 @@
-/* PXWA – Browser-Prüfungen (Chromium über Playwright) gegen php -S mit lokalen Mocks.
+/* PXWA – Browser-Prüfungen (Chromium über Playwright) gegen den lokalen Nachbau der Zielarchitektur:
+   Caddy mit deploy/railway/Caddyfile (Railway-Ersatz) und Edge-Proxy (Cloudflare-Route /api/* → API-Worker in workerd mit D1).
    Playwright ist bewusst keine Projekt-Abhängigkeit:
      PXK_PLAYWRIGHT=/pfad/zu/node_modules/playwright [PXK_AXE=/pfad/zu/axe.min.js] [PXK_SCREENSHOT_DIR=…] node --test tests/browser.test.mjs
    Die Google-Anmeldeseite ersetzt ein lokaler Mock-Endpunkt (/auth), der sofort mit einem Einmal-Code zurückleitet,
    so wie Google es nach erfolgreicher Anmeldung täte. (Playwright-Routen greifen bei Redirect-Zielen nicht.)
-   Ohne Playwright oder PHP: NOT_RUN statt bestanden. */
+   Die Videos kommen aus der lokalen Testkopie in public/media/ (nicht Teil des Artefakts).
+   Ohne Playwright, Caddy oder Worker-Abhängigkeiten: NOT_RUN statt bestanden. */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { mockGoogle, mockSmtp, startApp, phpAvailable, sqliteAvailable } from './lib/harness.mjs';
+import { mockGoogle, mockMailApi, startWorker, startCaddy, startEdge, siteRoot, freePort, waitFor, workerAvailable, caddyAvailable, ROOT } from './lib/harness.mjs';
 
 const SHOTS = process.env.PXK_SCREENSHOT_DIR || '';
 const AXE = process.env.PXK_AXE || '';
@@ -18,20 +20,26 @@ const pw = await (async () => {
   const dir = process.env.PXK_PLAYWRIGHT;
   try { return dir ? await import(pathToFileURL(join(dir, 'index.mjs')).href) : await import('playwright'); } catch { return null; }
 })();
-const skip = !pw ? 'NOT_RUN: Playwright nicht verfügbar (PXK_PLAYWRIGHT setzen)' : !(phpAvailable && sqliteAvailable) ? 'NOT_RUN: php/pdo_sqlite fehlt' : false;
+const skip = !pw ? 'NOT_RUN: Playwright nicht verfügbar (PXK_PLAYWRIGHT setzen)' : !workerAvailable ? 'NOT_RUN: miniflare/esbuild fehlen (npm ci)' : !caddyAvailable ? 'NOT_RUN: caddy fehlt' : false;
+const skipVideo = skip || (!existsSync(join(ROOT, 'public/media/360-pixelkiez-video-1080p.mp4')) && 'NOT_RUN: lokale Videokopie in public/media/ fehlt');
 
-let google, smtp, app, browser;
+let google, mail, app, site, caddy, edge, browser;
 before(async () => {
   if (skip) return;
   google = await mockGoogle().start();
-  smtp = await mockSmtp().start();
-  app = await startApp({ google, smtp, authEndpoint: `${google.origin}/auth` });
+  mail = await mockMailApi().start();
+  site = siteRoot({ media: true });
+  caddy = await startCaddy(site);
+  const port = await freePort();
+  app = await startWorker({ google, mail, base: `http://127.0.0.1:${port}`, authEndpoint: `${google.origin}/auth` });
+  edge = await startEdge({ port, worker: app, origin: caddy.url });
   browser = await pw.chromium.launch();
   if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 });
 after(async () => {
   if (skip) return;
-  await browser.close(); await app.stop(); await google.stop(); await smtp.stop();
+  await browser.close(); await edge.stop(); await app.stop(); await caddy.stop(); await google.stop(); await mail.stop();
+  rmSync(site, { recursive: true, force: true });
 });
 
 async function open(path, { width = 1440, height = 900, reducedMotion = 'reduce', bypassCSP = false } = {}) {
@@ -47,7 +55,8 @@ async function open(path, { width = 1440, height = 900, reducedMotion = 'reduce'
   });
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', e => errors.push(String(e)));
-  await page.goto(app.base + path, { waitUntil: 'networkidle' });
+  /* 'load' statt 'networkidle': Caddy beantwortet Video-Range-Anfragen mit 206, Chromium hält die Video-Anfrage (preload) dann offen */
+  await page.goto(app.base + path, { waitUntil: 'load' });
   await page.evaluate(() => document.fonts.ready);
   return { context, page, errors, blocked };
 }
@@ -74,7 +83,7 @@ async function tabTo(page, pred, max = 40) {
 
 test('Mobile Hauptansicht: kein horizontaler Überlauf, Formular sichtbar, Navigationsbutton in der Pille (320/390/768/1440)', { skip }, async t => {
   for (const width of [320, 390, 768, 1440]) {
-    for (const path of ['/index.html', '/pruefkriterien.html', '/anfrage.php', '/impressum.html', '/datenschutz.html']) {
+    for (const path of ['/index.html', '/pruefkriterien.html', '/api/anfrage', '/impressum.html', '/datenschutz.html']) {
       const { context, page, errors, blocked } = await open(path, { width, height: 800 });
       await page.$$eval('details', ds => ds.forEach(d => { d.open = true; }));
       assert.ok(await overflow(page) <= 0, `${path} ${width}: Überlauf`);
@@ -83,7 +92,7 @@ test('Mobile Hauptansicht: kein horizontaler Überlauf, Formular sichtbar, Navig
         return b.right <= n.right && b.left >= n.left;
       });
       assert.ok(nav, `${path} ${width}: Navigationsbutton ragt aus der Pille`);
-      if (['/index.html', '/anfrage.php'].includes(path)) {
+      if (['/index.html', '/api/anfrage'].includes(path)) {
         const form = await page.evaluate(() => ['#url', '.url-field .btn'].map(s => { const r = document.querySelector(s).getBoundingClientRect(); return r.width > 0 && r.left >= 0 && r.right <= innerWidth; }));
         assert.deepEqual(form, [true, true], `${path} ${width}: Eingabefeld und Button vollständig sichtbar`);
       }
@@ -126,7 +135,7 @@ test('Hero beim Öffnen: Überschrift, Text und Website-Eingabe vollständig im 
   }
 });
 
-test('Video unter dem Hero: mittig, abgerundet, ohne Bedienelemente, startet beim Hineinscrollen und läuft in Schleife', { skip }, async () => {
+test('Video unter dem Hero: mittig, abgerundet, ohne Bedienelemente, startet beim Hineinscrollen und läuft in Schleife', { skip: skipVideo }, async () => {
   const state = page => page.evaluate(() => {
     const v = document.querySelector('.showcase-video'), f = v.closest('.showcase-frame'), r = f.getBoundingClientRect(), cs = getComputedStyle(f);
     return { paused: v.paused, time: v.currentTime, loop: v.loop, muted: v.muted, controls: v.controls, inline: v.playsInline,
@@ -159,7 +168,7 @@ test('Video unter dem Hero: mittig, abgerundet, ohne Bedienelemente, startet bei
   await context.close();
 });
 
-test('Video bei „Ihr Bericht“: rechts neben dem Text (mobil darunter), abgerundet, lädt und startet erst beim Hineinscrollen', { skip }, async () => {
+test('Video bei „Ihr Bericht“: rechts neben dem Text (mobil darunter), abgerundet, lädt und startet erst beim Hineinscrollen', { skip: skipVideo }, async () => {
   for (const [width, height] of [[1440, 900], [390, 844]]) {
     const { context, page, errors, blocked } = await open('/index.html', { width, height, reducedMotion: 'no-preference' });
     const report = () => page.evaluate(() => {
@@ -198,7 +207,7 @@ test('Scrollen: Inhalte blenden beim Hineinscrollen ein; oben nichts versteckt; 
   for (const variant of [{ reducedMotion: 'reduce' }, { javaScriptEnabled: false }]) {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, ...variant });
     const pg = await ctx.newPage();
-    await pg.goto(app.base + '/index.html', { waitUntil: 'networkidle' });
+    await pg.goto(app.base + '/index.html', { waitUntil: 'load' });
     assert.equal(await pg.evaluate(() => document.querySelectorAll('.reveal').length), 0, JSON.stringify(variant));
     assert.equal(await pg.evaluate(() => getComputedStyle(document.querySelector('#warum .why-item')).opacity), '1', JSON.stringify(variant));
     await ctx.close();
@@ -207,8 +216,8 @@ test('Scrollen: Inhalte blenden beim Hineinscrollen ein; oben nichts versteckt; 
 
 test('Tastatur: ungültige Eingabe bleibt im Feld; gültige Anfrage komplett per Tab/Enter/Leertaste bis zur Referenz (mobil und Desktop)', { skip }, async () => {
   for (const width of [390, 1440]) {
-    app.exec('DELETE FROM notifications; DELETE FROM orders; DELETE FROM rate_limits;');
-    smtp.state.accepted.length = 0;
+    await app.exec('DELETE FROM notifications; DELETE FROM orders; DELETE FROM rate_limits; DELETE FROM sessions');
+    mail.reset();
     /* bypassCSP nur hier: Die statische Meta-CSP erlaubt als Formularziel nur https://accounts.google.com, nicht den lokalen Mock.
        Die CSP selbst prüfen der Mobil-Test (keine CSP-Konsolenfehler) und tests/static.test.mjs (form-action). */
     const before = google.log.auth || 0;
@@ -221,7 +230,7 @@ test('Tastatur: ungültige Eingabe bleibt im Feld; gültige Anfrage komplett per
     assert.deepEqual(await page.evaluate(() => [document.activeElement.id, document.activeElement.getAttribute('aria-invalid'), location.pathname]), ['url', 'true', '/index.html']);
     await page.fill('#url', '');
     await page.keyboard.type('musterfirma.de');
-    await Promise.all([page.waitForURL(`${app.base}/anfrage.php`), page.keyboard.press('Enter')]);
+    await Promise.all([page.waitForURL(`${app.base}/api/anfrage`), page.keyboard.press('Enter')]);
     assert.equal(google.log.auth - before, 1, 'genau eine Google-Autorisierung');
     assert.equal(google.log.lastAuth.scope, 'openid email');
     assert.match(await page.textContent('h1'), /Anfrage bestätigen/);
@@ -235,8 +244,9 @@ test('Tastatur: ungültige Eingabe bleibt im Feld; gültige Anfrage komplett per
     await Promise.all([page.waitForSelector('#reference'), page.keyboard.press('Enter')]);
     assert.match(await page.textContent('#reference'), /^PXA-[0-9A-Z]{4}-[0-9A-Z]{4}$/);
     assert.ok(await overflow(page) <= 0, `${width}: Überlauf auf der Bestätigung`);
-    assert.equal(app.sql('SELECT COUNT(*) AS n FROM orders')[0].n, 1);
-    assert.equal(smtp.state.accepted.length, 1);
+    assert.equal((await app.sql('SELECT COUNT(*) AS n FROM orders'))[0].n, 1);
+    await waitFor(() => mail.state.accepted.length === 1, { what: 'interne Benachrichtigung' });
+    assert.deepEqual(mail.state.accepted[0].to, ['kontakt@pixelkiez.de']);
     const cookies = await context.cookies();
     assert.ok(cookies.every(c => c.httpOnly && c.sameSite === 'Lax'), 'Session-Cookie HttpOnly/Lax');
     const storage = await page.evaluate(() => ({ local: localStorage.length, session: sessionStorage.length, cookie: document.cookie }));
@@ -249,12 +259,12 @@ test('Tastatur: ungültige Eingabe bleibt im Feld; gültige Anfrage komplett per
 
 test('Accessibility-Snapshot (axe-core): keine schweren Verstöße auf Startseite, Methodik, Eingabe- und Bestätigungsseite', { skip: skip || (!AXE && 'NOT_RUN: PXK_AXE nicht gesetzt') }, async t => {
   const report = {};
-  for (const path of ['/index.html', '/pruefkriterien.html', '/impressum.html', '/datenschutz.html', '/anfrage.php', 'confirm']) {
+  for (const path of ['/index.html', '/pruefkriterien.html', '/impressum.html', '/datenschutz.html', '/api/anfrage', 'confirm']) {
     /* axe wird als Inline-Skript injiziert; die CSP der Seite würde das (korrekt) blockieren */
     const o = await open(path === 'confirm' ? '/index.html' : path, { bypassCSP: true });
     if (path === 'confirm') {
       await o.page.fill('#url', 'musterfirma.de');
-      await Promise.all([o.page.waitForURL(`${app.base}/anfrage.php`), o.page.press('#url', 'Enter')]);
+      await Promise.all([o.page.waitForURL(`${app.base}/api/anfrage`), o.page.press('#url', 'Enter')]);
     }
     await o.page.addScriptTag({ path: AXE });
     const v = await o.page.evaluate(async () => (await window.axe.run(document, { resultTypes: ['violations'] })).violations.map(x => ({ id: x.id, impact: x.impact, n: x.nodes.length })));

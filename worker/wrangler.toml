@@ -1,0 +1,35 @@
+# 360°Pixelkiez – API-Worker. Vorlage ohne Secrets; Deploy nur mit eigener Freigabe für genau einen Commit-SHA.
+# Secrets (nie hier eintragen): npx wrangler secret put GOOGLE_CLIENT_SECRET | SECRET | MAIL_API_TOKEN
+name = "pxwa-api"
+main = "src/index.ts"
+compatibility_date = "2026-07-30"
+
+# Nur über die eigene Domain erreichbar: keine *.workers.dev-Adresse, keine Vorschau-URLs
+workers_dev = false
+preview_urls = false
+
+# Route erst nach Freigabe der Domain aktivieren (Zone muss in Cloudflare liegen, Frontend auf Railway als Ursprung):
+# routes = [{ pattern = "<freigegebene-domain>/api/*", zone_name = "<zone>" }]
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+# D1 mit EU-Jurisdiktion anlegen: npx wrangler d1 create pxwa --jurisdiction eu   → database_id hier eintragen
+[[d1_databases]]
+binding = "DB"
+database_name = "pxwa"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[vars]
+ENV = "production"
+BASE_URL = "https://DOMAIN-FEHLT.example"
+GOOGLE_CLIENT_ID = ""
+PRIVACY_VERSION = "ENTWURF-2026-10-30"
+# HTTPS-Mail-API: Host muss in AUTHORIZED_MAIL_API_HOSTS (src/config.ts) freigegeben sein, sonst bleibt die API gesperrt
+MAIL_API_URL = ""
+MAIL_FROM = ""
+MAIL_NOTIFY_TO = "kontakt@pixelkiez.de"
+
+[observability]
+enabled = true

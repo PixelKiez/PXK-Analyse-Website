@@ -1,0 +1,31 @@
+# 360°Pixelkiez – statisches Frontend auf Railway. Liefert nur Dateien aus /srv (= public/ ohne Medien), keine Logik.
+# Die API läuft als Cloudflare Worker auf derselben Domain (Route /api/*); TLS beenden Cloudflare und Railway davor.
+{
+	admin off
+	auto_https off
+	persist_config off
+}
+
+:{$PORT:8080} {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Content-Security-Policy "frame-ancestors 'none'"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Cross-Origin-Opener-Policy "same-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		-Server
+	}
+
+	# Kommt eine /api-Anfrage hier an, ist die Worker-Route nicht aktiv: ehrlich ablehnen, nichts annehmen
+	handle /api/* {
+		header Cache-Control "no-store"
+		respond "Anfragen sind im Moment nicht möglich." 503
+	}
+
+	handle {
+		root * {$SITE_ROOT:/srv}
+		file_server
+	}
+}

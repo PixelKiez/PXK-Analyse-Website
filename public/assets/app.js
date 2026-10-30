@@ -1,5 +1,5 @@
 /* Pixelkiez Analyse – kleine Verbesserungen für die Startseite.
-   Das Formular wird normal per POST an anfrage.php gesendet; der Server prüft die Adresse verbindlich.
+   Das Formular wird normal per POST an /api/anfrage (API-Worker) gesendet; der Worker prüft die Adresse verbindlich.
    Hier nur eine Vorabprüfung, damit offensichtliche Tippfehler ohne Seitenwechsel auffallen. */
 (() => {
   const $ = s => document.querySelector(s);
