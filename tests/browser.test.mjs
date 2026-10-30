@@ -184,6 +184,25 @@ test('Video bei „Ihr Bericht“: rechts neben dem Text (mobil darunter), abger
   }
 });
 
+test('Scrollen: Inhalte blenden beim Hineinscrollen ein; oben nichts versteckt; ohne JavaScript und bei „Bewegung reduzieren“ alles sofort sichtbar', { skip }, async () => {
+  const { context, page, errors } = await open('/index.html', { width: 1440, height: 900, reducedMotion: 'no-preference' });
+  const info = await page.evaluate(() => ({ hiddenAbove: [...document.querySelectorAll('.reveal')].filter(e => e.getBoundingClientRect().top <= innerHeight).length, hiddenBelow: document.querySelectorAll('.reveal:not(.is-visible)').length }));
+  assert.equal(info.hiddenAbove, 0, 'im ersten Bildschirm wird nichts ausgeblendet');
+  assert.ok(info.hiddenBelow > 10, 'weiter unten wartet Inhalt auf das Einblenden');
+  await page.evaluate(() => document.querySelector('#warum').scrollIntoView({ behavior: 'instant', block: 'start' }));
+  await page.waitForFunction(() => [...document.querySelectorAll('#warum .why-item')].every(e => e.classList.contains('is-visible') && getComputedStyle(e).opacity === '1'), null, { timeout: 5000 });
+  assert.deepEqual(errors, []);
+  await context.close();
+  for (const variant of [{ reducedMotion: 'reduce' }, { javaScriptEnabled: false }]) {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, ...variant });
+    const pg = await ctx.newPage();
+    await pg.goto(app.base + '/index.html', { waitUntil: 'networkidle' });
+    assert.equal(await pg.evaluate(() => document.querySelectorAll('.reveal').length), 0, JSON.stringify(variant));
+    assert.equal(await pg.evaluate(() => getComputedStyle(document.querySelector('#warum .why-item')).opacity), '1', JSON.stringify(variant));
+    await ctx.close();
+  }
+});
+
 test('Tastatur: ungültige Eingabe bleibt im Feld; gültige Anfrage komplett per Tab/Enter/Leertaste bis zur Referenz (mobil und Desktop)', { skip }, async () => {
   for (const width of [390, 1440]) {
     app.exec('DELETE FROM notifications; DELETE FROM orders; DELETE FROM rate_limits;');

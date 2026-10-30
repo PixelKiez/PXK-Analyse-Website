@@ -60,3 +60,20 @@
 .spec--cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(12px, 1.6vw, 20px); border-bottom: 0; }
 .spec--cards .spec-row { grid-template-columns: minmax(0, 1fr); gap: 14px; align-content: start; padding: clamp(22px, 2.6vw, 32px); border: 1px solid var(--line-soft); border-radius: clamp(14px, 2vw, 24px); }
 @media (max-width: 860px) { .spec--cards { grid-template-columns: minmax(0, 1fr); } }
+
+/* Karten in der Farbe ihres Abschnitts (keine neue Farbe): Umriss in der Linienfarbe des Abschnitts */
+.uses--cards { gap: clamp(10px, 1.2vw, 14px); border-bottom: 0; }
+.uses--cards .use { padding: clamp(18px, 2vw, 24px); border: 1px solid var(--line); border-radius: clamp(14px, 1.6vw, 20px); }
+.why--cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(12px, 1.6vw, 20px); border-bottom: 0; }
+.why--cards .why-item { padding: clamp(22px, 2.6vw, 32px); border: 1px solid var(--line); border-radius: clamp(14px, 2vw, 24px); }
+.uses--cards .use p, .why--cards .why-item p { color: var(--ink-70); }
+.steps--cards .step h3, .spec--cards .spec-row h3, .uses--cards .use h3, .why--cards .why-item h3 { line-height: 1.25; }
+@media (max-width: 860px) { .why--cards { grid-template-columns: minmax(0, 1fr); } }
+
+/* Scrollen: Sprungziele landen unter der festen Navigation; Navigation mit feinem Schatten, sobald gescrollt wird */
+section[id] { scroll-margin-top: 88px; }
+.nav { transition: max-width .3s var(--ease), padding .3s var(--ease), box-shadow .3s var(--ease); }
+.nav-wrap.is-scrolled .nav { box-shadow: 0 10px 30px rgb(12 12 12 / .07); }
+/* Sanftes Einblenden beim Scrollen; die Klassen setzt app.js (nicht bei „Bewegung reduzieren“) */
+.reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s var(--ease), transform .7s var(--ease); transition-delay: var(--reveal-delay, 0ms); }
+.reveal.is-visible { opacity: 1; transform: none; }

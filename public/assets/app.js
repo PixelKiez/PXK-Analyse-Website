@@ -13,6 +13,21 @@
     onScroll();
   }
 
+  /* Sanftes Einblenden beim Scrollen: nur Elemente, die beim Laden unterhalb des Bildschirms liegen (oben flackert nichts),
+     Karten einer Reihe leicht versetzt. Ohne JavaScript oder bei „Bewegung reduzieren“ bleibt alles sofort sichtbar. */
+  if (!reduce && 'IntersectionObserver' in window) {
+    const targets = ['.section-head', '.split > *', '.showcase-media', '.steps > *', '.spec--cards > *', '.uses > *', '.why > *', '.plans > *', '.faq details', '.tools > *', '.crosssell', '.closing > *'];
+    const reveal = new IntersectionObserver(entries => entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('is-visible'); reveal.unobserve(e.target); }
+    }), { rootMargin: '0px 0px -8% 0px' });
+    document.querySelectorAll(targets.join(',')).forEach(el => {
+      if (el.getBoundingClientRect().top <= innerHeight) return;
+      el.style.setProperty('--reveal-delay', `${Math.min([...el.parentElement.children].indexOf(el), 4) * 70}ms`);
+      el.classList.add('reveal');
+      reveal.observe(el);
+    });
+  }
+
   /* Videos (unter dem Hero und bei „Ihr Bericht“): starten, sobald sie ins Bild scrollen, und laufen dann in Schleife.
      Außerhalb des Bildes angehalten (spart Akku und Daten); bei „Bewegung reduzieren“ bleibt das Standbild. */
   const videos = document.querySelectorAll('.showcase-video');
