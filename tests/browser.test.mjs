@@ -166,7 +166,8 @@ test('Video bei „Ihr Bericht“: rechts neben dem Text (mobil darunter), abger
       const v = document.querySelector('#bericht .showcase-video'), f = v.closest('.showcase-frame'), t = document.querySelector('#bericht .split-copy');
       const fr = f.getBoundingClientRect(), tr = t.getBoundingClientRect();
       return { paused: v.paused, time: v.currentTime, loop: v.loop, controls: v.controls, buffered: v.buffered.length,
-        right: fr.left >= tr.right, below: fr.top >= tr.bottom, radius: parseFloat(getComputedStyle(f).borderTopLeftRadius), overflow: getComputedStyle(f).overflow };
+        right: fr.left >= tr.right, below: fr.top >= tr.bottom, radius: parseFloat(getComputedStyle(f).borderTopLeftRadius), overflow: getComputedStyle(f).overflow,
+        square: Math.abs(fr.width - fr.height) <= 2, width: fr.width };
     });
     const before = await report();
     assert.equal(before.paused, true, `${width}: läuft erst beim Hineinscrollen`);
@@ -177,6 +178,7 @@ test('Video bei „Ihr Bericht“: rechts neben dem Text (mobil darunter), abger
     assert.ok(width >= 1000 ? m.right : m.below, `${width}: ${width >= 1000 ? 'rechts neben' : 'unter'} dem Text`);
     assert.deepEqual([m.loop, m.controls], [true, false]);
     assert.ok(m.radius >= 12 && m.overflow === 'hidden', `${width}: abgerundete Ecken`);
+    assert.ok(m.square && m.width <= 560, `${width}: quadratisch, höchstens 560 px (${m.width})`);
     assert.equal(await page.evaluate(() => document.querySelector('.showcase-video').paused), true, `${width}: Video unter dem Hero hält außerhalb des Bildes an`);
     assert.deepEqual(errors, [], `${width}: Konsolenfehler`);
     assert.deepEqual(blocked, [], `${width}: unerwartete Fremd-Requests`);

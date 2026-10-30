@@ -49,8 +49,9 @@
 .showcase-frame { overflow: hidden; isolation: isolate; border-radius: clamp(14px, 2vw, 24px); background: #0E1416; box-shadow: 0 24px 60px rgb(12 12 12 / .16); }
 .showcase-video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; }
 .showcase-note { margin-top: 14px; text-align: center; font: 400 12px var(--font-mono); color: var(--ink-45); }
-/* Zweites Video rechts neben dem Text im Abschnitt „Ihr Bericht“ (Spalte aus .split) */
-.report-media { min-width: 0; margin: 0; }
+/* Zweites Video rechts neben dem Text im Abschnitt „Ihr Bericht“ (Spalte aus .split); quadratisch, höchstens 560 px */
+.report-media { width: 100%; max-width: 560px; min-width: 0; margin: 0; justify-self: center; }
+.showcase-video--square { aspect-ratio: 1 / 1; }
 
 /* Startseite: Schritte („So funktioniert's“) als lila Karten, Bereiche („Was wir prüfen“) als Pfirsich-Karten.
    Farben und Linien kommen aus .cw-lilac bzw. .cw-peach (styles.css). */

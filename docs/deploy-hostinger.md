@@ -156,7 +156,7 @@ Railway-Buckets sind privat; es gibt keine öffentlichen Bucket-URLs. Ausgeliefe
 im selben Railway-Projekt, der aus dem Bucket liest (z. B. Vorlage „Blob Butler“) und eine feste Domain hat.
 
 1. Bucket anlegen und hochladen: `360-pixelkiez-video-1080p.mp4`, `360-pixelkiez-video-poster.jpg` (unter dem Hero)
-   sowie `report-walkthrough-de-16x9.mp4`, `report-walkthrough-poster.jpg` (Abschnitt „Ihr Bericht“).
+   sowie `report-pdf-de-1x1.mp4`, `report-pdf-poster.jpg` (Abschnitt „Ihr Bericht“).
 2. Auslieferungsdienst mit Domain `<media-domain>` bereitstellen. Pflicht für iPhone/Safari: Antworten auf
    Range-Anfragen mit `206 Partial Content` und `Accept-Ranges: bytes`. Prüfung:
    `curl -s -o /dev/null -D - -H 'Range: bytes=0-1023' https://<media-domain>/360-pixelkiez-video-1080p.mp4 | head -5`

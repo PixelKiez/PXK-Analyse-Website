@@ -87,7 +87,7 @@ test('Startseite: kostenloses Angebot, vier Bereiche, sieben PDF-Seiten, GEO & A
   assert.deepEqual(H.byClass(H.byId(root, 'bereiche'), 'spec-row').map(r => txt(H.byTag(r, 'h3')[0])), AREAS);
   /* Videos: unter dem Hero und rechts neben dem Text bei „Ihr Bericht“; stumm, Schleife, ohne Bedienelemente */
   const videos = H.byTag(root, 'video');
-  assert.deepEqual(videos.map(v => H.byTag(v, 'source')[0].attrs.get('src')), ['media/360-pixelkiez-video-1080p.mp4', 'media/report-walkthrough-de-16x9.mp4']);
+  assert.deepEqual(videos.map(v => H.byTag(v, 'source')[0].attrs.get('src')), ['media/360-pixelkiez-video-1080p.mp4', 'media/report-pdf-de-1x1.mp4']);
   for (const v of videos) assert.ok(['muted', 'loop', 'playsinline', 'poster', 'aria-label'].every(a => v.attrs.has(a)) && !v.attrs.has('controls') && !v.attrs.has('autoplay'));
   assert.ok(H.byTag(H.byId(root, 'bericht'), 'video').length === 1, 'Berichtsvideo im Abschnitt „Ihr Bericht“');
   for (const s of ['GEO', 'AI Visibility', 'Generative Engine Optimization', '0 €', 'mit Google an', 'sieben Seiten', 'Core Web Vitals', 'beobachtet']) assert.ok(text.includes(s), `fehlt: ${s}`);
