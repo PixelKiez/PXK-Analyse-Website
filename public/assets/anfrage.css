@@ -22,3 +22,19 @@
 .form-hint { font: 400 13px var(--font-mono); color: var(--ink-45); text-align: center; }
 .report-pages .page-no { font: 500 12px/1.9 var(--font-mono); color: var(--ink-70); }
 .report-pages { border-top: 0; }
+
+/* Hero: Überschrift und Website-Eingabe stehen beim Öffnen vollständig im ersten Bildschirm.
+   Der Hero füllt die Fensterhöhe unter der Navigation (72 px); Schrift und Abstände richten sich auch nach der Höhe. */
+.hero { min-height: calc(100vh - 72px); min-height: calc(100svh - 72px); align-content: center; gap: clamp(12px, 2.4svh, 28px); padding-block: clamp(20px, 4svh, 64px); }
+.hero .h1 { font-size: clamp(46px, min(7.4vw, 10.5svh), 104px); }
+.hero .lead { color: var(--ink-70); }
+.hero .analyze { margin-top: clamp(0px, 1svh, 12px); gap: clamp(10px, 1.6svh, 14px); }
+.hero .url-field { border-color: var(--ink-45); box-shadow: 0 10px 30px rgb(12 12 12 / .08); }
+.hero .url-field input { color: var(--ink); }
+.hero .url-field input::placeholder { color: var(--ink-70); }
+.hero .facts, .hero .form-hint { color: var(--ink-70); }
+.hero .form-hint { text-wrap: balance; }
+@media (max-width: 620px) {
+  .hero .h1 { font-size: clamp(34px, min(12vw, 6.2svh), 46px); }
+  .hero .lead { font-size: clamp(16px, 2.3svh, 18px); }
+}
