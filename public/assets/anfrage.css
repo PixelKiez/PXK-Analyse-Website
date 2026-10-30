@@ -19,8 +19,6 @@
 .consent { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; font-size: 15px; cursor: pointer; }
 .consent input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--ink); }
 .consent input:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
-.report-pages .page-no { font: 500 12px/1.9 var(--font-mono); color: var(--ink-70); }
-.report-pages { border-top: 0; }
 
 /* Hero: Überschrift und Website-Eingabe stehen beim Öffnen vollständig im ersten Bildschirm.
    Der Hero füllt die Fensterhöhe unter der Navigation (72 px); Schrift und Abstände richten sich auch nach der Höhe. */
@@ -51,3 +49,5 @@
 .showcase-frame { overflow: hidden; isolation: isolate; border-radius: clamp(14px, 2vw, 24px); background: #0E1416; box-shadow: 0 24px 60px rgb(12 12 12 / .16); }
 .showcase-video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; }
 .showcase-note { margin-top: 14px; text-align: center; font: 400 12px var(--font-mono); color: var(--ink-45); }
+/* Zweites Video rechts neben dem Text im Abschnitt „Ihr Bericht“ (Spalte aus .split) */
+.report-media { min-width: 0; margin: 0; }

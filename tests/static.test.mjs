@@ -15,7 +15,6 @@ const PAGES = ['public/index.html', 'public/pruefkriterien.html', 'public/impres
 const REFERENCE_ZIP = process.env.PXK_REFERENCE_ZIP || join(ROOT, '..', 'pxwa-quellen-klein.zip');
 
 const AREAS = ['SEO & Auffindbarkeit', 'Performance & Technik', 'GEO & AI Visibility', 'UX, Barrierefreiheit & Vertrauen'];
-const REPORT_PAGES = ['Deckblatt und Kurzfazit', 'SEO & Auffindbarkeit', 'Performance & Technik', 'GEO & AI Visibility', 'UX, Barrierefreiheit & Vertrauen', 'Priorisierte Verbesserungen', 'Methodik, Quellen, Prüfgrenzen und Kontakt'];
 const METHOD = [
   ['findability_seo', 'SEO & Auffindbarkeit', [['FIND', 10]]],
   ['performance_technology', 'Performance & Technik', [['PERF', 9]]],
@@ -86,8 +85,11 @@ test('Startseite: kostenloses Angebot, vier Bereiche, sieben PDF-Seiten, GEO & A
   const txt = el => H.norm(H.textOf(el));
   const text = H.norm(H.visibleText(root));
   assert.deepEqual(H.byClass(H.byId(root, 'bereiche'), 'spec-row').map(r => txt(H.byTag(r, 'h3')[0])), AREAS);
-  assert.deepEqual(H.byTag(H.byClass(root, 'report-pages')[0], 'li').map(li => txt(li.children.filter(c => c.tag)[1])), REPORT_PAGES);
-  assert.deepEqual(H.byClass(root, 'report-pages')[0].children.filter(c => c.tag).map(li => txt(li.children.find(c => c.tag))), ['01', '02', '03', '04', '05', '06', '07']);
+  /* Videos: unter dem Hero und rechts neben dem Text bei „Ihr Bericht“; stumm, Schleife, ohne Bedienelemente */
+  const videos = H.byTag(root, 'video');
+  assert.deepEqual(videos.map(v => H.byTag(v, 'source')[0].attrs.get('src')), ['media/360-pixelkiez-video-1080p.mp4', 'media/report-walkthrough-de-16x9.mp4']);
+  for (const v of videos) assert.ok(['muted', 'loop', 'playsinline', 'poster', 'aria-label'].every(a => v.attrs.has(a)) && !v.attrs.has('controls') && !v.attrs.has('autoplay'));
+  assert.ok(H.byTag(H.byId(root, 'bericht'), 'video').length === 1, 'Berichtsvideo im Abschnitt „Ihr Bericht“');
   for (const s of ['GEO', 'AI Visibility', 'Generative Engine Optimization', '0 €', 'mit Google an', 'sieben Seiten', 'Core Web Vitals', 'beobachtet']) assert.ok(text.includes(s), `fehlt: ${s}`);
   assert.equal(H.byClass(root, 'plan').length, 3);
   assert.equal(H.byClass(root, 'plan--featured').length, 1);

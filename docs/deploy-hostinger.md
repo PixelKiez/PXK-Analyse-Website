@@ -155,10 +155,11 @@ Anschließend die Testdaten löschen:
 Railway-Buckets sind privat; es gibt keine öffentlichen Bucket-URLs. Ausgeliefert wird über einen öffentlichen Dienst
 im selben Railway-Projekt, der aus dem Bucket liest (z. B. Vorlage „Blob Butler“) und eine feste Domain hat.
 
-1. Bucket anlegen und `360-pixelkiez-video-1080p.mp4` sowie `360-pixelkiez-video-poster.jpg` hochladen.
+1. Bucket anlegen und hochladen: `360-pixelkiez-video-1080p.mp4`, `360-pixelkiez-video-poster.jpg` (unter dem Hero)
+   sowie `report-walkthrough-de-16x9.mp4`, `report-walkthrough-poster.jpg` (Abschnitt „Ihr Bericht“).
 2. Auslieferungsdienst mit Domain `<media-domain>` bereitstellen. Pflicht für iPhone/Safari: Antworten auf
    Range-Anfragen mit `206 Partial Content` und `Accept-Ranges: bytes`. Prüfung:
    `curl -s -o /dev/null -D - -H 'Range: bytes=0-1023' https://<media-domain>/360-pixelkiez-video-1080p.mp4 | head -5`
-3. In `public/index.html` `poster` und `<source src>` auf `https://<media-domain>/…` setzen und in der Meta-CSP
+3. In `public/index.html` bei beiden Videos `poster` und `<source src>` auf `https://<media-domain>/…` setzen und in der Meta-CSP
    `media-src 'self' https://<media-domain>; img-src 'self' https://<media-domain>` ergänzen.
 4. Railway als Anbieter in `datenschutz.html` aufnehmen (beim Abruf geht die IP-Adresse an Railway).

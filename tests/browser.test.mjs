@@ -159,6 +159,31 @@ test('Video unter dem Hero: mittig, abgerundet, ohne Bedienelemente, startet bei
   await context.close();
 });
 
+test('Video bei „Ihr Bericht“: rechts neben dem Text (mobil darunter), abgerundet, lädt und startet erst beim Hineinscrollen', { skip }, async () => {
+  for (const [width, height] of [[1440, 900], [390, 844]]) {
+    const { context, page, errors, blocked } = await open('/index.html', { width, height, reducedMotion: 'no-preference' });
+    const report = () => page.evaluate(() => {
+      const v = document.querySelector('#bericht .showcase-video'), f = v.closest('.showcase-frame'), t = document.querySelector('#bericht .split-copy');
+      const fr = f.getBoundingClientRect(), tr = t.getBoundingClientRect();
+      return { paused: v.paused, time: v.currentTime, loop: v.loop, controls: v.controls, buffered: v.buffered.length,
+        right: fr.left >= tr.right, below: fr.top >= tr.bottom, radius: parseFloat(getComputedStyle(f).borderTopLeftRadius), overflow: getComputedStyle(f).overflow };
+    });
+    const before = await report();
+    assert.equal(before.paused, true, `${width}: läuft erst beim Hineinscrollen`);
+    assert.equal(before.buffered, 0, `${width}: lädt erst, wenn es gebraucht wird`);
+    await page.evaluate(() => document.querySelector('#bericht .showcase-frame').scrollIntoView({ block: 'center' }));
+    await page.waitForFunction(() => { const v = document.querySelector('#bericht .showcase-video'); return !v.paused && v.currentTime > 0.3; }, null, { timeout: 8000 });
+    const m = await report();
+    assert.ok(width >= 1000 ? m.right : m.below, `${width}: ${width >= 1000 ? 'rechts neben' : 'unter'} dem Text`);
+    assert.deepEqual([m.loop, m.controls], [true, false]);
+    assert.ok(m.radius >= 12 && m.overflow === 'hidden', `${width}: abgerundete Ecken`);
+    assert.equal(await page.evaluate(() => document.querySelector('.showcase-video').paused), true, `${width}: Video unter dem Hero hält außerhalb des Bildes an`);
+    assert.deepEqual(errors, [], `${width}: Konsolenfehler`);
+    assert.deepEqual(blocked, [], `${width}: unerwartete Fremd-Requests`);
+    await context.close();
+  }
+});
+
 test('Tastatur: ungültige Eingabe bleibt im Feld; gültige Anfrage komplett per Tab/Enter/Leertaste bis zur Referenz (mobil und Desktop)', { skip }, async () => {
   for (const width of [390, 1440]) {
     app.exec('DELETE FROM notifications; DELETE FROM orders; DELETE FROM rate_limits;');
