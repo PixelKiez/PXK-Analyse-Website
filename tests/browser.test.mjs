@@ -74,7 +74,7 @@ async function tabTo(page, pred, max = 40) {
 
 test('Mobile Hauptansicht: kein horizontaler Überlauf, Formular sichtbar, Navigationsbutton in der Pille (320/390/768/1440)', { skip }, async t => {
   for (const width of [320, 390, 768, 1440]) {
-    for (const path of ['/index.html', '/pruefkriterien.html', '/anfrage.php']) {
+    for (const path of ['/index.html', '/pruefkriterien.html', '/anfrage.php', '/impressum.html', '/datenschutz.html']) {
       const { context, page, errors, blocked } = await open(path, { width, height: 800 });
       await page.$$eval('details', ds => ds.forEach(d => { d.open = true; }));
       assert.ok(await overflow(page) <= 0, `${path} ${width}: Überlauf`);
@@ -83,7 +83,7 @@ test('Mobile Hauptansicht: kein horizontaler Überlauf, Formular sichtbar, Navig
         return b.right <= n.right && b.left >= n.left;
       });
       assert.ok(nav, `${path} ${width}: Navigationsbutton ragt aus der Pille`);
-      if (path !== '/pruefkriterien.html') {
+      if (['/index.html', '/anfrage.php'].includes(path)) {
         const form = await page.evaluate(() => ['#url', '.url-field .btn'].map(s => { const r = document.querySelector(s).getBoundingClientRect(); return r.width > 0 && r.left >= 0 && r.right <= innerWidth; }));
         assert.deepEqual(form, [true, true], `${path} ${width}: Eingabefeld und Button vollständig sichtbar`);
       }
@@ -170,7 +170,7 @@ test('Tastatur: ungültige Eingabe bleibt im Feld; gültige Anfrage komplett per
 
 test('Accessibility-Snapshot (axe-core): keine schweren Verstöße auf Startseite, Methodik, Eingabe- und Bestätigungsseite', { skip: skip || (!AXE && 'NOT_RUN: PXK_AXE nicht gesetzt') }, async t => {
   const report = {};
-  for (const path of ['/index.html', '/pruefkriterien.html', '/anfrage.php', 'confirm']) {
+  for (const path of ['/index.html', '/pruefkriterien.html', '/impressum.html', '/datenschutz.html', '/anfrage.php', 'confirm']) {
     /* axe wird als Inline-Skript injiziert; die CSP der Seite würde das (korrekt) blockieren */
     const o = await open(path === 'confirm' ? '/index.html' : path, { bypassCSP: true });
     if (path === 'confirm') {

@@ -104,7 +104,7 @@ final class Config
         if (strlen((string) ($this->c['secret'] ?? '')) < 32) {
             $missing[] = 'secret';
         }
-        if (!filter_var($this->c['privacy']['url'] ?? '', FILTER_VALIDATE_URL) || trim((string) ($this->c['privacy']['version'] ?? '')) === '') {
+        if (trim((string) ($this->c['privacy']['version'] ?? '')) === '') {
             $missing[] = 'privacy';
         }
         if ($missing) {
@@ -164,7 +164,7 @@ final class Config
 
     public function mail(): array
     {
-        return $this->c['mail'] + ['username' => '', 'password' => '', 'from_name' => 'Pixelkiez Analyse', 'timeout' => 15];
+        return $this->c['mail'] + ['username' => '', 'password' => '', 'from_name' => '360°Pixelkiez', 'timeout' => 15];
     }
 
     public function dataDir(): string
@@ -180,11 +180,6 @@ final class Config
     public function secret(): string
     {
         return $this->c['secret'];
-    }
-
-    public function privacyUrl(): string
-    {
-        return $this->c['privacy']['url'];
     }
 
     public function privacyVersion(): string

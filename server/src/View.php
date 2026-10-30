@@ -7,7 +7,7 @@ namespace Pxwa;
    plus assets/anfrage.css. Kein JavaScript. Alle variablen Werte laufen durch Http::h(). */
 final class View
 {
-    public function __construct(private string $base = '', private string $privacyUrl = 'https://pixelkiez.de/datenschutz.html')
+    public function __construct(private string $base = '')
     {
     }
 
@@ -47,7 +47,7 @@ final class View
             . '<li>Die Anmeldung läuft über Google. Wir erhalten nur Konto-Kennung und bestätigte E-Mail-Adresse, keinen Zugriff auf Ihr Postfach.</li>'
             . '<li>Pixelkiez wird intern per E-Mail über Ihre Anfrage informiert.</li>'
             . '<li>Ihre Website wird von dieser Seite nicht automatisch abgerufen oder gescannt.</li>'
-            . '</ul><p class="request-small"><a class="request-link" href="' . $h($this->privacyUrl) . '">Datenschutzerklärung von Pixelkiez</a></p>'
+            . '</ul><p class="request-small"><a class="request-link" href="' . $base . '/datenschutz.html">Datenschutzerklärung</a></p>'
             . '<form class="request-confirm" method="post" action="' . $base . '/anfrage.php">'
             . '<input type="hidden" name="action" value="confirm"><input type="hidden" name="csrf" value="' . $h($csrf) . '"><input type="hidden" name="idem" value="' . $h($idem) . '">'
             . '<label class="consent"><input type="checkbox" name="zustimmung" value="1" required' . ($error !== null ? ' aria-invalid="true" aria-describedby="confirm-error"' : '') . '>'
@@ -94,8 +94,8 @@ final class View
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<title>' . $h($title) . ' | Pixelkiez Analyse</title>
-<meta name="description" content="Kostenlose Website-Analyse von Pixelkiez: Anfrage mit Google-Anmeldung.">
+<title>' . $h($title) . ' | 360°Pixelkiez</title>
+<meta name="description" content="Kostenlose Website-Analyse von 360°Pixelkiez: Anfrage mit Google-Anmeldung.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
@@ -105,7 +105,7 @@ final class View
 <body>
 <header class="nav-wrap" id="nav">
   <nav class="nav" aria-label="Hauptnavigation">
-    <a class="logo" href="' . $b . '/index.html#top">Pixelkiez<span>Analyse</span></a>
+    <a class="logo" href="' . $b . '/index.html#top">360°Pixelkiez<span>Analyse</span></a>
     <div class="nav-links"><a href="' . $b . '/index.html#bericht">Bericht</a><a href="' . $b . '/index.html#bereiche">Bereiche</a><a href="' . $b . '/index.html#angebot">Angebot</a><a href="' . $b . '/index.html#faq">FAQ</a></div>
     <a class="btn btn--ghost btn--sm" href="' . $b . '/index.html">Start</a>
   </nav>
@@ -114,8 +114,8 @@ final class View
   <section class="section request">' . $main . '</section>
   <footer class="cw-lilac">
     <div class="footer">
-      <span>© 2026 Pixelkiez · Webdesign Berlin</span>
-      <nav aria-label="Rechtliches"><a href="https://pixelkiez.de/impressum.html">Impressum</a><a href="' . $h($this->privacyUrl) . '">Datenschutz</a><a href="mailto:kontakt@pixelkiez.de">Kontakt</a></nav>
+      <span>© 2026 360°Pixelkiez</span>
+      <nav aria-label="Rechtliches"><a href="' . $b . '/impressum.html">Impressum</a><a href="' . $b . '/datenschutz.html">Datenschutz</a><a href="mailto:kontakt@pixelkiez.de">Kontakt</a></nav>
     </div>
   </footer>
 </main>

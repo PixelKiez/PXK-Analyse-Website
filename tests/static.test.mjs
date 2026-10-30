@@ -11,7 +11,7 @@ import { ROOT } from './lib/harness.mjs';
 
 const read = p => readFileSync(join(ROOT, p), 'utf8');
 const git = (...a) => execFileSync('git', a, { cwd: ROOT, encoding: 'utf8' });
-const PAGES = ['public/index.html', 'public/pruefkriterien.html'];
+const PAGES = ['public/index.html', 'public/pruefkriterien.html', 'public/impressum.html', 'public/datenschutz.html'];
 const REFERENCE_ZIP = process.env.PXK_REFERENCE_ZIP || join(ROOT, '..', 'pxwa-quellen-klein.zip');
 
 const AREAS = ['SEO & Auffindbarkeit', 'Performance & Technik', 'GEO & AI Visibility', 'UX, Barrierefreiheit & Vertrauen'];
@@ -22,7 +22,8 @@ const METHOD = [
   ['geo_ai_visibility', 'GEO & AI Visibility', [['AI', 8]]],
   ['ux_accessibility_trust', 'UX, Barrierefreiheit & Vertrauen', [['UX', 8], ['A11Y', 6], ['TRUST', 8]]],
 ];
-const EXTERNAL_OK = ['https://pixelkiez.de/', 'https://pixelkiez.de/impressum.html', 'https://pixelkiez.de/datenschutz.html', 'mailto:kontakt@pixelkiez.de'];
+/* 360°Pixelkiez ist eine eigenständige Website: keine Links zu pixelkiez.de, nur die Kontaktadresse */
+const EXTERNAL_OK = ['mailto:kontakt@pixelkiez.de'];
 
 /* Alles, was Nutzer, Screenreader oder Suchmaschinen lesen: sichtbarer und verborgener Text, Metadaten, ARIA, JSON-LD */
 const allText = n => n.text !== undefined ? n.text : ['script', 'style', 'symbol'].includes(n.tag) ? ' ' : ` ${n.children.map(allText).join(' ')} `;
@@ -138,7 +139,7 @@ test('Methodik: vier Bereiche in Reihenfolge, eindeutige IDs, 48 Original-Prüfp
   for (const [, id, name, desc] of refRows) assert.deepEqual(rows[id], [H.decode(name), H.decode(desc)], id);
 });
 
-test('Links: interne Anker gültig, externe Ziele nur Pixelkiez und mailto', () => {
+test('Links: interne Anker gültig, keine Links zu pixelkiez.de, nur mailto als externes Ziel', () => {
   const pages = Object.fromEntries(PAGES.map(p => [p.slice(7), read(p)]));
   for (const [page, html] of Object.entries(pages)) {
     for (const a of H.byTag(H.parse(html).root, 'a')) {
@@ -151,6 +152,32 @@ test('Links: interne Anker gültig, externe Ziele nur Pixelkiez und mailto', () 
       if (frag) assert.ok(H.byId(H.parse(pages[target]).root, frag), `${page}: Anker ${href} fehlt`);
     }
   }
+  /* Auch serverseitig gerenderte Seiten und Konfigurationsvorlage verweisen nicht auf die Webdesign-Website */
+  for (const f of [...PAGES, 'server/src/View.php', 'server/config.example.php']) {
+    assert.ok(!/https?:\/\/(www\.)?pixelkiez\.de/i.test(read(f)), `${f}: kein Link zu pixelkiez.de`);
+    assert.ok(!/Webdesign/i.test(read(f)), `${f}: kein Bezug auf Webdesign`);
+  }
+});
+
+test('Eigenständige Website 360°Pixelkiez: Name in Titel, Logo und Footer; Impressum und Datenschutz als eigene Seiten', () => {
+  const view = read('server/src/View.php');
+  for (const page of PAGES) {
+    const { root } = H.parse(read(page));
+    assert.match(H.textOf(H.byTag(root, 'title')[0]), /360°Pixelkiez/, `${page}: Titel`);
+    assert.ok(H.byClass(root, 'logo').every(l => H.norm(H.textOf(l)).startsWith('360°Pixelkiez')), `${page}: Logo`);
+    const legal = H.find(root, e => e.tag === 'nav' && e.attrs.get('aria-label') === 'Rechtliches')[0];
+    assert.deepEqual(H.byTag(legal, 'a').map(a => a.attrs.get('href')), ['impressum.html', 'datenschutz.html'], `${page}: Rechtliches`);
+    assert.match(H.norm(H.textOf(H.byClass(root, 'footer')[0])), /© 2026 360°Pixelkiez/, `${page}: Copyright`);
+  }
+  assert.match(view, /© 2026 360°Pixelkiez/);
+  assert.match(view, /href="' \. \$b \. '\/impressum\.html">Impressum<\/a><a href="' \. \$b \. '\/datenschutz\.html">Datenschutz<\/a>/);
+  const imprint = H.norm(H.textOf(H.byTag(H.parse(read('public/impressum.html')).root, 'main')[0]));
+  for (const s of ['§ 5 Digitale-Dienste-Gesetz (DDG)', 'Vincent Schnetzer', '360°Pixelkiez', 'Edelhofdamm 74', '13465 Berlin', 'kontakt@pixelkiez.de', '§ 18 Abs. 2 MStV', 'Verbraucherschlichtungsstelle']) {
+    assert.ok(imprint.includes(s), `Impressum enthält "${s}"`);
+  }
+  const privacy = H.norm(H.textOf(H.byTag(H.parse(read('public/datenschutz.html')).root, 'main')[0]));
+  assert.match(privacy, /in Vorbereitung/, 'Datenschutzerklärung als unvollständig gekennzeichnet, bis sie fertiggestellt ist');
+  assert.ok(privacy.includes('Vincent Schnetzer') && privacy.includes('kontakt@pixelkiez.de'), 'Verantwortlicher genannt');
 });
 
 test('Design: styles.css unverändert gegenüber vision.html; alle verwendeten Klassen sind definiert', () => {
@@ -168,7 +195,7 @@ test('Design: styles.css unverändert gegenüber vision.html; alle verwendeten K
 test('Release-Grenze: public/ enthält nur ausgelieferte Dateien; Konfiguration und Laufzeitdaten sind ausgeschlossen', () => {
   const walk = d => readdirSync(d).flatMap(f => statSync(join(d, f)).isDirectory() ? walk(join(d, f)) : [relative(join(ROOT, 'public'), join(d, f))]);
   const files = walk(join(ROOT, 'public')).filter(f => !f.endsWith('.DS_Store')).sort();
-  assert.deepEqual(files, ['.htaccess', 'anfrage.php', 'assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'auth/callback.php', 'index.html', 'pruefkriterien.html']);
+  assert.deepEqual(files, ['.htaccess', 'anfrage.php', 'assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'auth/callback.php', 'datenschutz.html', 'impressum.html', 'index.html', 'pruefkriterien.html']);
   for (const f of ['anfrage.php', 'auth/callback.php']) assert.ok(!/(new\s+PDO|curl_init|SmtpMailer)/.test(read('public/' + f)), `${f}: nur Einstieg, Logik außerhalb des Webroots`);
   for (const f of ['server/config.php', 'var/pxwa.sqlite', 'var/google-jwks.json']) assert.equal(spawnSync('git', ['check-ignore', '-q', f], { cwd: ROOT }).status, 0, `${f} ist ignoriert`);
   assert.ok(!git('ls-files').split('\n').includes('server/config.php'));

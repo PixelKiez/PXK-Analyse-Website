@@ -30,7 +30,7 @@ return [
         'username' => '',
         'password' => '',
         'from' => '',                            // Absenderadresse des SMTP-Kontos
-        'from_name' => 'Pixelkiez Analyse',
+        'from_name' => '360°Pixelkiez',
         'notify_to' => 'kontakt@pixelkiez.de',
         'timeout' => 15,
     ],
@@ -46,9 +46,8 @@ return [
     // Dient nur zum Pseudonymisieren von IP-Adressen im Rate-Limiting.
     'secret' => '',
 
-    // Datenschutzhinweise, die auf der Bestätigungsseite verlinkt werden. Version wird je Auftrag gespeichert.
+    // Stand der Datenschutzerklärung (public/datenschutz.html); wird je Auftrag gespeichert.
     'privacy' => [
-        'url' => 'https://pixelkiez.de/datenschutz.html',
         'version' => 'ENTWURF-2026-10-30',
     ],
 ];

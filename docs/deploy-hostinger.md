@@ -1,6 +1,7 @@
-# PXWA – Deploy auf Hostinger (Webhosting, PHP)
+# 360°Pixelkiez – Deploy auf Hostinger (Webhosting, PHP)
 
-Gilt für die kostenlose Website-Analyse mit Google-Anmeldung (PXK-153).
+Gilt für die kostenlose Website-Analyse mit Google-Anmeldung (PXK-153). 360°Pixelkiez ist eine eigenständige Website:
+keine Links zu pixelkiez.de, eigenes Impressum (`impressum.html`) und eigene Datenschutzerklärung (`datenschutz.html`).
 Ein Deployment braucht eine eigene, aktuelle Freigabe für **genau einen Commit-SHA und ein Hosting-Ziel**.
 Platzhalter: `<domain>` (z. B. eine Subdomain), `<user>` (Hostinger-Benutzer `u…`), `<sha>` (freigegebener Commit).
 
@@ -9,9 +10,8 @@ Platzhalter: `<domain>` (z. B. eine Subdomain), `<user>` (Hostinger-Benutzer `u�
 - [ ] Domain festlegen (D-10) und als Website/Subdomain in hPanel anlegen
 - [ ] Google-OAuth-Client angelegt (Abschnitt 4)
 - [ ] MySQL-Datenbank und Absender-Postfach angelegt (Abschnitte 3 und 5)
-- [ ] Datenschutzerklärung deckt **diesen** Ablauf ab: Google als Anmeldedienst, gespeicherte Daten, Speicherdauer,
-      Hosting bei Hostinger, Google Fonts. Die aktuelle Seite pixelkiez.de/datenschutz.html beschreibt pixelkiez.de
-      (Railway, keine Google Fonts) und passt dafür nicht. Danach `privacy.url` und `privacy.version` setzen.
+- [ ] `public/datenschutz.html` fertigstellen (derzeit „in Vorbereitung“): Google als Anmeldedienst, gespeicherte Daten,
+      Speicherdauer, Hosting bei Hostinger, Google Fonts. Danach `privacy.version` auf den Stand der Erklärung setzen.
 - [ ] Speicherdauer der Aufträge festlegen (Abschnitt 8)
 - [ ] `noindex` bleibt gesetzt, bis eine eigene Release-Freigabe es aufhebt
 
@@ -69,7 +69,7 @@ Es gibt keine Umgebungsvariablen. `PXWA_CONFIG` ist nur für Tests gedacht und w
 | `mail.notify_to` | `kontakt@pixelkiez.de` |
 | `data_dir`, `session_dir` | `/home/<user>/domains/<domain>/var` und `…/var/sessions` |
 | `secret` | `php -r 'echo bin2hex(random_bytes(32));'` |
-| `privacy.url`, `privacy.version` | geprüfte Datenschutzerklärung und deren Stand (nicht `ENTWURF-…`) |
+| `privacy.version` | Stand von `datenschutz.html` (nicht `ENTWURF-…`); wird je Auftrag gespeichert |
 
 Schema anlegen (idempotent): `php bin/migrate.php` → `PXWA: Schema ist aktuell.`
 Ohne SSH: `server/schema/mysql.sql` in phpMyAdmin importieren.
@@ -78,7 +78,7 @@ Fehlt ein Wert, antwortet `anfrage.php` mit 503. Das Server-Log nennt nur den Sc
 ## 4. Google OAuth (Google Cloud Console → Google Auth Platform)
 
 - Zielgruppe: **Extern**, Status **In Produktion**. Im Testmodus können sich nur eingetragene Testnutzer anmelden.
-- Branding: App-Name, Support-E-Mail, Startseite `https://<domain>/`, Datenschutz-Link (siehe Abschnitt 0),
+- Branding: App-Name `360°Pixelkiez`, Support-E-Mail, Startseite `https://<domain>/`, Datenschutz-Link `https://<domain>/datenschutz.html`,
   autorisierte Domain = registrierbare Domain von `<domain>`. Ein Logo löst eine Markenprüfung aus und wird nicht benötigt.
 - Datenzugriff: nur `openid` und `…/auth/userinfo.email`. Beide sind nicht sensibel, eine Scope-Prüfung ist nicht nötig.
 - Client: Typ **Webanwendung**. Autorisierte Weiterleitungs-URI exakt `https://<domain>/auth/callback.php`.
@@ -127,6 +127,7 @@ B=https://<domain>
 curl -sI "http://<domain>/index.html" | grep -i '^location: https://'                 # HTTP → HTTPS
 curl -sI "$B/index.html"  | grep -iE 'strict-transport|x-frame-options|content-security'
 curl -s -D - -o /dev/null "$B/anfrage.php" | grep -iE 'set-cookie: __Host-pxwa=.*secure.*httponly.*samesite=lax|content-security|cache-control: no-store'   # GET; HEAD ergibt 405
+for p in impressum.html datenschutz.html; do curl -s -o /dev/null -w "%{http_code} $p\n" "$B/$p"; done     # erwartet 200
 for p in vision.html DESIGN.md STRUCTURE.md server/config.php .htaccess .git/HEAD tests/server.test.mjs; do
   curl -s -o /dev/null -w "%{http_code} $p\n" "$B/$p"; done                           # erwartet 403 oder 404, nie 200
 php ~/domains/<domain>/bin/send-notifications.php                                     # erwartet: 0 versendet, 0 fehlgeschlagen.

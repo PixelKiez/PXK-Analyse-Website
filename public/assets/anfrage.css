@@ -38,3 +38,11 @@
   .hero .h1 { font-size: clamp(34px, min(12vw, 6.2svh), 46px); }
   .hero .lead { font-size: clamp(16px, 2.3svh, 18px); }
 }
+
+/* Rechtsseiten (Impressum, Datenschutz) */
+.legal-body { display: grid; gap: 12px; max-width: 68ch; color: var(--ink-70); }
+.legal-h { margin-top: 18px; font-size: 20px; letter-spacing: -.01em; line-height: 1.3; color: var(--ink); }
+.legal-h:first-child { margin-top: 0; }
+
+/* Längerer Name 360°Pixelkiez: auf schmalen Handys entfällt der Zusatz „Analyse“ im Navigationslogo, damit der Button in der Pille bleibt */
+@media (max-width: 379px) { .nav .logo span { display: none; } }

@@ -189,7 +189,7 @@ export async function startApp({ google, smtp, authEndpoint, scheme = 'http', db
   'data_dir' => ${php(dir)},
   'session_dir' => ${php(sessions)},
   'secret' => ${php(randomBytes(32).toString('hex'))},
-  'privacy' => ['url' => 'https://pixelkiez.de/datenschutz.html', 'version' => 'TEST-2026-10-30'],
+  'privacy' => ['version' => 'TEST-2026-10-30'],
 ];\n`);
   google.setRedirectUri(`${base}/auth/callback.php`);
   const env = { ...process.env, PXWA_CONFIG: config };

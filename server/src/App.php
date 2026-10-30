@@ -23,7 +23,7 @@ final class App
             return;
         }
         $base = rtrim((string) parse_url($config->baseUrl(), PHP_URL_PATH), '/');
-        $app = new self($config, new View($base, $config->privacyUrl()));
+        $app = new self($config, new View($base));
         Http::securityHeaders($config);
         /* Session-Cookie (__Host-) und Origin gelten nur für den Host der Basis-URL. Auf Alias-Hosts nicht starten.
            Ziel ist immer ein fester Pfad, nie der eingehende Host oder Pfad. */
