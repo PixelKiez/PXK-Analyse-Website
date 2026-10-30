@@ -1,1 +1,7 @@
 .DS_Store
+# Echte Serverkonfiguration mit Zugangsdaten – nie committen
+server/config.php
+# Laufzeitdaten (SQLite, Schlüssel-Cache, Sessions)
+var/
+*.sqlite
+*.sqlite-*

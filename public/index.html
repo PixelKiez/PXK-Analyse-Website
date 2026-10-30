@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self' https://accounts.google.com">
+<meta name="robots" content="noindex,nofollow">
+<title>Pixelkiez Analyse – kostenlose Website-Analyse als PDF</title>
+<meta name="description" content="Kostenlose Website-Analyse von Pixelkiez in vier Bereichen: SEO, Performance, GEO &amp; AI Visibility sowie UX, Barrierefreiheit und Vertrauen. Persönlich erstellt, als PDF mit sieben Seiten per E-Mail.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="stylesheet" href="assets/anfrage.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","inLanguage":"de","mainEntity":[{"@type":"Question","name":"Ist die Analyse wirklich kostenlos?","acceptedAnswer":{"@type":"Answer","text":"Ja. Die Analyse kostet 0 €. Es gibt kein Abo, keine Folgekosten und kein bezahltes Zusatzpaket."}},{"@type":"Question","name":"Warum muss ich mich mit Google anmelden?","acceptedAnswer":{"@type":"Answer","text":"Damit wir den Bericht an eine bestätigte E-Mail-Adresse schicken. Wir erhalten nur die Kennung Ihres Google-Kontos und Ihre bestätigte E-Mail-Adresse, keinen Zugriff auf Ihr Postfach."}},{"@type":"Question","name":"Brauchen Sie Zugriff auf meine Website?","acceptedAnswer":{"@type":"Answer","text":"Nein. Wir betrachten nur öffentlich erreichbare Seiten. Sie installieren nichts und teilen keine Zugangsdaten."}},{"@type":"Question","name":"Was bedeutet GEO & AI Visibility?","acceptedAnswer":{"@type":"Answer","text":"GEO steht für Generative Engine Optimization. Wir prüfen, ob KI-Systeme Ihre Inhalte lesen, verstehen und als Quelle zitieren können. KI-Antworten zeigen wir nur, wenn wir sie in einer datierten Stichprobe tatsächlich beobachtet haben."}},{"@type":"Question","name":"Wann bekomme ich den Bericht?","acceptedAnswer":{"@type":"Answer","text":"Pixelkiez erstellt jeden Bericht persönlich und schickt ihn per E-Mail an Ihre bestätigte Adresse. Eine feste Bearbeitungszeit sagen wir nicht zu."}},{"@type":"Question","name":"Gibt es eine Garantie für Rankings oder KI-Erwähnungen?","acceptedAnswer":{"@type":"Answer","text":"Nein. Der Bericht enthält Befunde und Empfehlungen, aber keine Garantie für Rankings, Punktzahlen oder Nennungen in KI-Antworten."}},{"@type":"Question","name":"Ist der Bericht ein Rechtsgutachten?","acceptedAnswer":{"@type":"Answer","text":"Nein. Die Analyse ist keine Rechtsberatung und keine Zertifizierung, etwa nach DSGVO, BFSG oder WCAG."}}]}</script>
+</head>
+<body>
+<svg class="sr-only" width="0" height="0" aria-hidden="true">
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+</svg>
+
+<header class="nav-wrap" id="nav">
+  <nav class="nav" aria-label="Hauptnavigation">
+    <a class="logo" href="#top">Pixelkiez<span>Analyse</span></a>
+    <div class="nav-links">
+      <a href="#bericht">Bericht</a>
+      <a href="#bereiche">Bereiche</a>
+      <a href="#angebot">Angebot</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <a class="btn btn--ghost btn--sm" href="pruefkriterien.html">Katalog</a>
+  </nav>
+</header>
+
+<main class="frame" id="top">
+  <section class="hero">
+    <span class="badge"><span class="pixel" aria-hidden="true"></span>Kostenlose Website-Analyse</span>
+    <h1 class="h1">Sehen Sie, was Ihre Website <em>ausbremst</em>.</h1>
+    <p class="lead">Pixelkiez prüft Ihre Website persönlich in vier Bereichen, inklusive GEO &amp; AI Visibility. Den Bericht erhalten Sie kostenlos als PDF mit sieben Seiten per E-Mail.</p>
+    <form class="analyze" id="analyze" action="anfrage.php" method="post" novalidate>
+      <input type="hidden" name="action" value="start">
+      <label class="sr-only" for="url">Adresse Ihrer Website</label>
+      <div class="url-field">
+        <svg class="i"><use href="#i-globe"/></svg>
+        <input id="url" name="website" type="text" inputmode="url" autocomplete="url" maxlength="2048" placeholder="ihre-website.de">
+        <button class="btn btn--accent" type="submit">Kostenlos anfragen <svg class="i"><use href="#i-arrow"/></svg></button>
+      </div>
+      <p class="form-error" id="url-error" hidden>Bitte geben Sie eine öffentliche Website-Adresse wie beispiel.de ein.</p>
+      <div class="facts">
+        <span><svg class="i"><use href="#i-check"/></svg>0 €</span>
+        <span><svg class="i"><use href="#i-check"/></svg>Vier Bereiche</span>
+        <span><svg class="i"><use href="#i-check"/></svg>PDF mit 7 Seiten</span>
+      </div>
+      <p class="form-hint">Im nächsten Schritt melden Sie sich mit Google an. So bestätigen wir Ihre E-Mail-Adresse.</p>
+    </form>
+  </section>
+
+  <section class="section cw-peach" id="ablauf">
+    <div class="section-head"><p class="eyebrow">So funktioniert's</p><h2 class="h2">In drei Schritten zum PDF-Bericht.</h2></div>
+    <div class="steps">
+      <div class="step"><span>01</span><h3>Website eingeben</h3><p>Sie nennen die öffentliche Adresse der Website, die wir analysieren sollen.</p></div>
+      <div class="step"><span>02</span><h3>Anmelden und bestätigen</h3><p>Sie melden sich mit Google an und bestätigen die Anfrage. So wissen wir, wohin der Bericht geht.</p></div>
+      <div class="step"><span>03</span><h3>PDF per E-Mail</h3><p>Pixelkiez analysiert Ihre Website persönlich und schickt Ihnen den Bericht als PDF.</p></div>
+    </div>
+  </section>
+
+  <section class="section cw-white" id="bericht">
+    <div class="split">
+      <div class="split-copy">
+        <p class="eyebrow">Ihr Bericht</p>
+        <h2 class="h2">Ein PDF. Sieben Seiten.</h2>
+        <p class="text">Pixelkiez erstellt den Bericht von Hand und schickt ihn an die E-Mail-Adresse, die Google bestätigt hat. Er zeigt, was auf den geprüften Seiten auffällt und womit Sie beginnen.</p>
+        <ul class="checklist">
+          <li><svg class="i"><use href="#i-check"/></svg>Befunde mit Fundstellen</li>
+          <li><svg class="i"><use href="#i-check"/></svg>Priorisierte nächste Schritte</li>
+          <li><svg class="i"><use href="#i-check"/></svg>Quellen und Prüfgrenzen offen benannt</li>
+          <li><svg class="i"><use href="#i-check"/></svg>Kein automatisch erzeugter Bericht</li>
+        </ul>
+      </div>
+      <div class="card" aria-label="Aufbau des PDF-Berichts mit sieben Seiten">
+        <div class="card-top"><span>PDF-Bericht</span><span class="tag">7 Seiten</span></div>
+        <ol class="issues report-pages">
+          <li><span class="page-no num">01</span><span>Deckblatt und Kurzfazit</span><small>Überblick</small></li>
+          <li><span class="page-no num">02</span><span>SEO &amp; Auffindbarkeit</span><small>Bereich 1</small></li>
+          <li><span class="page-no num">03</span><span>Performance &amp; Technik</span><small>Bereich 2</small></li>
+          <li><span class="page-no num">04</span><span>GEO &amp; AI Visibility</span><small>Bereich 3</small></li>
+          <li><span class="page-no num">05</span><span>UX, Barrierefreiheit &amp; Vertrauen</span><small>Bereich 4</small></li>
+          <li><span class="page-no num">06</span><span>Priorisierte Verbesserungen</span><small>Reihenfolge</small></li>
+          <li><span class="page-no num">07</span><span>Methodik, Quellen, Prüfgrenzen und Kontakt</span><small>Transparenz</small></li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="bereiche">
+    <div class="section-head"><p class="eyebrow">Was wir prüfen</p><h2 class="h2">Vier Bereiche. Ein klares Bild.</h2><p class="text">Wir betrachten ausgewählte öffentliche Seiten Ihrer Website. Welche Prüfpunkte passen, entscheiden wir je Website. Der Bericht nennt, was tatsächlich geprüft wurde.</p></div>
+    <div class="spec">
+      <div class="spec-row"><div><h3>SEO &amp; Auffindbarkeit</h3><span class="count">Bereich 1 · PDF-Seite 2</span></div><p>Ob Suchmaschinen Ihre Seiten erreichen, indexieren und richtig einordnen können.</p><div class="pills"><span>Titles &amp; Überschriften</span><span>Indexierbarkeit</span><span>Canonicals</span><span>interne Links</span><span>Sitemap</span></div></div>
+      <div class="spec-row"><div><h3>Performance &amp; Technik</h3><span class="count">Bereich 2 · PDF-Seite 3</span></div><p>Wie schnell und stabil ausgewählte Seiten auf dem Smartphone und am Desktop laden, mit Blick auf die Core Web Vitals.</p><div class="pills"><span>Core Web Vitals</span><span>Felddaten, falls verfügbar</span><span>Mobile Labormessung</span><span>Bilder &amp; Medien</span><span>Caching</span></div></div>
+      <div class="spec-row"><div><h3>GEO &amp; AI Visibility</h3><span class="count">Bereich 3 · PDF-Seite 4</span></div><p>Ob KI-Systeme Ihre Inhalte lesen, verstehen und als Quelle zitieren können. KI-Antworten nennen wir nur, wenn wir sie in einer Stichprobe tatsächlich beobachtet haben. Keine Garantie für KI-Erwähnungen.</p><div class="pills"><span>KI-Lesbarkeit</span><span>Quellen- &amp; Zitierfähigkeit</span><span>strukturierte Daten</span><span>beobachtete KI-Antworten</span></div></div>
+      <div class="spec-row"><div><h3>UX, Barrierefreiheit &amp; Vertrauen</h3><span class="count">Bereich 4 · PDF-Seite 5</span></div><p>Ob sich Besucher zurechtfinden, Ihre Seiten per Tastatur nutzen können und Impressum, Datenschutz und Kontakt finden. Eine Stichprobe, keine vollständige WCAG-Prüfung und kein Rechtsgutachten.</p><div class="pills"><span>Nutzerführung</span><span>Tastatur &amp; Kontrast</span><span>Formulare</span><span>Impressum &amp; Kontakt</span><span>HTTPS</span></div></div>
+    </div>
+  </section>
+
+  <section class="section cw-lilac" id="nutzen">
+    <div class="split split--reverse">
+      <div class="split-copy">
+        <p class="eyebrow">So nutzen Sie den Bericht</p>
+        <h2 class="h2">Jeder Befund verständlich erklärt.</h2>
+        <div class="uses">
+          <div class="use"><span>01</span><div><h3>Mit dem Wichtigsten beginnen</h3><p>Seite 6 des Berichts ordnet die Verbesserungen, damit Sie wissen, womit Sie anfangen.</p></div></div>
+          <div class="use"><span>02</span><div><h3>Bericht weitergeben</h3><p>Das PDF können Sie an Ihr Team, Ihre Agentur oder Ihre IT weitergeben.</p></div></div>
+          <div class="use"><span>03</span><div><h3>Kostenlos, ohne Abo</h3><p>Die Analyse ist einmalig und kostenlos. Es gibt kein Abo und keine laufende Überwachung.</p></div></div>
+        </div>
+      </div>
+      <article class="card detail" aria-label="Fiktives Beispiel eines Befunds im Bericht">
+        <div class="detail-top"><span class="sev sev--warn"></span><span>Beispiel · fiktiv</span><span class="tag">GEO &amp; AI Visibility</span></div>
+        <h3>Leistung und Standort fehlen in einem klaren Satz</h3>
+        <dl>
+          <div><dt>Befund</dt><dd>Die Startseite beschreibt das Angebot nur mit Schlagworten. Leistung, Zielgruppe und Ort stehen nirgends als zusammenhängender Text.</dd></div>
+          <div><dt>Warum wichtig</dt><dd>Menschen, Suchmaschinen und KI-Systeme können das Angebot schwerer einordnen und als Quelle nennen.</dd></div>
+          <div><dt>Empfehlung</dt><dd>Einen kurzen, sachlichen Absatz zu Leistung, Zielgruppe und Standort ergänzen und mit Belegen verknüpfen.</dd></div>
+          <div><dt>Fundstellen</dt><dd class="mono">/ · /leistungen</dd></div>
+          <div><dt>Hinweis</dt><dd>Fiktives Beispiel, kein Befund einer echten Website.</dd></div>
+        </dl>
+      </article>
+    </div>
+  </section>
+
+  <section class="section" id="fuer-wen">
+    <div class="section-head"><p class="eyebrow">Für wen</p><h2 class="h2">Für alle, die eine Website verantworten.</h2></div>
+    <div class="steps">
+      <div class="step"><h3>Unternehmen &amp; Selbstständige</h3><p>Sie wollen wissen, ob Ihre Website ihren Job macht, ohne Fachwissen. Der Bericht erklärt die Befunde in Klartext.</p></div>
+      <div class="step"><h3>Marketing-Teams</h3><p>Sie brauchen eine begründete Reihenfolge für die nächsten Schritte, etwa vor einem Relaunch.</p></div>
+      <div class="step"><h3>Geschäftsführung</h3><p>Sie möchten eine zweite Einschätzung, bevor Sie Zeit und Budget in die Website stecken.</p></div>
+    </div>
+  </section>
+
+  <section class="section cw-peach" id="warum">
+    <div class="section-head"><p class="eyebrow">Warum Pixelkiez</p><h2 class="h2">Persönlich geprüft. Klar formuliert.</h2></div>
+    <div class="why">
+      <div class="why-item"><h3>Klartext statt Fachbegriffe</h3><p>Jeder Befund ist so formuliert, dass Sie ihn verstehen und direkt weitergeben können.</p></div>
+      <div class="why-item"><h3>Von Menschen erstellt</h3><p>Pixelkiez analysiert jede Website selbst und erstellt den Bericht von Hand.</p></div>
+      <div class="why-item"><h3>Belege statt Vermutungen</h3><p>Befunde nennen ihre Fundstelle. Was sich nicht bewerten ließ, steht offen im Bericht.</p></div>
+      <div class="why-item"><h3>Grenzen offen benannt</h3><p>Kein Rechtsgutachten, keine Zertifizierung und keine Garantie für Rankings, Punktzahlen oder KI-Erwähnungen.</p></div>
+    </div>
+    <div class="crosssell"><p><b>Nur Analyse, keine Beratung.</b> Sie erhalten einen PDF-Bericht. Umsetzung und Beratung gehören nicht dazu.</p><a class="btn btn--ghost btn--sm" href="pruefkriterien.html">Methodik ansehen <svg class="i"><use href="#i-arrow"/></svg></a></div>
+  </section>
+
+  <section class="section cw-grey" id="angebot">
+    <div class="section-head"><p class="eyebrow">Angebot</p><h2 class="h2">Ein Angebot. 0 €.</h2></div>
+    <div class="plans">
+      <article class="plan plan--featured">
+        <div class="plan-name">Website-Analyse <em>Kostenlos</em></div>
+        <div class="price"><b class="num">0 €</b><span>einmalig</span></div>
+        <p>Persönlich erstellt, als PDF per E-Mail.</p>
+        <ul><li><svg class="i"><use href="#i-check"/></svg>Vier Bereiche inklusive GEO &amp; AI Visibility</li><li><svg class="i"><use href="#i-check"/></svg>PDF-Bericht mit sieben Seiten</li><li><svg class="i"><use href="#i-check"/></svg>Priorisierte Verbesserungen</li><li><svg class="i"><use href="#i-check"/></svg>Kein Abo, keine Folgekosten</li></ul>
+        <a class="btn btn--accent btn--block" href="#top">Website eingeben</a>
+      </article>
+      <article class="plan">
+        <div class="plan-name">Anmeldung</div>
+        <div class="price"><b class="num">Google</b></div>
+        <p>Bestätigt die E-Mail-Adresse, an die der Bericht geht.</p>
+        <ul><li><svg class="i"><use href="#i-check"/></svg>Nur Konto-Kennung und E-Mail-Adresse</li><li><svg class="i"><use href="#i-check"/></svg>Kein Zugriff auf Ihr Postfach</li><li><svg class="i"><use href="#i-check"/></svg>Kein Passwort bei Pixelkiez</li></ul>
+        <a class="btn btn--ghost btn--block" href="#faq">Fragen zur Anmeldung</a>
+      </article>
+      <article class="plan">
+        <div class="plan-name">Lieferung</div>
+        <div class="price"><b class="num">PDF</b><span>per E-Mail</span></div>
+        <p>Pixelkiez verschickt den Bericht persönlich.</p>
+        <ul><li><svg class="i"><use href="#i-check"/></svg>Keine Sofortanalyse</li><li><svg class="i"><use href="#i-check"/></svg>Kein automatischer Scan</li><li><svg class="i"><use href="#i-check"/></svg>Keine Beratung oder Umsetzung</li></ul>
+        <a class="btn btn--ghost btn--block" href="#ablauf">Ablauf ansehen</a>
+      </article>
+    </div>
+    <p class="note">Keine Rechtsberatung. Keine Garantie für Rankings, Punktzahlen oder Nennungen in KI-Antworten.</p>
+  </section>
+
+  <section class="section cw-white" id="faq">
+    <div class="faq-grid">
+      <div class="section-head"><p class="eyebrow">Fragen</p><h2 class="h2">Gut zu wissen.</h2></div>
+      <div class="faq">
+        <details><summary>Ist die Analyse wirklich kostenlos?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Ja. Die Analyse kostet 0 €. Es gibt kein Abo, keine Folgekosten und kein bezahltes Zusatzpaket.</p></details>
+        <details><summary>Warum muss ich mich mit Google anmelden?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Damit wir den Bericht an eine bestätigte E-Mail-Adresse schicken. Wir erhalten nur die Kennung Ihres Google-Kontos und Ihre bestätigte E-Mail-Adresse, keinen Zugriff auf Ihr Postfach.</p></details>
+        <details><summary>Brauchen Sie Zugriff auf meine Website?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Nein. Wir betrachten nur öffentlich erreichbare Seiten. Sie installieren nichts und teilen keine Zugangsdaten.</p></details>
+        <details><summary>Was bedeutet GEO &amp; AI Visibility?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>GEO steht für Generative Engine Optimization. Wir prüfen, ob KI-Systeme Ihre Inhalte lesen, verstehen und als Quelle zitieren können. KI-Antworten zeigen wir nur, wenn wir sie in einer datierten Stichprobe tatsächlich beobachtet haben.</p></details>
+        <details><summary>Wann bekomme ich den Bericht?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Pixelkiez erstellt jeden Bericht persönlich und schickt ihn per E-Mail an Ihre bestätigte Adresse. Eine feste Bearbeitungszeit sagen wir nicht zu.</p></details>
+        <details><summary>Gibt es eine Garantie für Rankings oder KI-Erwähnungen?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Nein. Der Bericht enthält Befunde und Empfehlungen, aber keine Garantie für Rankings, Punktzahlen oder Nennungen in KI-Antworten.</p></details>
+        <details><summary>Ist der Bericht ein Rechtsgutachten?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Nein. Die Analyse ist keine Rechtsberatung und keine Zertifizierung, etwa nach DSGVO, BFSG oder WCAG.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="tools">
+    <div class="section-head"><p class="eyebrow">Methodik im Detail</p><h2 class="h2">Alle Prüfpunkte nachlesen.</h2></div>
+    <div class="tools">
+      <a class="tool" href="pruefkriterien.html#findability_seo"><span><b>SEO &amp; Auffindbarkeit</b>10 Prüfpunkte</span><svg class="i"><use href="#i-arrow"/></svg></a>
+      <a class="tool" href="pruefkriterien.html#performance_technology"><span><b>Performance &amp; Technik</b>9 Prüfpunkte</span><svg class="i"><use href="#i-arrow"/></svg></a>
+      <a class="tool" href="pruefkriterien.html#geo_ai_visibility"><span><b>GEO &amp; AI Visibility</b>8 Prüfpunkte</span><svg class="i"><use href="#i-arrow"/></svg></a>
+      <a class="tool" href="pruefkriterien.html#ux_accessibility_trust"><span><b>UX, Barrierefreiheit &amp; Vertrauen</b>22 Prüfpunkte</span><svg class="i"><use href="#i-arrow"/></svg></a>
+    </div>
+  </section>
+
+  <section class="section closing cw-lilac">
+    <h2 class="h2">Kostenlos anfragen. Persönlich geprüft.</h2>
+    <button class="btn btn--accent" type="button" id="to-top">Website eingeben <svg class="i"><use href="#i-arrow"/></svg></button>
+  </section>
+
+  <footer class="cw-lilac">
+    <div class="footer-cols">
+      <div class="footer-brand"><a class="logo" href="#top">Pixelkiez<span>Analyse</span></a><p>Kostenlose, persönlich erstellte Website-Analyse als PDF. Ein Angebot von Pixelkiez.</p></div>
+      <div><h4>Angebot</h4><ul><li><a href="#ablauf">Ablauf</a></li><li><a href="#bericht">Bericht</a></li><li><a href="#bereiche">Bereiche</a></li><li><a href="#angebot">Angebot</a></li></ul></div>
+      <div><h4>Methodik</h4><ul><li><a href="pruefkriterien.html">Alle Prüfpunkte</a></li><li><a href="pruefkriterien.html#findability_seo">SEO &amp; Auffindbarkeit</a></li><li><a href="pruefkriterien.html#geo_ai_visibility">GEO &amp; AI Visibility</a></li></ul></div>
+      <div><h4>Pixelkiez</h4><ul><li><a href="https://pixelkiez.de/">Webdesign Berlin</a></li><li><a href="mailto:kontakt@pixelkiez.de">Kontakt</a></li></ul></div>
+    </div>
+    <div class="footer">
+      <span>© 2026 Pixelkiez · Webdesign Berlin</span>
+      <nav aria-label="Rechtliches"><a href="https://pixelkiez.de/impressum.html">Impressum</a><a href="https://pixelkiez.de/datenschutz.html">Datenschutz</a></nav>
+    </div>
+  </footer>
+</main>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

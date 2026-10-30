@@ -1,0 +1,24 @@
+/* Pixelkiez Analyse – Ergänzungen für Anfrageablauf und Hinweise. Baut auf den Tokens aus styles.css auf. */
+.request .section-head { margin-bottom: clamp(28px, 4vw, 40px); }
+.request-form { justify-items: start; margin-top: 0; }
+.request-notice { margin-bottom: 20px; padding: 14px 16px; border-radius: 12px; background: var(--accent-soft); font-size: 15px; color: var(--ink-70); }
+.request-grid { display: grid; grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); gap: clamp(28px, 5vw, 64px); align-items: start; }
+@media (max-width: 960px) { .request-grid { grid-template-columns: minmax(0, 1fr); } }
+.request-side { display: grid; gap: 18px; align-content: start; }
+.request-h { font-size: 22px; letter-spacing: -.02em; line-height: 1.25; }
+.request-notes { display: grid; gap: 10px; margin: 0; padding: 0 0 0 18px; font-size: 15px; color: var(--ink-70); }
+.request-small { font-size: 14px; color: var(--ink-45); }
+.request-link { text-decoration: underline; text-underline-offset: 3px; }
+.request-link:hover { color: var(--accent-text); }
+.request-meta { display: block; margin-top: 2px; font: 400 12px var(--font-mono); color: var(--ink-45); }
+.request-break { overflow-wrap: anywhere; }
+.request-confirm { display: grid; gap: 16px; justify-items: start; padding-top: 18px; border-top: 1px solid var(--line-soft); }
+.request-logout { margin-top: -4px; }
+.request-ref { font-size: 17px; }
+.request-ref b { font-weight: 500; letter-spacing: .04em; }
+.consent { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; font-size: 15px; cursor: pointer; }
+.consent input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--ink); }
+.consent input:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.form-hint { font: 400 13px var(--font-mono); color: var(--ink-45); text-align: center; }
+.report-pages .page-no { font: 500 12px/1.9 var(--font-mono); color: var(--ink-70); }
+.report-pages { border-top: 0; }

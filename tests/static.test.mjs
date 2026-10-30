@@ -1,530 +1,210 @@
-/* PXK-154 – statische Prüfungen ohne Abhängigkeiten (Node >= 20).
-   Ausführen im Repo-Root:  node --test tests/static.test.mjs
-   Jede Prüfung hat eine Negativprobe gegen den Base-Stand oder eine gezielte Mutation,
-   damit belegt ist, dass der Test den ursprünglichen Fehler tatsächlich erkennt. */
+/* PXWA – statische Prüfungen ohne Abhängigkeiten (Node ≥ 20). Ausführen im Repo-Root: node --test tests/static.test.mjs
+   Prüft Inhalte (kostenloses Angebot, vier Bereiche, sieben PDF-Seiten, GEO & AI Visibility), Methodik, Links,
+   unveränderte Design-Quelle, Release-Grenze public/, Secrets und den Scope der Serverkomponente. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { join, relative } from 'node:path';
 import * as H from './lib/html.mjs';
+import { ROOT } from './lib/harness.mjs';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const BASE = 'ead3908edf49657bd2ae5756690b2610be64e691';
+const read = p => readFileSync(join(ROOT, p), 'utf8');
+const git = (...a) => execFileSync('git', a, { cwd: ROOT, encoding: 'utf8' });
+const PAGES = ['public/index.html', 'public/pruefkriterien.html'];
 const REFERENCE_ZIP = process.env.PXK_REFERENCE_ZIP || join(ROOT, '..', 'pxwa-quellen-klein.zip');
 
-const git = (...args) => execFileSync('git', args, { cwd: ROOT, maxBuffer: 1 << 26 });
-const gitText = (...args) => git(...args).toString('utf8');
-const read = p => readFileSync(join(ROOT, p), 'utf8');
-const base = p => gitText('show', `${BASE}:${p}`);
-const sha256 = b => createHash('sha256').update(b).digest('hex');
-
-const PROTECTED = ['vision.html', 'assets/styles.css', 'DESIGN.md', 'STRUCTURE.md', '.gitignore'];
-const ALLOWED_CHANGES = [/^index\.html$/, /^assets\/app\.js$/, /^pruefkriterien\.html$/, /^tests\//];
-const PREVIEW = 'Vorschau – es wurde keine Anfrage versendet und keine Website geprüft.';
-const AREAS = [
-  ['findability_seo', 'Auffindbarkeit & SEO', 'FIND', 10],
-  ['performance_technology', 'Performance & Technik', 'PERF', 9],
-  ['ux_conversion', 'Nutzerführung & Conversion', 'UX', 8],
-  ['accessibility', 'Barrierefreiheit', 'A11Y', 6],
-  ['trust_privacy_content', 'Vertrauen, Datenschutz & Inhalt', 'TRUST', 8],
-  ['ai_readiness', 'KI-Verständlichkeit', 'AI', 7],
+const AREAS = ['SEO & Auffindbarkeit', 'Performance & Technik', 'GEO & AI Visibility', 'UX, Barrierefreiheit & Vertrauen'];
+const REPORT_PAGES = ['Deckblatt und Kurzfazit', 'SEO & Auffindbarkeit', 'Performance & Technik', 'GEO & AI Visibility', 'UX, Barrierefreiheit & Vertrauen', 'Priorisierte Verbesserungen', 'Methodik, Quellen, Prüfgrenzen und Kontakt'];
+const METHOD = [
+  ['findability_seo', 'SEO & Auffindbarkeit', [['FIND', 10]]],
+  ['performance_technology', 'Performance & Technik', [['PERF', 9]]],
+  ['geo_ai_visibility', 'GEO & AI Visibility', [['AI', 8]]],
+  ['ux_accessibility_trust', 'UX, Barrierefreiheit & Vertrauen', [['UX', 8], ['A11Y', 6], ['TRUST', 8]]],
 ];
-/* Platzhalter-Links, die bewusst offen bleiben: Release-Blocker (AC9), nicht Teil von PXK-154. */
-const KNOWN_PLACEHOLDERS = ['Kontakt', 'Impressum', 'Datenschutz', 'AGB'];
-const EXTERNAL_OK = ['https://pixelkiez.de/'];
+const EXTERNAL_OK = ['https://pixelkiez.de/', 'https://pixelkiez.de/impressum.html', 'https://pixelkiez.de/datenschutz.html', 'mailto:kontakt@pixelkiez.de'];
 
-/* ---------- Prüffunktionen (werden auch für die Negativproben verwendet) ---------- */
-
-function scopeViolations(paths) {
-  return paths.filter(p => !ALLOWED_CHANGES.some(r => r.test(p)));
-}
-
-function documentProblems(html) {
-  const p = [];
-  const { root, doctype } = H.parse(html);
-  if (!doctype) p.push('kein <!doctype html>');
-  const htmlEl = H.byTag(root, 'html');
-  if (htmlEl.length !== 1) p.push('nicht genau ein <html>');
-  else if (htmlEl[0].attrs.get('lang') !== 'de') p.push('html lang ist nicht "de"');
-  const heads = H.byTag(root, 'head'), bodies = H.byTag(root, 'body');
-  if (heads.length !== 1) p.push('nicht genau ein <head>');
-  if (bodies.length !== 1) p.push('nicht genau ein <body>');
-  if (htmlEl[0] && htmlEl[0].children.filter(c => c.tag).map(c => c.tag).join(',') !== 'head,body') p.push('<html> enthält nicht genau head,body');
-  const head = heads[0];
-  const first = head && head.children.find(c => c.tag);
-  if (!first || first.tag !== 'meta' || (first.attrs.get('charset') || '').toLowerCase() !== 'utf-8') p.push('meta charset=utf-8 nicht als erstes Element im head');
-  const metas = H.byTag(head || root, 'meta');
-  const named = n => metas.find(m => m.attrs.get('name') === n)?.attrs.get('content');
-  const vp = named('viewport') || '';
-  if (!/width=device-width/.test(vp) || !/initial-scale=1/.test(vp)) p.push('viewport fehlt oder unvollständig');
-  if ((named('robots') || '').replace(/\s/g, '') !== 'noindex,nofollow') p.push('robots ist nicht noindex,nofollow');
-  if (!H.norm(H.textOf(H.byTag(head || root, 'title')[0] || { children: [] }))) p.push('title fehlt');
-  if (!(named('description') || '').trim()) p.push('meta description fehlt');
-  if (bodies[0] && H.find(bodies[0], e => ['meta', 'title', 'link'].includes(e.tag)).length) p.push('head-Elemente im body');
-  const h1 = H.byTag(root, 'h1');
-  if (h1.length !== 1) p.push(`${h1.length} statt genau einer h1`);
-  for (const lm of ['header', 'nav', 'main', 'footer']) if (!H.byTag(root, lm).length) p.push(`Landmark <${lm}> fehlt`);
-  return p;
-}
-
-const bodyEls = html => {
+/* Alles, was Nutzer, Screenreader oder Suchmaschinen lesen: sichtbarer und verborgener Text, Metadaten, ARIA, JSON-LD */
+const allText = n => n.text !== undefined ? n.text : ['script', 'style', 'symbol'].includes(n.tag) ? ' ' : ` ${n.children.map(allText).join(' ')} `;
+function surfaces(html) {
   const { root } = H.parse(html);
-  const body = H.byTag(root, 'body')[0] || root;
-  return H.elements(body).filter(e => e.tag !== 'script' && !H.closest(e.parent, x => x.tag === 'script'));
-};
-const ownText = el => H.norm(el.children.filter(c => c.text !== undefined).map(c => c.text).join(' '));
-/* Im verborgenen Alt-Ergebnisblock #result sind seit Auftrag 05 (Freigabe 29.10.2026) nur Textänderungen erlaubt;
-   Tags, Attribute, Klassen, IDs und SVG-Geometrie werden dort weiterhin wie im übrigen Hero verglichen. */
-const heroTextAllowed = el =>
-  H.hasClass(el, 'badge') || H.hasClass(el, 'lead') ||
-  (el.tag === 'button' && el.attrs.get('type') === 'submit') ||
-  (el.tag === 'span' && el.parent && H.hasClass(el.parent, 'facts')) ||
-  !!H.closest(el, e => e.attrs.get('id') === 'result');
-
-/* Vergleicht das Element-Skelett von vision.html und index.html.
-   Erlaubt: Textänderungen außerhalb des Hero; href/aria-label außerhalb des Hero;
-   im Hero nur Badge/Lead/Button/Facts-Text, Text im verborgenen #result und das Entfernen von name="url". */
-function structureProblems(visionHtml, indexHtml) {
-  const p = [];
-  const v = bodyEls(visionHtml), i = bodyEls(indexHtml);
-  if (v.length !== i.length) p.push(`Elementanzahl ${i.length} statt ${v.length}`);
-  const n = Math.min(v.length, i.length);
-  for (let k = 0; k < n; k++) {
-    const a = v[k], b = i[k];
-    const where = `${a.tag}#${a.attrs.get('id') || ''}.${a.attrs.get('class') || ''} (Element ${k})`;
-    if (a.tag !== b.tag) { p.push(`Tag ${b.tag} statt ${a.tag} bei ${where}`); break; }
-    const inHero = !!H.closest(a, e => H.hasClass(e, 'hero'));
-    const removable = a.attrs.get('id') === 'url' ? ['name'] : [];
-    const want = [...a.attrs.keys()].filter(x => !removable.includes(x)).sort().join(' ');
-    const have = [...b.attrs.keys()].sort().join(' ');
-    if (want !== have) p.push(`Attribute [${have}] statt [${want}] bei ${where}`);
-    for (const [name, val] of b.attrs) {
-      if (a.attrs.get(name) === val) continue;
-      if (!inHero && (name === 'href' || name === 'aria-label')) continue;
-      p.push(`Attributwert ${name}="${val}" statt "${a.attrs.get(name)}" bei ${where}`);
+  const out = [['Text', H.norm(allText(H.byTag(root, 'body')[0]))], ['title', H.norm(H.textOf(H.byTag(root, 'title')[0]))]];
+  for (const e of H.elements(root)) {
+    if (e.tag === 'meta' && e.attrs.get('name') === 'description') out.push(['meta description', e.attrs.get('content')]);
+    for (const a of ['aria-label', 'alt', 'title', 'placeholder']) if (e.attrs.has(a)) out.push([a, e.attrs.get(a)]);
+    if (e.tag === 'script' && e.attrs.get('type') === 'application/ld+json') {
+      const s = [];
+      JSON.stringify(JSON.parse(e.raw), (k, v) => { if (typeof v === 'string' && !k.startsWith('@')) s.push(v); return v; });
+      out.push(['JSON-LD', s.join(' ')]);
     }
-    if (inHero && !heroTextAllowed(a) && ownText(a) !== ownText(b)) p.push(`Hero-Text geändert bei ${where}: "${ownText(b)}"`);
-  }
-  const h1 = html => H.norm(H.textOf(H.byTag(H.parse(html).root, 'h1')[0] || { children: [] }));
-  if (h1(indexHtml) !== h1(visionHtml)) p.push(`H1 "${h1(indexHtml)}" statt "${h1(visionHtml)}"`);
-  return p;
-}
-
-function criteriaProblems(html) {
-  const p = [];
-  const { root } = H.parse(html);
-  const seen = new Set();
-  const sections = H.byTag(root, 'section').filter(s => AREAS.some(a => a[0] === s.attrs.get('id')));
-  if (sections.map(s => s.attrs.get('id')).join() !== AREAS.map(a => a[0]).join()) p.push('Bereichsabschnitte fehlen oder falsche Reihenfolge');
-  for (const [key, title, prefix, count] of AREAS) {
-    const s = H.byId(root, key);
-    if (!s) { p.push(`Bereich ${key} fehlt`); continue; }
-    const h2 = H.norm(H.textOf(H.byTag(s, 'h2')[0] || { children: [] }));
-    if (h2 !== title) p.push(`Bereichsname "${h2}" statt "${title}"`);
-    const ids = H.byClass(s, 'spec-row').map(r => H.norm(H.textOf(H.byClass(r, 'count')[0] || { children: [] })));
-    if (ids.length !== count) p.push(`${key}: ${ids.length} statt ${count} Kriterien`);
-    ids.forEach((id, n) => {
-      if (id !== `${prefix}-${String(n + 1).padStart(2, '0')}`) p.push(`${key}: ID "${id}" an Position ${n + 1}`);
-      if (seen.has(id)) p.push(`doppelte ID ${id}`);
-      seen.add(id);
-    });
-  }
-  const total = H.byClass(root, 'spec-row').length;
-  if (total !== 48) p.push(`${total} statt 48 Kriterienzeilen`);
-  if (seen.size !== 48) p.push(`${seen.size} statt 48 eindeutige IDs`);
-  return p;
-}
-
-const HARD = [
-  /\d+(?:[.,]\d+)?\s?€/g, /pro Monat/i, /monatlich/i, /14 Tage/i, /kostenlos testen/i, /Testzeitraum/i,
-  /\b112\b/, /30 Sekunden/i, /in Sekunden/i, /Ergebnis in/i,
-  /Anmelden/i, /\bLogin\b/i, /Dashboard/i, /Team-Zug/i,
-  /wöchentlich/i, /jede Woche/i, /\bKW\s?\d/i, /seit gestern/i, /neuen Fehlern/i, /Verlauf/i,
-  /kiez-kaffee/i, /speisekarte/i,
-  /DSGVO-konform/i, /Server in Deutschland/i, /Auftragsverarbeitung/i,
-  /Festpreis/i, /Umsetzung anfragen/i, /Gespräch vereinbaren/i, /\bbehebt\b/i,
-  /\bScore\b/i, /\bPro\b/, /\bCheck\b/, /\bAnalysieren\b/i, /\bDemo\b/,
-  /vier\s+(priorisierte|Maßnahmen|Baustellen)/i, /Branche/i, /\d+\s+Prüf(ungen|punkte)/i,
-  /spart\s+\d/i, /\b\d+\s*(Werktage?|Arbeitstage?|Tage?|Stunden?|Wochen?)\b/i,
-  /gecrawlt/i, /wird gemessen/i,
-  /erfolgreich/i, /vielen Dank/i, /(Anfrage|Auftrag|Bestellung)\s+(ist\s+)?(eingegangen|erhalten|bestätigt)/i,
-];
-const NEGATED_ONLY = [
-  /\bAbo\b/i, /Monitoring/i, /Überwachung/i, /\bKonto\b/i, /Garantie|garantiert/i, /Beratung/i,
-  /Zertifizierung|zertifiziert/i, /\bDSGVO\b/, /\bBFSG\b/, /\bWCAG\b/, /Rechtsgutachten|Rechtsberatung/i,
-  /automatische[nrs]?\s+(Analyse|Scan|Prüfung)/i, /Sofort(analyse|scan|ergebnis)/i,
-  /versendet|gesendet|übermittelt|gespeichert/i,
-];
-const NEGATION = /\b(kein|keine|keinen|keiner|keines|ohne|nicht|nein|weder)\b/i;
-
-/* Text eines Teilbaums einschließlich hidden-Bereichen (steht im Quelltext und kann per JavaScript eingeblendet werden).
-   Anders als H.visibleText trennt jedes Element mit Leerzeichen, damit \b-Muster an Elementgrenzen greifen. */
-const allText = node => {
-  if (node.text !== undefined) return node.text;
-  if (['script', 'style', 'symbol', 'template'].includes(node.tag)) return ' ';
-  return ` ${node.children.map(allText).join(' ')} `;
-};
-const outermostHidden = node => H.hiddenTrees(node).filter(e => !H.closest(e.parent, x => x.attrs.has('hidden')));
-
-/* Alle für Nutzer, Screenreader oder Suchmaschinen sichtbaren Texte einer Seite, dazu der Text verborgener Bereiche. */
-function claimSurfaces(html) {
-  const { root } = H.parse(html);
-  const body = H.byTag(root, 'body')[0] || root;
-  const out = [['sichtbarer Text', H.norm(H.visibleText(body))]];
-  for (const e of outermostHidden(body)) out.push([`verborgener Text #${e.attrs.get('id') || e.tag}`, H.norm(allText(e))]);
-  const title = H.byTag(root, 'title')[0];
-  if (title) out.push(['title', H.norm(H.textOf(title))]);
-  for (const m of H.byTag(root, 'meta')) if (m.attrs.get('name') === 'description') out.push(['meta description', m.attrs.get('content')]);
-  for (const e of H.elements(root)) for (const a of ['aria-label', 'alt', 'title', 'placeholder']) if (e.attrs.has(a)) out.push([a, e.attrs.get(a)]);
-  for (const s of H.byTag(root, 'script')) if (s.attrs.get('type') === 'application/ld+json') {
-    const strings = [];
-    JSON.stringify(JSON.parse(s.raw), (k, v) => { if (typeof v === 'string' && !k.startsWith('@')) strings.push(v); return v; });
-    out.push(['JSON-LD', strings.join(' ')]);
   }
   return out;
 }
-
-function claimProblems(surfaces) {
+/* Nicht mehr zum Produkt gehörende oder unzulässige Aussagen */
+const FORBIDDEN = [/Premium/i, /Checkout/i, /Warenkorb/i, /\bPro\b/, /Dashboard/i, /\bScore\b/i, /\d+(?:[.,]\d+)?\s?€/g, /pro Monat|monatlich/i,
+  /DSGVO-konform|datenschutzkonform|rechtssicher/i, /Server in Deutschland/i, /Vorschau/i, /Testzeitraum|kostenlos testen/i,
+  /\b\d+\s*(Werktage?|Arbeitstage?|Tage?|Stunden?|Wochen?)\b/i, /Platz\s*1|Top-?Ranking/i];
+const NEGATED_ONLY = [/\bAbo\b/i, /Garantie|garantiert/i, /Monitoring|Überwachung/i, /Beratung/i, /Zertifizierung/i, /Rechtsgutachten|Rechtsberatung/i,
+  /Sofort(analyse|scan|ergebnis)/i, /automatische[nrs]?\s+(Scan|Analyse|Bericht)/i, /Punktzahl/i, /Zugriff auf Ihr Postfach/i, /\bDSGVO\b/, /\bWCAG\b/];
+const NEGATION = /\b(kein|keine|keinen|keiner|keines|ohne|nicht|nein|weder)\b/i;
+function claimProblems(list) {
   const p = [];
-  for (const [where, text] of surfaces) {
-    for (const re of HARD) {
-      for (const m of text.matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g'))) {
-        if (re === HARD[0] && m[0].replace(/\s/g, '') === '0€') continue;
-        p.push(`${where}: "${m[0]}" (…${text.slice(Math.max(0, m.index - 40), m.index + 40)}…)`);
-      }
+  for (const [where, text] of list) {
+    for (const re of FORBIDDEN) for (const m of text.matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g'))) {
+      if (m[0].replace(/\s/g, '') === '0€') continue;
+      p.push(`${where}: "${m[0]}" (…${text.slice(Math.max(0, m.index - 40), m.index + 40)}…)`);
     }
-    for (const re of NEGATED_ONLY) {
-      for (const m of text.matchAll(new RegExp(re.source, re.flags + 'g'))) {
-        const ctx = text.slice(Math.max(0, m.index - 80), m.index + m[0].length + 60);
-        if (!NEGATION.test(ctx)) p.push(`${where}: "${m[0]}" ohne Verneinung (…${ctx}…)`);
-      }
-    }
-  }
-  return p;
-}
-
-/* Alt-Inhalte der früheren Scan-Simulation, die im verborgenen Ergebnisblock #result nicht mehr stehen dürfen (Auftrag 05).
-   Ergänzt die allgemeine T12-Liste: z. B. „ohne Einwilligung … DSGVO“ besteht dort wegen der Verneinung. */
-const RESULT_LEGACY = [
-  ['Scan', /gecrawlt|crawl|Seiten werden|wird gemessen/i],
-  ['Domain', /\b[\wäöüß-]+\.(de|com|net|org|eu|berlin|example)\b/i],
-  ['Score/Messwert', /\d/],
-  ['DSGVO', /DSGVO|Einwilligung|Google Fonts/i],
-  ['Befund', /Titelbild|Seitenaufbau|\bLCP\b|Meta-Beschreibung|\bSEO\b|Solide Basis|Baustellen/i],
-  ['Demo/Report', /\bDemo\b|vollständige Report/i],
-];
-function resultBlockProblems(html) {
-  const result = H.byId(H.parse(html).root, 'result');
-  if (!result) return ['#result fehlt'];
-  const text = H.norm(allText(result));
-  return RESULT_LEGACY.filter(([, re]) => re.test(text)).map(([kind, re]) => `${kind}: "${text.match(re)[0]}"`);
-}
-
-const APP_FORBIDDEN = [
-  /\bfetch\s*\(/, /XMLHttpRequest/, /sendBeacon/, /WebSocket/, /EventSource/,
-  /localStorage/, /sessionStorage/, /indexedDB/, /document\.cookie/, /caches\./,
-  /innerHTML|outerHTML|insertAdjacentHTML|document\.write/, /\beval\s*\(|new Function/,
-  /Math\.imul|\bhash\s*\(/, /strokeDashoffset|is-running|countUp|dataFor/,
-  /result-score|result-ring|result-verdict|result-lcp|result-meta/,
-  /\.submit\s*\(|requestSubmit|location\s*=|location\.(href|assign|replace)|history\.(push|replace)State/,
-  /body\.hidden\s*=\s*false/,
-];
-const appProblems = src => APP_FORBIDDEN.filter(re => re.test(src)).map(re => `verbotenes Muster ${re}`)
-  .concat(src.includes(`'${PREVIEW}'`) ? [] : ['exakter Vorschau-Hinweis fehlt']);
-
-function formProblems(html) {
-  const { root } = H.parse(html);
-  const form = H.byId(root, 'analyze');
-  if (!form) return ['Formular #analyze fehlt'];
-  const p = [];
-  for (const a of ['action', 'method', 'target']) if (form.attrs.has(a)) p.push(`Formular hat ${a}`);
-  for (const e of H.elements(form)) if (e.attrs.has('name')) p.push(`benanntes Feld <${e.tag} name="${e.attrs.get('name')}"> würde ohne JavaScript übertragen`);
-  return p;
-}
-
-const readAllowlist = () => read('tests/release-allowlist.txt').split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
-function releaseProblems(allowlist) {
-  const p = [];
-  for (const f of allowlist) {
-    if (/^(vision\.html|DESIGN\.md|STRUCTURE\.md|\.gitignore)$/.test(f) || /^tests\//.test(f) || /\.md$/i.test(f)) p.push(`${f} darf nicht öffentlich ausgeliefert werden`);
-    if (!existsSync(join(ROOT, f))) p.push(`${f} existiert nicht`);
-  }
-  for (const page of allowlist.filter(f => f.endsWith('.html'))) {
-    const { root } = H.parse(read(page));
-    for (const e of H.elements(root)) {
-      const ref = e.tag === 'script' ? e.attrs.get('src') : (e.tag === 'link' || e.tag === 'a') ? e.attrs.get('href') : null;
-      if (!ref || /^(https?:|mailto:|tel:|#)/.test(ref)) continue;
-      const file = ref.split('#')[0];
-      if (!allowlist.includes(file)) p.push(`${page} verweist auf ${file}, das nicht im Release-Artefakt ist`);
+    for (const re of NEGATED_ONLY) for (const m of text.matchAll(new RegExp(re.source, re.flags + 'g'))) {
+      const ctx = text.slice(Math.max(0, m.index - 80), m.index + m[0].length + 40);
+      if (!NEGATION.test(ctx)) p.push(`${where}: "${m[0]}" ohne Verneinung (…${ctx}…)`);
     }
   }
   return p;
 }
 
-function linkReport(page, html, pages) {
-  const p = [], placeholders = [];
-  const { root } = H.parse(html);
-  for (const a of H.byTag(root, 'a')) {
-    const href = a.attrs.get('href');
-    const label = H.norm(H.textOf(a));
-    if (href === undefined) { p.push(`<a> ohne href: "${label}"`); continue; }
-    if (href === '#') { placeholders.push(label); continue; }
-    if (/^https?:/.test(href)) { if (!EXTERNAL_OK.includes(href)) p.push(`unerwarteter externer Link ${href}`); continue; }
-    const [file, frag] = href.split('#');
-    const target = file || page;
-    if (!pages[target]) { p.push(`Link "${label}" auf unbekannte Datei ${target}`); continue; }
-    if (frag && !H.byId(H.parse(pages[target]).root, frag)) p.push(`Link "${label}" → ${href}: Ziel-ID fehlt`);
+test('Dokumente: valides Gerüst, genau eine H1, Landmarks, CSP, keine Inline-Styles oder Inline-Skripte', () => {
+  for (const page of PAGES) {
+    const html = read(page);
+    const { root, doctype } = H.parse(html);
+    assert.ok(doctype, `${page}: doctype`);
+    assert.equal(H.byTag(root, 'html')[0].attrs.get('lang'), 'de');
+    const head = H.byTag(root, 'head')[0];
+    assert.equal(head.children.find(c => c.tag).attrs.get('charset'), 'utf-8', `${page}: charset zuerst`);
+    assert.equal(H.byTag(root, 'h1').length, 1, `${page}: eine H1`);
+    for (const lm of ['header', 'nav', 'main', 'footer']) assert.ok(H.byTag(root, lm).length, `${page}: <${lm}>`);
+    const csp = H.byTag(head, 'meta').find(m => m.attrs.get('http-equiv') === 'Content-Security-Policy')?.attrs.get('content') || '';
+    assert.match(csp, /script-src 'self'/); assert.match(csp, /form-action 'self' https:\/\/accounts\.google\.com/); assert.match(csp, /object-src 'none'/);
+    assert.deepEqual(H.find(root, e => e.attrs.has('style')).map(e => e.tag), [], `${page}: keine style-Attribute (CSP)`);
+    assert.deepEqual(H.byTag(root, 'script').filter(s => !s.attrs.has('src') && s.attrs.get('type') !== 'application/ld+json').length, 0, `${page}: keine Inline-Skripte`);
+    assert.ok(H.find(root, e => [...e.attrs.keys()].some(a => a.startsWith('on'))).length === 0, `${page}: keine Inline-Event-Handler`);
   }
-  return { problems: p, placeholders };
-}
-
-/* ---------- T1 / T15: geschützte Dateien und Change-Scope ---------- */
-
-test('T1 geschützte Dateien sind bytegleich zum Base-SHA', () => {
-  for (const f of PROTECTED) {
-    const now = readFileSync(join(ROOT, f));
-    const then = git('show', `${BASE}:${f}`);
-    assert.equal(sha256(now), sha256(then), `${f} weicht vom Base-SHA ab`);
-  }
-  execFileSync('git', ['diff', '--quiet', BASE, '--', ...PROTECTED], { cwd: ROOT });
 });
 
-test('T15 geänderte Dateien gehören nur zur Allowlist', t => {
-  const changed = gitText('diff', '--name-only', BASE).split('\n').filter(Boolean);
-  const untracked = gitText('ls-files', '--others', '--exclude-standard').split('\n').filter(Boolean);
-  const all = [...new Set([...changed, ...untracked])].sort();
-  t.diagnostic(`geänderte Pfade gegen ${BASE.slice(0, 7)}: ${all.join(', ')}`);
-  assert.deepEqual(scopeViolations(all), []);
-  assert.deepEqual(scopeViolations(['vision.html', 'assets/styles.css', 'package.json']), ['vision.html', 'assets/styles.css', 'package.json'], 'Negativprobe: Scope-Prüfung muss Verstöße melden');
-});
-
-/* ---------- T3: Dokumentgerüst ---------- */
-
-test('T3 index.html und pruefkriterien.html sind valide Dokumente mit genau einer H1 und noindex', () => {
-  assert.deepEqual(documentProblems(read('index.html')), []);
-  assert.deepEqual(documentProblems(read('pruefkriterien.html')), []);
-});
-
-test('T3 Negativprobe: Base-index.html wird als unvollständig erkannt', () => {
-  const p = documentProblems(base('index.html'));
-  assert.ok(p.includes('kein <!doctype html>') && p.includes('robots ist nicht noindex,nofollow'), p.join('; '));
-});
-
-/* ---------- T2 / T14: Hero, Design und Struktur gegen vision.html ---------- */
-
-test('T2/T14 Element-Skelett, Attribute und Hero entsprechen vision.html', () => {
-  assert.deepEqual(structureProblems(read('vision.html'), read('index.html')), []);
-});
-
-test('T2/T14 CSS-Quelle unverändert: assets/styles.css entspricht dem Inline-CSS von vision.html', () => {
-  const inline = H.byTag(H.parse(read('vision.html')).root, 'style')[0].raw;
-  const strip = s => s.split('\n').map(l => l.replace(/\s+$/, '')).join('\n').trim();
-  assert.equal(strip(read('assets/styles.css')), strip(inline));
-});
-
-test('T2/T14 Hero-Texte, Grafikanzahlen und Auszugskennzeichnung', t => {
-  const { root } = H.parse(read('index.html'));
-  const hero = H.byClass(root, 'hero')[0];
+test('Startseite: kostenloses Angebot, vier Bereiche, sieben PDF-Seiten, GEO & AI Visibility, Google-Anmeldung', () => {
+  const { root } = H.parse(read('public/index.html'));
   const txt = el => H.norm(H.textOf(el));
-  assert.equal(txt(H.byTag(hero, 'h1')[0]), 'Sehen Sie, was Ihre Website ausbremst.');
-  assert.equal(txt(H.byClass(hero, 'badge')[0]), 'Website-Analyse als PDF');
-  assert.equal(txt(H.byTag(hero, 'button')[0]), 'Vorschau anzeigen');
-  assert.deepEqual(H.byClass(hero, 'facts')[0].children.filter(c => c.tag).map(txt), ['Free bis 6 Seiten', 'Persönlich geprüft', 'PDF per E-Mail']);
-  const lead = txt(H.byClass(hero, 'lead')[0]);
-  assert.match(lead, /persönlich/); assert.match(lead, /PDF per E-Mail/); assert.match(lead, /Vorschau/); assert.match(lead, /nicht versendet/);
-  const count = c => H.byClass(root, c).length;
-  const counts = { bar: count('bar'), 'spec-row': count('spec-row'), ring: count('ring'), chart: count('chart'), plan: count('plan'), tool: count('tool'), step: count('step'), use: count('use'), details: H.byTag(root, 'details').length, section: H.byTag(root, 'section').length };
-  t.diagnostic(`Grafik-/Komponentenanzahl: ${JSON.stringify(counts)}`);
-  assert.deepEqual(counts, { bar: 5, 'spec-row': 5, ring: 2, chart: 1, plan: 3, tool: 6, step: 6, use: 3, details: 6, section: 12 });
-  const vSections = H.byTag(H.parse(read('vision.html')).root, 'section').map(s => s.attrs.get('id') || s.attrs.get('class'));
-  assert.deepEqual(H.byTag(root, 'section').map(s => s.attrs.get('id') || s.attrs.get('class')), vSections, 'Abschnittsreihenfolge');
-  assert.match(txt(H.byId(root, 'pruefungen')), /fünf der sechs Analysebereiche als Auszug/);
-  assert.match(txt(H.byId(root, 'report')), /Auszug: 5 von 6 Bereichen/);
-});
-
-test('T2/T14 Negativproben: sechster Balken, Hero-Klasse, H1 und Hero-Attribut werden erkannt', () => {
-  const vision = read('vision.html'), index = read('index.html');
-  const bar = '<div class="bar"><span>Barrierefreiheit</span><span class="bar-track"><i style="width:61%"></i></span><b class="num">61</b><span class="sev sev--warn"></span></div>';
-  assert.ok(index.includes(bar));
-  const mutations = {
-    'sechster Balken': index.replace(bar, bar + bar),
-    'Hero-Klasse': index.replace('class="url-field"', 'class="url-field neu"'),
-    'H1-Text': index.replace('<em>ausbremst</em>', '<em>bremst</em>'),
-    'Hero-Attribut': index.replace('placeholder="ihre-website.de"', 'placeholder="musterfirma.example"'),
-    'Hero-Fehlertext': index.replace('Bitte geben Sie eine Adresse wie beispiel.de ein.', 'Ungültig.'),
-    'Grafikgeometrie': index.replace('stroke-dashoffset="113.1"', 'stroke-dashoffset="50"'),
-    /* #result: Text frei, Struktur weiterhin geschützt */
-    'Ergebnis-Klasse': index.replace('<div class="result-head">', '<div class="result-head neu">'),
-    'Ergebnis-ID': index.replace('id="result-verdict"', 'id="result-urteil"'),
-    'Ergebnis-Element entfernt': index.replace('<span class="tag">Vorschau</span>', ''),
-    'Ergebnis-Element ergänzt': index.replace('<span class="tag">Vorschau</span>', '<span class="tag">Vorschau</span><span class="tag">neu</span>'),
-    'Ergebnis-Ringgeometrie': index.replace('r="28" stroke-dasharray="175.93" stroke-dashoffset="175.93"', 'r="28" stroke-dasharray="175.93" stroke-dashoffset="80"'),
-    'Ergebnis eingeblendet': index.replace('<div id="result-body" hidden>', '<div id="result-body">'),
-  };
-  for (const [name, html] of Object.entries(mutations)) {
-    assert.notEqual(html, index, name);
-    assert.ok(structureProblems(vision, html).length > 0, `Mutation "${name}" wurde nicht erkannt`);
-  }
-});
-
-/* ---------- T4 / T5 / T6 (statischer Anteil): Formular und app.js ---------- */
-
-test('T5 Formular überträgt ohne JavaScript keine Felder (kein name, kein action/method)', () => {
-  assert.deepEqual(formProblems(read('index.html')), []);
-  assert.ok(formProblems(base('index.html')).some(x => x.includes('name="url"')), 'Negativprobe: Base-Formular mit name="url" muss erkannt werden');
-});
-
-test('T5/T6 app.js enthält keine Übertragung, Speicherung, Score-Berechnung oder Scan-Simulation', () => {
-  assert.deepEqual(appProblems(read('assets/app.js')), []);
-  const baseProblems = appProblems(base('assets/app.js'));
-  assert.ok(baseProblems.length >= 3, `Negativprobe: Base-app.js muss als Scan-Simulation erkannt werden (${baseProblems.join('; ')})`);
-});
-
-/* ---------- T7: Methodikseite ---------- */
-
-test('T7 Methodikseite: sechs Bereiche, 48 eindeutige IDs, Verteilung 10/9/8/6/8/7', t => {
-  const html = read('pruefkriterien.html');
-  assert.deepEqual(criteriaProblems(html), []);
-  const { root } = H.parse(html);
-  t.diagnostic(AREAS.map(([key, , prefix]) => `${prefix}=${H.byClass(H.byId(root, key), 'spec-row').length}`).join(' '));
-});
-
-test('T7 Methodikseite: Coverage-Hinweis, keine Zertifizierung, nur vorhandene Styles', () => {
-  const html = read('pruefkriterien.html');
-  const { root } = H.parse(html);
   const text = H.norm(H.visibleText(root));
-  assert.match(text, /nicht was bei jeder Website geprüft wird/);
-  assert.match(text, /je Auftrag unterschiedlich/);
-  assert.match(text, /Kein Rechtsgutachten und keine Zertifizierung/);
-  assert.equal(H.byTag(root, 'style').length, 0, 'kein eigenes <style>');
-  const styled = H.find(root, e => e.attrs.has('style')).map(e => e.attrs.get('style'));
-  assert.deepEqual(styled, ['position:absolute'], 'nur das Icon-Sprite trägt (wie in index.html) ein style-Attribut');
-  const sheets = H.byTag(root, 'link').filter(l => l.attrs.get('rel') === 'stylesheet').map(l => l.attrs.get('href'));
-  assert.deepEqual(sheets, ['https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap', 'assets/styles.css']);
-  assert.deepEqual(H.byTag(root, 'script').map(s => s.attrs.get('src')), ['assets/app.js']);
-  const used = new Set(H.elements(H.byTag(root, 'body')[0]).flatMap(e => (e.attrs.get('class') || '').split(/\s+/).filter(Boolean)));
-  const css = read('assets/styles.css');
-  const unknown = [...used].filter(c => !new RegExp(`\\.${c.replace(/-/g, '\\-')}(?![\\w-])`).test(css));
-  assert.deepEqual(unknown, [], 'nur Klassen aus assets/styles.css');
+  assert.deepEqual(H.byClass(H.byId(root, 'bereiche'), 'spec-row').map(r => txt(H.byTag(r, 'h3')[0])), AREAS);
+  assert.deepEqual(H.byTag(H.byClass(root, 'report-pages')[0], 'li').map(li => txt(li.children.filter(c => c.tag)[1])), REPORT_PAGES);
+  assert.deepEqual(H.byClass(root, 'report-pages')[0].children.filter(c => c.tag).map(li => txt(li.children.find(c => c.tag))), ['01', '02', '03', '04', '05', '06', '07']);
+  for (const s of ['GEO', 'AI Visibility', 'Generative Engine Optimization', '0 €', 'mit Google an', 'sieben Seiten', 'Core Web Vitals', 'beobachtet']) assert.ok(text.includes(s), `fehlt: ${s}`);
+  assert.equal(H.byClass(root, 'plan').length, 3);
+  assert.equal(H.byClass(root, 'plan--featured').length, 1);
+  assert.match(txt(H.byClass(root, 'plan--featured')[0]), /0 €/);
+  const form = H.byId(root, 'analyze');
+  assert.equal(form.attrs.get('action'), 'anfrage.php'); assert.equal(form.attrs.get('method'), 'post');
+  assert.deepEqual(H.find(form, e => e.attrs.has('name')).map(e => e.attrs.get('name')), ['action', 'website']);
 });
 
-test('T7 Negativproben: fehlendes, doppeltes oder falsch zugeordnetes Kriterium wird erkannt', () => {
-  const html = read('pruefkriterien.html');
-  assert.ok(criteriaProblems(html.replace('<span class="count">FIND-10</span>', '<span class="count">FIND-09</span>')).length > 0, 'doppelte ID');
-  const withoutAi07 = html.split('\n').filter(l => !l.includes('>AI-07<')).join('\n');
-  assert.notEqual(withoutAi07, html);
-  assert.ok(criteriaProblems(withoutAi07).length > 0, 'fehlendes Kriterium');
-  assert.ok(criteriaProblems(html.replace('<span class="count">UX-08</span>', '<span class="count">A11Y-07</span>')).length > 0, 'falsche Zuordnung');
-  assert.ok(criteriaProblems(html.replace('<h2 class="h2">KI-Verständlichkeit</h2>', '<h2 class="h2">KI-Sichtbarkeit</h2>')).length > 0, 'falscher Bereichsname');
+test('Wahrheitsgemäße Aussagen: kein Premium/Checkout/Abo/Dashboard/Score, keine Garantien, keine DSGVO-Behauptung, keine Vorschau-Reste', () => {
+  for (const page of PAGES) assert.deepEqual(claimProblems(surfaces(read(page))), [], page);
+  const view = [...read('server/src/View.php').matchAll(/'((?:[^'\\]|\\.)*)'/g)].map(m => m[1].replace(/<[^>]+>/g, ' ')).join(' ');
+  assert.deepEqual(claimProblems([['View.php', view]]), []);
+  /* Negativprobe: der alte Stand mit Free/Premium wird erkannt */
+  const old = git('show', '98d21094619a53c28f56609ecbef13f94859ae58:index.html');
+  const found = claimProblems(surfaces(old)).join('\n');
+  for (const s of ['Premium', 'Vorschau']) assert.ok(found.includes(s), `Negativprobe: ${s} nicht erkannt`);
 });
 
-test('T7 Kriterien stimmen mit der Referenz-ZIP überein (falls lokal verfügbar)', t => {
-  if (!existsSync(REFERENCE_ZIP)) { t.skip(`NOT_RUN: Referenz-ZIP nicht gefunden (${REFERENCE_ZIP})`); return; }
-  const ref = execFileSync('unzip', ['-p', REFERENCE_ZIP, 'pxwa_small_build/pruefkriterien.html']).toString('utf8');
-  const refRows = [...ref.matchAll(/<h3>([A-Z0-9]+-\d\d)<\/h3><span class="count">(.*?)<\/span><\/div><p>(.*?)<\/p>/g)].map(m => [m[1], H.decode(m[2]), H.decode(m[3])]);
-  const { root } = H.parse(read('pruefkriterien.html'));
-  const ours = H.byClass(root, 'spec-row').map(r => [H.norm(H.textOf(H.byClass(r, 'count')[0])), H.norm(H.textOf(H.byTag(r, 'h3')[0])), H.norm(H.textOf(H.byTag(r, 'p')[0]))]);
-  assert.equal(refRows.length, 48);
-  assert.deepEqual(ours, refRows);
-});
-
-/* ---------- T8: Navigation ---------- */
-
-test('T8 interne Links und Anker sind gültig; offene Rechtslinks sind als Release-Blocker gelistet', t => {
-  const pages = { 'index.html': read('index.html'), 'pruefkriterien.html': read('pruefkriterien.html') };
-  for (const [page, html] of Object.entries(pages)) {
-    const { problems, placeholders } = linkReport(page, html, pages);
-    assert.deepEqual(problems, [], page);
-    assert.deepEqual([...placeholders].sort(), [...KNOWN_PLACEHOLDERS].sort(), `${page}: nur bekannte Platzhalter`);
-    t.diagnostic(`${page}: RELEASE-BLOCKER Platzhalter-Links ohne Ziel: ${placeholders.join(', ')}`);
-  }
-  for (const html of Object.values(pages)) assert.ok(!/vision\.html|DESIGN\.md|STRUCTURE\.md/.test(html), 'kein Link auf historische Dateien');
-});
-
-test('T8 Negativprobe: Base-index.html hat zusätzliche tote Platzhalter', () => {
-  const { placeholders } = linkReport('index.html', base('index.html'), { 'index.html': base('index.html') });
-  assert.ok(placeholders.length > KNOWN_PLACEHOLDERS.length, placeholders.join(', '));
-});
-
-/* ---------- T12: wahrheitsgemäße Inhalte ---------- */
-
-test('T12 keine Abo-, Preis-, Scan-, Monitoring- oder Garantie-Aussagen in Text, Metadaten, ARIA und JSON-LD', t => {
-  for (const page of ['index.html', 'pruefkriterien.html']) assert.deepEqual(claimProblems(claimSurfaces(read(page))), [], page);
-  const literals = [...read('assets/app.js').matchAll(/'((?:[^'\\]|\\.)*)'/g)].map(m => m[1]).join(' ');
-  assert.deepEqual(claimProblems([['app.js-Texte', literals]]), []);
-  const hidden = H.hiddenTrees(H.parse(read('index.html')).root);
-  assert.deepEqual(hidden.map(e => e.attrs.get('id')), ['url-error', 'result', 'result-body'], 'versteckte Inhalte nur in Fehlermeldung und Ergebnisbereich');
-  const surfaces = claimSurfaces(read('index.html')).map(([where]) => where);
-  assert.ok(surfaces.includes('verborgener Text #url-error') && surfaces.includes('verborgener Text #result'), `verborgene Bereiche werden mitgeprüft: ${surfaces.join(', ')}`);
-});
-
-test('T12 verborgener Alt-Ergebnisblock #result enthält keine Scan-, Domain-, Score-, DSGVO- oder Befundtexte', t => {
-  const html = read('index.html');
-  assert.deepEqual(resultBlockProblems(html), []);
-  t.diagnostic(`#result (hidden, nie als Ergebnis angezeigt): ${H.norm(allText(H.byId(H.parse(html).root, 'result')))}`);
-});
-
-test('T12 Negativproben: alte Texte im verborgenen Ergebnisblock werden erkannt', () => {
-  const html = read('index.html');
-  assert.deepEqual(resultBlockProblems(base('index.html')).map(p => p.split(':')[0]), RESULT_LEGACY.map(([kind]) => kind), 'Base-#result enthält alle Alt-Inhalte');
-  const once = (from, to) => {
-    assert.equal(html.split(from).length, 2, `genau ein Vorkommen: ${from}`);
-    return html.replace(from, to);
-  };
-  const reinserted = {
-    'Scan': once('>Vorschau – keine Website geprüft<', '>Seiten werden gecrawlt …<'),
-    'Domain': once('>Keine Anfrage versendet<', '>kiez-kaffee.de<'),
-    'Score/Messwert': once('id="result-score">–<', 'id="result-score">0<'),
-    'DSGVO': once('<span>Keine Befunde ermittelt</span><small>–</small>', '<span>Google Fonts werden ohne Einwilligung geladen</span><small>DSGVO</small>'),
-    'Befund': once('>Keine Analyse durchgeführt<', '>Solide Basis mit Baustellen<'),
-    'Demo/Report': once('<span class="tag">Vorschau</span>', '<span class="tag">Demo</span>'),
-  };
-  for (const [kind, mutated] of Object.entries(reinserted)) {
-    assert.ok(resultBlockProblems(mutated).some(p => p.startsWith(`${kind}:`)), `wieder eingesetzter Alt-Text "${kind}" wurde nicht erkannt`);
-  }
-  /* Die allgemeine T12-Prüfung erfasst verborgene Texte jetzt ebenfalls (vorher nur sichtbarer Text) */
-  for (const kind of ['Scan', 'Domain', 'Demo/Report']) {
-    const found = claimProblems(claimSurfaces(reinserted[kind]));
-    assert.ok(found.some(p => p.startsWith('verborgener Text #result')), `T12 erkennt "${kind}" im verborgenen Block nicht: ${found.join('; ')}`);
-  }
-});
-
-test('T12 Negativprobe: Base-index.html und Base-app.js werden als unwahr erkannt', () => {
-  const found = claimProblems(claimSurfaces(base('index.html'))).join('\n');
-  for (const s of ['29 €', '14 Tage', 'Anmelden', 'KW 30', 'Score', 'DSGVO-konform', 'Festpreis']) assert.ok(found.includes(s), `nicht erkannt: ${s}`);
-  const baseLiterals = [...base('assets/app.js').matchAll(/'((?:[^'\\]|\\.)*)'/g)].map(m => m[1]).join(' ');
-  assert.ok(claimProblems([['app.js', baseLiterals]]).length > 0, 'Crawl-Phasen der Base-app.js nicht erkannt');
-});
-
-test('T12 JSON-LD entspricht den sichtbaren FAQ und enthält kein Angebot/Preis', () => {
-  const { root } = H.parse(read('index.html'));
+test('JSON-LD entspricht den sichtbaren FAQ, ohne Angebot oder Preis-Markup', () => {
+  const { root } = H.parse(read('public/index.html'));
   const ld = JSON.parse(H.byTag(root, 'script').find(s => s.attrs.get('type') === 'application/ld+json').raw);
-  assert.equal(ld['@type'], 'FAQPage');
   const visible = H.byTag(root, 'details').map(d => [H.norm(H.textOf(H.byTag(d, 'summary')[0])), H.norm(H.textOf(H.byTag(d, 'p')[0]))]);
   assert.deepEqual(ld.mainEntity.map(q => [q.name, q.acceptedAnswer.text]), visible);
-  const raw = JSON.stringify(ld);
-  assert.ok(!/offers|price|Offer|WebApplication/.test(raw));
-  assert.ok(/offers|price/.test(H.byTag(H.parse(base('index.html')).root, 'script').find(s => s.attrs.get('type') === 'application/ld+json').raw), 'Negativprobe: Base-JSON-LD mit Angebot');
+  assert.ok(!/offers|price|Offer/.test(JSON.stringify(ld)));
 });
 
-/* ---------- T13: Release-Schutz ---------- */
-
-test('T13 Release-Allowlist schließt historische Dateien aus und deckt alle verlinkten Ressourcen ab', t => {
-  const allow = readAllowlist();
-  t.diagnostic(`öffentliches Artefakt (Allowlist): ${allow.join(', ')}`);
-  assert.deepEqual(releaseProblems(allow), []);
-  assert.ok(!allow.includes('vision.html'));
-  const repoFiles = gitText('ls-files').split('\n').filter(Boolean).concat(gitText('ls-files', '--others', '--exclude-standard').split('\n').filter(Boolean));
-  const excluded = repoFiles.filter(f => !allow.includes(f));
-  for (const f of ['vision.html', 'DESIGN.md', 'STRUCTURE.md']) assert.ok(excluded.includes(f), `${f} muss ausgeschlossen sein`);
-  t.diagnostic('NOT_RUN: echter HTTP-404/410-Test für /vision.html erst nach Hosting-Entscheidung (D-10/RG1)');
+test('Methodik: vier Bereiche in Reihenfolge, eindeutige IDs, 48 Original-Prüfpunkte unverändert plus AI-08', t => {
+  const { root } = H.parse(read('public/pruefkriterien.html'));
+  const txt = el => H.norm(H.textOf(el));
+  const sections = H.byTag(root, 'section').filter(s => METHOD.some(m => m[0] === s.attrs.get('id')));
+  assert.deepEqual(sections.map(s => s.attrs.get('id')), METHOD.map(m => m[0]));
+  const seen = [];
+  for (const [id, title, groups] of METHOD) {
+    const s = H.byId(root, id);
+    assert.equal(txt(H.byTag(s, 'h2')[0]), title);
+    const want = groups.flatMap(([prefix, n]) => Array.from({ length: n }, (_, i) => `${prefix}-${String(i + 1).padStart(2, '0')}`));
+    const ids = H.byClass(s, 'spec-row').map(r => txt(H.byClass(r, 'count')[0]));
+    assert.deepEqual(ids, want, id);
+    seen.push(...ids);
+  }
+  assert.equal(new Set(seen).size, 49);
+  const rows = Object.fromEntries(H.byClass(root, 'spec-row').map(r => [txt(H.byClass(r, 'count')[0]), [txt(H.byTag(r, 'h3')[0]), txt(H.byTag(r, 'p')[0])]]));
+  assert.match(rows['AI-08'][1], /tatsächlich beobachtete/);
+  if (!existsSync(REFERENCE_ZIP)) { t.diagnostic(`NOT_RUN: Referenz-ZIP fehlt (${REFERENCE_ZIP})`); return; }
+  const ref = execFileSync('unzip', ['-p', REFERENCE_ZIP, 'pxwa_small_build/pruefkriterien.html']).toString('utf8');
+  const refRows = [...ref.matchAll(/<h3>([A-Z0-9]+-\d\d)<\/h3><span class="count">(.*?)<\/span><\/div><p>(.*?)<\/p>/g)];
+  assert.equal(refRows.length, 48);
+  for (const [, id, name, desc] of refRows) assert.deepEqual(rows[id], [H.decode(name), H.decode(desc)], id);
 });
 
-test('T13 Negativprobe: vision.html oder fehlende Ressource im Artefakt wird erkannt', () => {
-  const allow = readAllowlist();
-  assert.ok(releaseProblems([...allow, 'vision.html']).some(x => x.startsWith('vision.html')));
-  assert.ok(releaseProblems(allow.filter(f => f !== 'assets/app.js')).some(x => x.includes('assets/app.js')));
+test('Links: interne Anker gültig, externe Ziele nur Pixelkiez und mailto', () => {
+  const pages = Object.fromEntries(PAGES.map(p => [p.slice(7), read(p)]));
+  for (const [page, html] of Object.entries(pages)) {
+    for (const a of H.byTag(H.parse(html).root, 'a')) {
+      const href = a.attrs.get('href');
+      assert.ok(href && href !== '#', `${page}: Link ohne Ziel "${H.norm(H.textOf(a))}"`);
+      if (/^(https?:|mailto:)/.test(href)) { assert.ok(EXTERNAL_OK.includes(href), `${page}: externer Link ${href}`); continue; }
+      const [file, frag] = href.split('#');
+      const target = file || page;
+      assert.ok(pages[target], `${page}: unbekannte Datei ${target}`);
+      if (frag) assert.ok(H.byId(H.parse(pages[target]).root, frag), `${page}: Anker ${href} fehlt`);
+    }
+  }
+});
+
+test('Design: styles.css unverändert gegenüber vision.html; alle verwendeten Klassen sind definiert', () => {
+  const inline = H.byTag(H.parse(read('vision.html')).root, 'style')[0].raw;
+  const strip = s => s.split('\n').map(l => l.replace(/\s+$/, '')).join('\n').trim();
+  assert.equal(strip(read('public/assets/styles.css')), strip(inline), 'Design-Quelle unverändert');
+  const css = read('public/assets/styles.css') + read('public/assets/anfrage.css');
+  const classes = new Set();
+  for (const p of PAGES) for (const e of H.elements(H.byTag(H.parse(read(p)).root, 'body')[0])) for (const c of (e.attrs.get('class') || '').split(/\s+/).filter(Boolean)) classes.add(c);
+  for (const m of read('server/src/View.php').matchAll(/class="([^"]+)"/g)) for (const c of m[1].split(/\s+/)) classes.add(c);
+  const unknown = [...classes].filter(c => !new RegExp(`\\.${c.replace(/-/g, '\\-')}(?![\\w-])`).test(css));
+  assert.deepEqual(unknown, []);
+});
+
+test('Release-Grenze: public/ enthält nur ausgelieferte Dateien; Konfiguration und Laufzeitdaten sind ausgeschlossen', () => {
+  const walk = d => readdirSync(d).flatMap(f => statSync(join(d, f)).isDirectory() ? walk(join(d, f)) : [relative(join(ROOT, 'public'), join(d, f))]);
+  const files = walk(join(ROOT, 'public')).filter(f => !f.endsWith('.DS_Store')).sort();
+  assert.deepEqual(files, ['.htaccess', 'anfrage.php', 'assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'auth/callback.php', 'index.html', 'pruefkriterien.html']);
+  for (const f of ['anfrage.php', 'auth/callback.php']) assert.ok(!/(new\s+PDO|curl_init|SmtpMailer)/.test(read('public/' + f)), `${f}: nur Einstieg, Logik außerhalb des Webroots`);
+  for (const f of ['server/config.php', 'var/pxwa.sqlite', 'var/google-jwks.json']) assert.equal(spawnSync('git', ['check-ignore', '-q', f], { cwd: ROOT }).status, 0, `${f} ist ignoriert`);
+  assert.ok(!git('ls-files').split('\n').includes('server/config.php'));
+  const ht = read('public/.htaccess');
+  assert.match(ht, /Options -Indexes/); assert.match(ht, /RewriteRule \(\^\|\/\)\\\. - \[F\]/); assert.match(ht, /https:\/\/%\{HTTP_HOST\}/);
+});
+
+test('Keine Secrets im Repository', () => {
+  const tracked = git('ls-files').split('\n').filter(f => f && !f.startsWith('tests/') && existsSync(join(ROOT, f)));
+  const hits = [];
+  for (const f of tracked) {
+    const s = readFileSync(join(ROOT, f), 'utf8');
+    if (/-----BEGIN (RSA |EC )?PRIVATE KEY-----/.test(s)) hits.push(`${f}: privater Schlüssel`);
+    if (/GOCSPX-[A-Za-z0-9_-]{10,}/.test(s)) hits.push(`${f}: Google-Client-Secret`);
+    for (const m of s.matchAll(/'(client_secret|password|pass|secret)'\s*=>\s*'([^']+)'/g)) hits.push(`${f}: ${m[1]} gesetzt`);
+  }
+  assert.deepEqual(hits, []);
+  const example = read('server/config.example.php');
+  assert.match(example, /'client_secret' => ''/); assert.match(example, /'password' => ''/);
+});
+
+test('Scope der Serverkomponente: nur openid email, kein PDF, keine Kunden-Mail, kein Abruf der Kundenwebsite, keine Tokens im Browser', () => {
+  const src = readdirSync(join(ROOT, 'server/src')).map(f => read('server/src/' + f)).join('\n') + read('bin/send-notifications.php');
+  assert.match(read('server/src/GoogleOidc.php'), /'scope' => 'openid email'/);
+  const literals = [...src.matchAll(/'((?:[^'\\]|\\.)*)'/g)].map(m => m[1]).join('\n');
+  assert.ok(!/gmail|mail\.google\.com|userinfo|googleapis\.com\/auth/i.test(literals), 'keine zusätzlichen Google-Berechtigungen');
+  assert.ok(!/application\/pdf|%PDF|fpdf|tcpdf|dompdf|mpdf|wkhtmltopdf/i.test(src), 'keine PDF-Erzeugung');
+  const sends = [...src.matchAll(/->send\(([^,]+),/g)].map(m => m[1].trim());
+  assert.deepEqual(sends, ['$this->notifyTo'], 'einziger Mailversand geht an die interne Adresse');
+  assert.ok(!/website_url[^;\n]*(curl|file_get_contents|fopen|get\()/.test(src) && !/->get\(\$(url|website)/.test(src), 'Kundenwebsite wird nicht abgerufen');
+  assert.ok(!/localStorage|sessionStorage|indexedDB|document\.cookie|fetch\(/.test(read('public/assets/app.js')), 'app.js speichert und sendet nichts selbst');
+});
+
+test('PHP-Syntax (php -l) aller Serverdateien', t => {
+  if (spawnSync('php', ['-v']).status !== 0) { t.skip('NOT_RUN: php nicht verfügbar'); return; }
+  const files = ['server/bootstrap.php', 'server/config.example.php', 'public/anfrage.php', 'public/auth/callback.php', 'bin/migrate.php', 'bin/send-notifications.php',
+    ...readdirSync(join(ROOT, 'server/src')).map(f => 'server/src/' + f)];
+  for (const f of files) assert.equal(spawnSync('php', ['-l', join(ROOT, f)]).status, 0, f);
 });

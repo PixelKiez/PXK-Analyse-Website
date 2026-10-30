@@ -1,0 +1,31 @@
+# PXWA – Webroot (Hostinger public_html, LiteSpeed/Apache-kompatibel)
+Options -Indexes
+DirectoryIndex index.html
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  # Nur HTTPS
+  RewriteCond %{HTTPS} !=on
+  # X-Forwarded-Proto nur relevant, wenn ein vorgeschalteter Proxy/CDN TLS beendet; sonst Bedingung entfernen
+  RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+  # Kanonischer Host – vor Livegang mit der echten Domain aktivieren (Session-Cookie und Origin gelten nur dort):
+  # RewriteCond %{HTTP_HOST} !^DOMAIN-FEHLT\.example$ [NC]
+  # RewriteRule ^ https://DOMAIN-FEHLT.example%{REQUEST_URI} [L,R=301]
+  # Versteckte Dateien (z. B. .htaccess, .git) nie ausliefern; .well-known bleibt für Zertifikate erreichbar
+  RewriteCond %{REQUEST_URI} !^/\.well-known/
+  RewriteRule (^|/)\. - [F]
+</IfModule>
+
+<IfModule mod_headers.c>
+  Header always set Strict-Transport-Security "max-age=31536000"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  # Nur statische Dateien: Die PHP-Seiten setzen ihre strengere CSP und Referrer-Policy selbst.
+  <FilesMatch "\.(html|css|js)$">
+    Header always set Content-Security-Policy "frame-ancestors 'none'"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Cross-Origin-Opener-Policy "same-origin"
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+  </FilesMatch>
+</IfModule>
