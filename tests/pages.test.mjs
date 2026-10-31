@@ -1,4 +1,4 @@
-/* PXWA – Cloudflare Pages: Pages Function an der Service-Binding-Grenze und lokales Pages (wrangler pages dev).
+/* PXWA – Cloudflare Pages: Pages Function an der Service-Binding-Grenze, Video-Function (Byte-Ranges) und lokales Pages (wrangler pages dev).
    Nur lokale Nachbildung mit workerd und Wrangler, ohne Cloudflare-Konto: KEIN Test gegen echtes Cloudflare, Google oder Resend.
    Ausführen im Repo-Root nach `npm ci`:  node --test tests/pages.test.mjs */
 import { test, before, after } from 'node:test';
@@ -7,8 +7,9 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   ROOT, CUSTOMER, NOTIFY_TO, mockGoogle, mockResend, startPages, startPagesFunction, buildPagesFunctions, uploadFiles,
-  Client, login, confirm, field, waitFor, workerAvailable, wranglerAvailable,
+  Client, login, confirm, field, waitFor, workerAvailable, wranglerAvailable, MfResponse,
 } from './lib/harness.mjs';
+import { execFileSync } from 'node:child_process';
 
 const skip = !workerAvailable ? 'NOT_RUN: miniflare/esbuild fehlen (npm ci)' : !wranglerAvailable ? 'NOT_RUN: wrangler fehlt (npm ci)' : false;
 const SITE = 'https://360.pixelkiez.de';
@@ -95,15 +96,153 @@ test('Pages Function: ohne Service Binding (Vorschau) oder bei Ausnahme im Worke
   }
 });
 
-test('Routing: Function läuft nur für /api/* (_routes.json); Wrangler erzeugt aus functions/ dieselbe Regel; functions/ enthält nur das Gateway', { skip }, () => {
+test('Routing: Functions laufen nur für /api/* und genau die zwei Videos (_routes.json); Poster und alle übrigen Dateien bleiben statisch', { skip }, () => {
   const routes = JSON.parse(readFileSync(join(ROOT, 'public/_routes.json'), 'utf8'));
-  assert.deepEqual(routes, { version: 1, include: ['/api/*'], exclude: [] });
+  assert.deepEqual(routes, { version: 1, include: ['/api/*', ...VIDEOS], exclude: [] });
+  /* Wrangler erzeugt aus functions/media/[file].ts die breitere Regel /media/*; die eigene _routes.json hat Vorrang und
+     beschränkt die Video-Function auf die zwei festen Pfade */
   const generated = buildPagesFunctions().routes;
-  assert.deepEqual([generated.include, generated.exclude], [routes.include, routes.exclude], 'eigene und erzeugte Regeln stimmen überein');
+  assert.deepEqual([[...generated.include].sort(), generated.exclude], [['/api/*', '/media/*'], []]);
+  assert.ok(routes.include.every(r => r === '/api/*' || r.startsWith('/media/')), 'jede eigene Regel ist durch eine Function gedeckt');
   const files = [];
   const walk = d => { for (const f of readdirSync(join(ROOT, 'functions', d), { withFileTypes: true })) f.isDirectory() ? walk(join(d, f.name)) : files.push(join(d, f.name)); };
   walk('');
-  assert.deepEqual(files.sort(), ['api/[[path]].ts', 'tsconfig.json']);
+  assert.deepEqual(files.sort(), ['api/[[path]].ts', 'media/[file].ts', 'tsconfig.json']);
+  assert.deepEqual(VIDEOS.map(v => v.slice(1)), uploadFiles().filter(f => f.endsWith('.mp4')), 'genau die ausgelieferten Videos');
+});
+
+/* ---------- Video-Function (functions/media/[file].ts) kompiliert in workerd, mit Ersatz für das Pages-Binding ASSETS ---------- */
+
+const VIDEOS = ['/media/360-pixelkiez-video-1080p.mp4', '/media/report-pdf-de-1x1.mp4'];
+const FILE = Uint8Array.from({ length: 1000 }, (_, i) => (i * 7) % 251);
+const ETAG = '"pxwa-test-etag"';
+/* Ersatz für ASSETS: liefert für die Videos FILE (wie Pages: 200, ganze Datei, auch bei Range); mode steuert Fehlerfälle */
+function assetsStub(mode = 'ok') {
+  const seen = [];
+  const handler = req => {
+    seen.push({ method: req.method, url: req.url, headers: Object.fromEntries(req.headers) });
+    if (mode === 'throw') throw new Error('ASSETS nicht erreichbar');
+    if (!VIDEOS.includes(new URL(req.url).pathname)) return new MfResponse('statische Datei', { status: 200, headers: { 'content-type': 'text/plain' } });
+    if (mode === 'missing') return new MfResponse('<!doctype html><title>Seite nicht gefunden</title>', { status: 404, headers: { 'content-type': 'text/html' } });
+    if (mode === 'html') return new MfResponse('<!doctype html><title>Startseite</title>', { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } });
+    return new MfResponse(FILE, { status: 200, headers: { 'content-type': 'video/mp4', etag: ETAG } });
+  };
+  return { seen, handler };
+}
+/* Sicherheits-Header des Blocks /* in public/_headers */
+const headersFile = () => Object.fromEntries(readFileSync(join(ROOT, 'public/_headers'), 'utf8').split(/\n(?=\S)/).find(b => b.startsWith('/*\n'))
+  .split('\n').slice(1).map(l => l.trim()).filter(l => l && !l.startsWith('!') && !l.startsWith('#')).map(l => [l.slice(0, l.indexOf(':')).toLowerCase(), l.slice(l.indexOf(':') + 1).trim()]));
+
+test('Video-Function: Byte-Ranges nach RFC 9110 – 200 ohne Range, 206 mit Content-Range/Content-Length, 416 für ungültige oder nicht erfüllbare Bereiche', { skip }, async () => {
+  const stub = assetsStub();
+  const fn = await startPagesFunction({ assets: stub.handler });
+  try {
+    for (const video of VIDEOS) {
+      const full = await fn.fetch(SITE + video, { headers: { cookie: 'x=1' } });
+      assert.equal(full.status, 200, video);
+      assert.deepEqual(new Uint8Array(await full.arrayBuffer()), FILE, `${video}: ganze Datei`);
+      assert.deepEqual([full.headers.get('content-type'), full.headers.get('content-length'), full.headers.get('accept-ranges'), full.headers.get('etag'), full.headers.get('content-range')],
+        ['video/mp4', '1000', 'bytes', ETAG, null], video);
+    }
+    const cases = [
+      ['bytes=0-1', 206, 0, 1], ['bytes=0-', 206, 0, 999], ['bytes=100-199', 206, 100, 199], ['bytes=990-5000', 206, 990, 999], ['bytes=999-999', 206, 999, 999],
+      ['bytes=-10', 206, 990, 999], ['bytes=-5000', 206, 0, 999], ['Bytes=5-9', 206, 5, 9], ['bytes=0-99999999999999999999', 206, 0, 999],
+      ['bytes=1000-', 416], ['bytes=5000-6000', 416], ['bytes=-0', 416], ['bytes=5-2', 416], ['bytes=-', 416], ['bytes=', 416], ['bytes=abc', 416], ['bytes=1-2-3', 416],
+      ['bytes= 0-1', 416], ['bytes=0x10-20', 416], ['bytes=+1-2', 416], ['0-1', 416], ['bytes', 416], ['bytes=' + '9'.repeat(120) + '-', 416],
+      /* andere Einheit: muss ignoriert werden; mehrere Bereiche: nicht unterstützt → ganze Datei */
+      ['items=0-1', 200, 0, 999], ['bytes=0-1,5-6', 200, 0, 999],
+    ];
+    for (const [range, status, start, end] of cases) {
+      const r = await fn.fetch(SITE + VIDEOS[0], { headers: { range } });
+      const body = new Uint8Array(await r.arrayBuffer());
+      assert.equal(r.status, status, range);
+      assert.equal(r.headers.get('accept-ranges'), 'bytes', range);
+      if (status === 416) {
+        assert.equal(r.headers.get('content-range'), 'bytes */1000', range);
+        assert.match(r.headers.get('content-type'), /^text\/plain/, range);
+        continue;
+      }
+      assert.deepEqual(body, FILE.slice(start, end + 1), `${range}: Inhalt`);
+      assert.equal(r.headers.get('content-length'), String(end - start + 1), `${range}: Content-Length`);
+      assert.equal(r.headers.get('content-range'), status === 206 ? `bytes ${start}-${end}/1000` : null, `${range}: Content-Range`);
+      assert.equal(r.headers.get('content-type'), 'video/mp4', range);
+    }
+    /* ASSETS bekommt nur feste Pfade als einfache GET-Anfrage – ohne Range, Cookies oder Bedingungen der Anfrage */
+    assert.ok(stub.seen.length > 0 && stub.seen.every(s => s.method === 'GET' && VIDEOS.includes(new URL(s.url).pathname) && new URL(s.url).search === ''
+      && !('range' in s.headers) && !('cookie' in s.headers) && !('if-none-match' in s.headers)), JSON.stringify(stub.seen.slice(0, 2)));
+  } finally {
+    await fn.stop();
+  }
+});
+
+test('Video-Function: HEAD, ETag (If-None-Match → 304, If-Range), nur GET/HEAD, Sicherheits-Header wie _headers; andere Pfade statisch, Fehler kontrolliert', { skip }, async () => {
+  const stub = assetsStub();
+  const fn = await startPagesFunction({ assets: stub.handler });
+  try {
+    const v = SITE + VIDEOS[1];
+    const head = await fn.fetch(v, { method: 'HEAD' });
+    assert.deepEqual([head.status, head.headers.get('content-length'), head.headers.get('accept-ranges'), (await head.arrayBuffer()).byteLength], [200, '1000', 'bytes', 0]);
+    const headRange = await fn.fetch(v, { method: 'HEAD', headers: { range: 'bytes=10-19' } });
+    assert.deepEqual([headRange.status, headRange.headers.get('content-length'), headRange.headers.get('content-range'), (await headRange.arrayBuffer()).byteLength], [206, '10', 'bytes 10-19/1000', 0]);
+    for (const [inm, status] of [[ETAG, 304], [`W/${ETAG}`, 304], ['*', 304], [`"alt", ${ETAG}`, 304], ['"alt"', 200]]) {
+      const r = await fn.fetch(v, { headers: { 'if-none-match': inm, range: 'bytes=0-1' } });
+      await r.arrayBuffer();
+      assert.equal(r.status, status === 304 ? 304 : 206, `If-None-Match ${inm}`);
+      if (status === 304) assert.equal(r.headers.get('etag'), ETAG);
+    }
+    for (const [ifRange, status] of [[ETAG, 206], ['"alt"', 200], [`W/${ETAG}`, 200], ['Sat, 31 Oct 2026 10:00:00 GMT', 200]]) {
+      const r = await fn.fetch(v, { headers: { 'if-range': ifRange, range: 'bytes=0-1' } });
+      assert.equal(r.status, status, `If-Range ${ifRange}`);
+      assert.equal((await r.arrayBuffer()).byteLength, status === 206 ? 2 : 1000);
+    }
+    const expected = headersFile();
+    assert.ok(Object.keys(expected).length >= 7);
+    for (const [range, status] of [[undefined, 200], ['bytes=0-1', 206], ['bytes=5000-', 416]]) {
+      const r = await fn.fetch(v, { headers: range ? { range } : {} });
+      await r.arrayBuffer();
+      assert.equal(r.status, status);
+      for (const [k, val] of Object.entries(expected)) assert.equal(r.headers.get(k), val, `${status}: ${k} wie in _headers`);
+      assert.equal(r.headers.get('access-control-allow-origin'), null);
+      assert.deepEqual(r.headers.getSetCookie(), []);
+      assert.equal(r.headers.get('x-robots-tag'), null, 'Produktionsdomain ohne noindex-Header');
+    }
+    const preview = await fn.fetch('https://pxwa.pages.dev' + VIDEOS[0], { headers: { range: 'bytes=0-1' } });
+    await preview.arrayBuffer();
+    assert.deepEqual([preview.status, preview.headers.get('x-robots-tag')], [206, 'noindex'], '*.pages.dev wie in _headers nicht indexieren');
+    const calls = stub.seen.length;
+    for (const method of ['POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']) {
+      const r = await fn.fetch(v, { method, body: ['POST', 'PUT', 'PATCH'].includes(method) ? 'x' : undefined });
+      await r.arrayBuffer();
+      assert.deepEqual([r.status, r.headers.get('allow')], [405, 'GET, HEAD'], method);
+    }
+    assert.equal(stub.seen.length, calls, 'andere Methoden lesen keine Datei');
+    /* Andere Pfade (Poster, unbekannte Dateien, Umgehungsversuche) bedient die Function nicht selbst: weiter an die statischen Dateien */
+    for (const p of ['/media/report-pdf-poster.jpg', '/media/gibt-es-nicht.mp4', '/media/360-pixelkiez-video-1080p.mp4.bak', '/media/%2e%2e%2fapi%2fanfrage', '/media/360-PIXELKIEZ-VIDEO-1080P.MP4']) {
+      const r = await fn.fetch(SITE + p, { headers: { range: 'bytes=0-1' } });
+      assert.deepEqual([r.status, await r.text()], [200, 'statische Datei'], p);
+    }
+    const q = await fn.fetch(SITE + VIDEOS[0] + '?datei=../../worker/wrangler.toml', { headers: { range: 'bytes=0-1' } });
+    await q.arrayBuffer();
+    assert.equal(q.status, 206, 'Query verändert die gelesene Datei nicht');
+    assert.equal(new URL(stub.seen.at(-1).url).search, '', 'Query geht nicht an ASSETS');
+  } finally {
+    await fn.stop();
+  }
+  /* Datei fehlt im Deployment, Pages liefert HTML statt Video, Binding nicht erreichbar: kontrollierte Fehler ohne fremde Inhalte.
+     Das Poster-Fallback in app.js ersetzt das Video dann durch das Standbild. */
+  for (const [mode, status] of [['missing', 404], ['html', 404], ['throw', 503]]) {
+    const f = await startPagesFunction({ assets: assetsStub(mode).handler });
+    try {
+      const r = await f.fetch(SITE + VIDEOS[0], { headers: { range: 'bytes=0-1' } });
+      const text = await r.text();
+      assert.equal(r.status, status, mode);
+      assert.match(r.headers.get('content-type'), /^text\/plain/, mode);
+      assert.ok(!/<html|<title|doctype/i.test(text), `${mode}: kein HTML als Video`);
+      assert.equal(r.headers.get('x-frame-options'), 'DENY', mode);
+    } finally {
+      await f.stop();
+    }
+  }
 });
 
 /* ---------- Lokales Cloudflare Pages (wrangler pages dev) ---------- */
@@ -113,7 +252,7 @@ const STATIC_HEADERS = {
   'content-security-policy': "frame-ancestors 'none'", 'referrer-policy': 'strict-origin-when-cross-origin', 'cross-origin-opener-policy': 'same-origin',
 };
 
-test('Lokales Pages ohne verbundenen Worker: statische Dateien ohne Function mit Sicherheits-Headern, unbekannte Pfade 404, /api/* 503', { skip }, async t => {
+test('Lokales Pages ohne verbundenen Worker: alle Dateien mit Sicherheits-Headern (Videos über die Function), unbekannte Pfade 404, /api/* 503', { skip }, async t => {
   const site = await startPages({ worker: false });
   try {
     const get = (p, init = {}) => fetch(site.base + p, { redirect: 'manual', ...init });
@@ -156,15 +295,57 @@ test('Lokales Pages ohne verbundenen Worker: statische Dateien ohne Function mit
       assert.ok(!/<html/i.test(unavailable), `${path}: keine statische Seite als API-Antwort`);
     }
     t.diagnostic(`/api/* ohne verbundenen Worker: 503 „${unavailable.trim()}“`);
-    const video = files.find(f => f.endsWith('.mp4'));
-    if (video) {
-      const r = await get('/' + video, { headers: { range: 'bytes=0-1' } });
-      await r.arrayBuffer();
-      assert.ok([200, 206].includes(r.status));
-      t.diagnostic(`Range bytes=0-1 auf ${video}: HTTP ${r.status}${r.status === 200 ? ' (ganze Datei, wie von Cloudflare für Pages dokumentiert – Safari/iOS spielt so kein Video)' : ''}`);
-    } else {
-      t.diagnostic('Medien fehlen in public/media/ – Range-Verhalten nicht geprüft');
+  } finally {
+    await site.stop();
+  }
+});
+
+test('Lokales Pages: beide Videos mit echten Byte-Ranges (200/206/416, HEAD, If-None-Match) aus dem eigenen Assets-Binding; Poster weiter statisch', { skip }, async t => {
+  const site = await startPages({ worker: false });
+  try {
+    const get = (p, init = {}) => fetch(site.base + p, { redirect: 'manual', ...init });
+    for (const video of VIDEOS) {
+      const file = readFileSync(join(ROOT, 'public', video));
+      const size = file.length;
+      const full = await get(video);
+      assert.equal(full.status, 200, video);
+      assert.ok(Buffer.from(await full.arrayBuffer()).equals(file), `${video}: ganze Datei bytegleich`);
+      assert.deepEqual([full.headers.get('content-length'), full.headers.get('accept-ranges'), full.headers.get('content-type')], [String(size), 'bytes', 'video/mp4']);
+      const mid = Math.floor(size / 2);
+      for (const [range, start, end] of [['bytes=0-1', 0, 1], ['bytes=0-', 0, size - 1], [`bytes=${mid}-${mid + 65535}`, mid, mid + 65535], ['bytes=-4096', size - 4096, size - 1], [`bytes=${size - 1}-`, size - 1, size - 1]]) {
+        const r = await get(video, { headers: { range } });
+        const body = Buffer.from(await r.arrayBuffer());
+        assert.equal(r.status, 206, `${video} ${range}`);
+        assert.equal(r.headers.get('content-range'), `bytes ${start}-${end}/${size}`, `${video} ${range}`);
+        assert.equal(r.headers.get('content-length'), String(end - start + 1), `${video} ${range}`);
+        assert.ok(body.equals(file.subarray(start, end + 1)), `${video} ${range}: Inhalt`);
+      }
+      for (const range of [`bytes=${size}-`, 'bytes=5-2', 'bytes=abc']) {
+        const r = await get(video, { headers: { range } });
+        await r.arrayBuffer();
+        assert.deepEqual([r.status, r.headers.get('content-range')], [416, `bytes */${size}`], `${video} ${range}`);
+      }
+      const head = await get(video, { method: 'HEAD', headers: { range: 'bytes=0-1' } });
+      assert.deepEqual([head.status, head.headers.get('content-range'), head.headers.get('content-length')], [206, `bytes 0-1/${size}`, '2'], `${video} HEAD`);
+      const etag = full.headers.get('etag');
+      assert.ok(etag, `${video}: ETag`);
+      const again = await get(video, { headers: { 'if-none-match': etag } });
+      assert.equal(again.status, 304, `${video}: unverändert → 304`);
+      const post = await get(video, { method: 'POST', body: 'x' });
+      assert.equal(post.status, 405, `${video}: nur GET/HEAD`);
+      t.diagnostic(`${video}: 200 ganz, 206 mit Content-Range, 416 außerhalb, 304 mit ETag`);
     }
+    /* Poster laufen nicht über die Function (nicht in _routes.json): unverändert statisch, Range wird wie bei Pages ignoriert */
+    for (const poster of ['/media/360-pixelkiez-video-poster.jpg', '/media/report-pdf-poster.jpg']) {
+      const r = await get(poster, { headers: { range: 'bytes=0-1' } });
+      const body = Buffer.from(await r.arrayBuffer());
+      assert.equal(r.status, 200, poster);
+      assert.ok(body.equals(readFileSync(join(ROOT, 'public', poster))), `${poster}: ganze Datei`);
+      assert.match(r.headers.get('content-type'), /^image\/jpeg/);
+    }
+    const unknown = await get('/media/gibt-es-nicht.mp4', { headers: { range: 'bytes=0-1' } });
+    assert.equal(unknown.status, 404);
+    assert.match(await unknown.text(), /Seite nicht gefunden/, 'unbekannte Videos: eigene 404-Seite statt Function');
   } finally {
     await site.stop();
   }
@@ -212,9 +393,14 @@ test('Lokales Pages mit Worker über das Service Binding: URL-Eingabe → Functi
   }
 });
 
-test('Medien: Videos und Poster liegen lokal vor, unter 25 MiB je Datei (Pages-Grenze); sonst Release-Blocker', { skip: !existsSync(join(ROOT, 'public/media')) && 'NOT_RUN: public/media/ fehlt – Release-Blocker: Originalmedien fehlen' }, async t => {
-  const media = uploadFiles().filter(f => f.startsWith('media/'));
-  assert.deepEqual(media, ['media/360-pixelkiez-video-1080p.mp4', 'media/360-pixelkiez-video-poster.jpg', 'media/report-pdf-de-1x1.mp4', 'media/report-pdf-poster.jpg']);
+test('Medien: Videos und Poster sind versioniert (nicht nur lokal), unter 25 MiB je Datei (Pages-Grenze), Videos mit Faststart', async t => {
+  const MEDIA = ['media/360-pixelkiez-video-1080p.mp4', 'media/360-pixelkiez-video-poster.jpg', 'media/report-pdf-de-1x1.mp4', 'media/report-pdf-poster.jpg'];
+  assert.ok(MEDIA.every(f => existsSync(join(ROOT, 'public', f))), 'Medien fehlen in public/media/ – Release-Blocker');
+  assert.deepEqual(uploadFiles().filter(f => f.startsWith('media/')), MEDIA);
+  /* Im Git-Index (bzw. Commit), nicht nur als ignorierte lokale Kopie; den Commit selbst prüft tests/release.test.mjs */
+  const tracked = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', 'public/media'], { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean);
+  assert.deepEqual(tracked.map(f => f.slice('public/'.length)).sort(), MEDIA, 'Medien nicht ignoriert');
+  const media = MEDIA;
   for (const f of media) {
     const buf = readFileSync(join(ROOT, 'public', f));
     assert.ok(buf.length < 25 * 1024 * 1024, `${f}: ${buf.length} Byte`);

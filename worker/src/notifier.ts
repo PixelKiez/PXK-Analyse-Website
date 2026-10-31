@@ -15,6 +15,10 @@ const TIMEOUT_MS = 15000;
 const USER_AGENT = 'pxwa-api/1 (360-pixelkiez)';
 /* Resend-Fehler, nach denen ein späterer Versuch sinnvoll ist (zusätzlich zu 408, 429 und 5xx) */
 const RETRYABLE = new Set(['concurrent_idempotent_requests', 'resource_locked']);
+/* Nur vorübergehende Fehler werden automatisch wiederholt. "permanent" (z. B. 401 ungültiger API-Key, 403 Domain nicht
+   verifiziert, 422 Validierung, 409 invalid_idempotent_request) und "protocol" scheitern mit unveränderter Konfiguration
+   bei jedem Versuch gleich: sofort "failed", bis die Ursache behoben und die Benachrichtigung manuell neu eingereiht ist. */
+const RETRY_KINDS = new Set(['connect', 'timeout', 'temporary']);
 
 export interface Mail {
   to: string;
@@ -70,7 +74,8 @@ interface OrderRow {
   attempts: number;
 }
 
-/* sent: von Resend angenommen; failed: Versuch gescheitert, später erneut; busy: gerade von einem anderen Aufruf beansprucht */
+/* sent: von Resend angenommen; failed: Versuch gescheitert (vorübergehend: später erneut; dauerhaft: Status "failed" in D1);
+   busy: gerade von einem anderen Aufruf beansprucht. Der Auftrag bleibt in jedem Fall unverändert gespeichert. */
 export type Delivery = 'sent' | 'failed' | 'busy';
 
 export class Notifier {
@@ -90,11 +95,13 @@ export class Notifier {
       id = await this.mailer.send({ to: this.notifyTo, subject: 'Neue Analyse-Anfrage ' + order.reference, text: text(order), replyTo: order.email, idempotencyKey: 'pxwa-' + order.reference });
     } catch (e) {
       if (!(e instanceof MailError)) throw e;
-      const final = order.attempts >= MAX_ATTEMPTS;
+      const permanent = !RETRY_KINDS.has(e.kind);
+      const final = permanent || order.attempts >= MAX_ATTEMPTS;
       const reason = [e.kind, e.status || '', e.code].filter(Boolean).join(':').slice(0, 64);
       await this.db.run('UPDATE notifications SET status = ?1, locked_until = NULL, next_attempt_at = ?2, last_error = ?3 WHERE order_id = ?4',
         [final ? 'failed' : 'pending', utcText(Math.floor(Date.now() / 1000) + backoff(order.attempts)), reason, orderId]);
-      console.error(`PXWA: Benachrichtigung zu ${order.reference} fehlgeschlagen (${reason.replace(/:/g, ' ')}, Versuch ${order.attempts}${final ? ', endgültig' : ''})`);
+      const outcome = permanent ? ', dauerhaft abgelehnt – keine automatische Wiederholung, Konfiguration prüfen' : final ? ', endgültig' : '';
+      console.error(`PXWA: Benachrichtigung zu ${order.reference} fehlgeschlagen (${reason.replace(/:/g, ' ')}, Versuch ${order.attempts}${outcome})`);
       return 'failed';
     }
     /* Resend hat angenommen. Scheitert jetzt das Speichern, bleibt die Zeile "sending" und wird nach Ablauf der Sperre

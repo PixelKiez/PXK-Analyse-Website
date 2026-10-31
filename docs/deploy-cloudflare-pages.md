@@ -9,8 +9,10 @@ Google-Client, keine Resend-Domain. Alle bisherigen Tests sind lokal (Mocks, wor
 Browser ──HTTPS──► 360.pixelkiez.de  (CNAME bei Hostinger → <projekt>.pages.dev)
                      │
                      ▼
-                Cloudflare Pages „pxwa“ ── /, *.html, /assets/*, /media/* ──► statische Dateien aus public/
+                Cloudflare Pages „pxwa“ ── /, *.html, /assets/*, Poster ──► statische Dateien aus public/
                      │
+                     ├─ zwei Videos (public/_routes.json) ──► Pages Function functions/media/[file].ts (Byte-Ranges, 206)
+                     │                                          └─ liest nur aus dem eigenen Assets-Binding
                      └─ /api/* (public/_routes.json) ──► Pages Function functions/api/[[path]].ts
                                                             │ Service Binding „API“ (intern, keine öffentliche Adresse)
                                                             ▼
@@ -31,16 +33,17 @@ Browser ──HTTPS──► 360.pixelkiez.de  (CNAME bei Hostinger → <projekt
       Solange `PRIVACY_VERSION` mit „ENTWURF“ beginnt, nimmt der Worker in Produktion **keine** Aufträge an (503).
 - [ ] Aufbewahrungsfrist für Auftragsdaten entschieden (D-5, Abschnitt 8)
 - [ ] Auftragsverarbeitungsverträge (Cloudflare, Resend) und Übermittlungsgrundlagen geprüft
-- [ ] Videos auf iPhone/Safari: Pages beantwortet Range-Anfragen laut Cloudflare-Dokumentation mit 200 statt 206.
-      WebKit zeigt dann statt des Videos das Standbild (Fallback in `app.js`). Echte Wiedergabe in Safari braucht
-      eine eigene Entscheidung (Abschnitt 7).
+- [ ] Videos auf einem echten iPhone/Safari prüfen: Die Video-Function beantwortet Range-Anfragen mit 206; lokal
+      (WebKit, `wrangler pages dev`) laufen beide Videos. Auf echtem Cloudflare noch nicht geprüft (Abschnitt 7).
 - [ ] Echte Ende-zu-Ende-Prüfung nach der Aktivierung (Abschnitt 9)
 - [ ] `noindex` bleibt gesetzt, bis eine eigene Launch-Freigabe es aufhebt
 
 ## 1. Werkzeuge und Prüfung vor jedem Deploy
 
 Node ≥ 22. Auf einem sauberen Checkout des freigegebenen Commits: `npm ci`, `npm run typecheck`, `npm test`
-(statisch, Worker in workerd mit lokaler D1, Pages Function und lokales Pages per `wrangler pages dev`).
+(statisch, Worker in workerd mit lokaler D1, Pages Functions und lokales Pages per `wrangler pages dev`) und
+`npm run test:release` (klont das Repository frisch und prüft den Commit: Medien vorhanden und bytegleich, alle
+referenzierten Dateien da, keine PHP-/Railway-Reste, keine Schlüssel – lokale oder ignorierte Dateien zählen nicht).
 Browser-Regression: `npm run test:browser` mit `PXK_PLAYWRIGHT` (optional WebKit: `playwright install webkit`).
 Telemetrie aus: `export WRANGLER_SEND_METRICS=false`. Konfiguration ohne Deploy prüfen:
 `(cd worker && npx wrangler deploy --dry-run --outdir /tmp/pxwa-dry)` und `npx wrangler pages functions build --outdir /tmp/pxwa-fn`.
@@ -56,14 +59,17 @@ Zwei getrennte Konfigurationen, damit nie das Falsche deployt wird:
 
 ## 2. Cloudflare Pages (Website und Gateway)
 
-**Empfohlen: kontrollierter Direct Upload** statt GitHub-Integration. Gründe: Die Videos in `public/media/` sind
-nicht versioniert (eine Git-Integration würde ohne sie bauen), und die Git-Integration deployt bei jedem Push
-automatisch (auch Feature-Branches als Vorschau). Während der Entwicklung keine Git-Integration verbinden.
+**Empfohlen: kontrollierter Direct Upload aus einem frischen Git-Checkout** statt GitHub-Integration. Alles, was
+ausgeliefert wird, ist versioniert (auch die vier Medien in `public/media/`); der Upload entsteht deshalb aus genau
+dem freigegebenen Commit, nie aus einem Arbeitsverzeichnis mit lokalen Dateien. Die GitHub-Integration bleibt
+unverbunden, weil sie bei jedem Push automatisch deployt (auch Feature-Branches als Vorschau).
 
 1. Projekt einmalig anlegen (Production-Branch `main`): `npx wrangler pages project create pxwa --production-branch main`.
    Cloudflare vergibt `pxwa.pages.dev` oder bei belegtem Namen eine Variante – den **tatsächlich angezeigten** Namen notieren.
-2. Medien prüfen (vier Dateien, je unter 25 MiB): `node --test --test-name-pattern=Medien tests/pages.test.mjs`.
-3. Deploy des freigegebenen Commits aus einem sauberen Checkout:
+2. Frischen Checkout des freigegebenen Commits anlegen und prüfen:
+   `git clone https://github.com/PixelKiez/PXK-Analyse-Website.git pxwa-<sha> && cd pxwa-<sha> && git checkout --detach <sha>`,
+   dann `npm ci`, `npm run typecheck`, `npm test`, `npm run test:release`; `git status --porcelain` muss leer sein.
+3. Deploy aus genau diesem Checkout:
    `npx wrangler pages deploy --branch main --commit-hash <sha> --commit-message "PXK-153 <sha>"`
    (liest `wrangler.toml`: Ausgabeverzeichnis `./public`, kompiliert `functions/`, nimmt `_routes.json` und `_headers` mit).
    `--branch` mit anderem Namen erzeugt ein Vorschau-Deployment.
@@ -71,11 +77,11 @@ automatisch (auch Feature-Branches als Vorschau). Während der Entwicklung keine
    (`[env.preview]`, `services = []`) haben **kein** Binding: `/api/*` antwortet dort mit 503, Vorschau-Code erreicht
    weder den Worker noch die D1-Daten. `*.pages.dev` sendet `X-Robots-Tag: noindex` (`public/_headers`).
 5. Falls später doch die GitHub-Integration gewünscht ist: Build-Befehl leer, Ausgabeverzeichnis `public`,
-   Root-Verzeichnis `/`, automatische Vorschau-Deployments abschalten, und vorher entscheiden, ob die Videos versioniert
-   werden. Erst mit eigener Freigabe verbinden.
+   Root-Verzeichnis `/`, automatische Vorschau-Deployments abschalten. Erst mit eigener Freigabe verbinden.
 
-Was Pages ausliefert: Dateien aus `public/` (ohne `_headers`, `_routes.json`, `.DS_Store`). Die Function läuft nur für
-`/api/*`; alle anderen Anfragen sind statisch und verbrauchen kein Function-Kontingent. `*.html` leitet Pages mit 308
+Was Pages ausliefert: Dateien aus `public/` (ohne `_headers`, `_routes.json`, `.DS_Store`). Functions laufen nur für
+`/api/*` und die zwei Videos (`public/_routes.json`); alle anderen Anfragen, auch die Poster, sind statisch und
+verbrauchen kein Function-Kontingent. `*.html` leitet Pages mit 308
 auf die Adresse ohne Endung um; unbekannte Adressen bekommen `404.html` mit Status 404 (ohne diese Datei würde Pages
 jede unbekannte Adresse mit der Startseite beantworten).
 
@@ -137,11 +143,15 @@ zugelassen werden sollen, ist eine Produktentscheidung; der Code ändert die Zie
 - Vertrag: `POST https://api.resend.com/emails`, `Authorization: Bearer …`, `User-Agent` (Pflicht, sonst 403),
   `Idempotency-Key: pxwa-<Referenz>`, JSON `{ from, to: ["kontakt@pixelkiez.de"], reply_to, subject, text }`.
   Kein HTML, kein Anhang, keine Mail an Kundinnen und Kunden.
+- Empfänger: In Produktion muss `MAIL_NOTIFY_TO` `kontakt@pixelkiez.de` sein (Groß-/Kleinschreibung egal, nur ASCII);
+  versendet wird immer an genau diese Adresse. Jeder andere Wert sperrt die API (503) und den Cron-Versand.
 - Zuverlässigkeit: Auftrag und Benachrichtigung entstehen in einem D1-Batch (Outbox). Fällt Resend aus, bleibt der
-  Auftrag angenommen. Wiederholung: 5 min, 15 min, 45 min … höchstens 12 h, nach 10 Versuchen `failed`.
-  Fehler 408/429/5xx sowie 409 `concurrent_idempotent_requests` gelten als vorübergehend, andere als dauerhaft
-  (werden trotzdem begrenzt wiederholt, damit eine korrigierte Konfiguration greift). Gespeichert wird nur der feste
-  Fehlername von Resend, nie dessen Freitext.
+  Auftrag angenommen; ein Mailfehler löscht nie einen Auftrag. **Vorübergehende** Fehler (Verbindung, Zeitüberschreitung,
+  408/429/5xx, 409 `concurrent_idempotent_requests`) werden wiederholt: 5 min, 15 min, 45 min … höchstens 12 h, nach
+  10 Versuchen `failed`. **Dauerhafte** Fehler (z. B. 401 ungültiger API-Key, 403 Domain nicht verifiziert, 422
+  Validierung, 409 `invalid_idempotent_request`) werden **nicht** automatisch wiederholt: sofort `status = 'failed'`,
+  `last_error = 'permanent:<Status>:<Fehlername>'`, Log „dauerhaft abgelehnt … Konfiguration prüfen“. Nach der
+  Korrektur manuell neu einreihen (Abschnitt 8). Gespeichert wird nur der feste Fehlername von Resend, nie dessen Freitext.
 - Grenzen: Resend hält Idempotency-Keys **24 Stunden**. Geht eine Antwort verloren (Timeout, Abbruch) oder scheitert
   danach das Speichern in D1, verhindert derselbe Key innerhalb von 24 Stunden eine zweite Mail. Spätere Versuche
   (ab etwa dem 8. Versuch) können in seltenen Fällen eine zweite Mail erzeugen. `status = 'sent'` heißt „von Resend
@@ -149,16 +159,25 @@ zugelassen werden sollen, ist eine Produktentscheidung; der Code ändert die Zie
 
 ## 7. Medien
 
-`public/media/` (nicht versioniert): `360-pixelkiez-video-1080p.mp4` (3,4 MiB), `360-pixelkiez-video-poster.jpg`,
-`report-pdf-de-1x1.mp4` (3,4 MiB), `report-pdf-poster.jpg`. H.264 (High), yuv420p, ohne Ton, `moov` vor `mdat`
-(Faststart) – keine weitere Kodierung nötig, alle Dateien weit unter 25 MiB.
+`public/media/` ist versioniert, aber nur genau diese vier freigegebenen Dateien (eigenes 360°Pixelkiez-Material;
+`.gitignore` lässt alles andere dort ignoriert): `360-pixelkiez-video-1080p.mp4` (3,4 MiB),
+`360-pixelkiez-video-poster.jpg`, `report-pdf-de-1x1.mp4` (3,4 MiB), `report-pdf-poster.jpg`. H.264 (High), yuv420p,
+ohne Ton, `moov` vor `mdat` (Faststart), alle Dateien weit unter 25 MiB. Die SHA-256-Werte stehen in
+`tests/release.test.mjs`; eine neue Fassung braucht eine eigene Freigabe und eine bewusste Änderung dort.
 
-Cloudflare dokumentiert für Pages: Range-Anfragen werden mit 200 statt 206 beantwortet; lokal (`wrangler pages dev`)
-ist es ebenso. Safari/iOS (WebKit) spielt Videos dann nicht ab. Lokal geprüft: WebKit spielt dieselben Dateien mit
-206 ab, mit 200 nicht. `app.js` ersetzt ein nicht ladbares Video deshalb durch sein Standbild (gleiche Größe,
-gleicher Alternativtext); Chromium und Firefox spielen weiter. Für echte Wiedergabe in Safari gibt es nur Wege mit
-eigener Freigabe: eine Function für `/media/*` mit 206-Antworten (zusätzliche Function-Aufrufe) oder ein anderer
-Medien-Host. Vor dem Livegang auf einem echten iPhone prüfen.
+Pages beantwortet Range-Anfragen statischer Dateien mit 200 statt 206; Safari/iOS spielt Videos dann nicht ab. Deshalb
+laufen nur die zwei Videos über die Pages Function `functions/media/[file].ts` (`public/_routes.json` nennt genau diese
+Pfade): Sie liest die Datei aus dem eigenen Assets-Binding (feste Pfade, kein R2, kein fremder Host) und antwortet mit
+200 (ohne Range), 206 mit `Content-Range`/`Content-Length`/`Accept-Ranges` (gültiger Bereich), 416 (ungültiger oder
+nicht erfüllbarer Bereich), 304 (`If-None-Match`), 405 (andere Methoden als GET/HEAD). Poster bleiben statisch. Die
+Sicherheits-Header setzt die Function selbst (`_headers` gilt nicht für Functions); ein Test vergleicht beide.
+Lokal geprüft (`wrangler pages dev`, Playwright): Chromium und WebKit spielen beide Videos mit 206.
+
+Kosten und Grenzen (Free-Plan): Jede Video-Anfrage ist ein Function-Aufruf (Workers-Kontingent, 100 000 Anfragen pro
+Tag; Safari stellt je Video etwa zwei Anfragen). Ist das Kontingent erschöpft oder die Function gestört, ersetzt
+`app.js` das Video durch sein Standbild (gleiche Größe, gleicher Alternativtext). Nach dem Deploy prüfen:
+`curl -s -D - -o /dev/null -H 'Range: bytes=0-1' https://360.pixelkiez.de/media/report-pdf-de-1x1.mp4` (erwartet 206,
+`Content-Range: bytes 0-1/3582541`), im Workers-Log die CPU-Zeit der Function, und auf einem echten iPhone beide Videos.
 
 ## 8. Daten, Backup, Aufbewahrung
 
@@ -173,6 +192,8 @@ Medien-Host. Vor dem Livegang auf einem echten iPhone prüfen.
   `npx wrangler d1 execute pxwa --remote --command "UPDATE orders SET status = 'completed' WHERE reference = 'PXA-…'"`.
 - Nicht zugestellte Benachrichtigungen wöchentlich prüfen:
   `npx wrangler d1 execute pxwa --remote --command "SELECT o.reference, n.status, n.attempts, n.last_error FROM orders o JOIN notifications n ON n.order_id = o.id WHERE n.status <> 'sent'"`.
+- Nach Korrektur eines dauerhaften Fehlers (Abschnitt 6) erneut einreihen; der nächste Cron-Lauf versendet einmal:
+  `npx wrangler d1 execute pxwa --remote --command "UPDATE notifications SET status = 'pending', next_attempt_at = '2000-01-01 00:00:00' WHERE status = 'failed' AND last_error LIKE 'permanent:%'"`.
 
 ## 9. Ende-zu-Ende-Prüfung nach der Aktivierung (kontrollierte Testdaten)
 
@@ -189,8 +210,8 @@ curl -s -o /dev/null -w "%{http_code}\n" "https://<projekt>.pages.dev/api/anfrag
 Im Browser mit einem Test-Google-Konto und einer eigenen Website: URL eingeben → Google → bestätigen.
 Erwartet: Referenz `PXA-…`, genau eine Zeile in `orders`, `notifications.status = 'sent'`, **genau eine** Mail in
 kontakt@pixelkiez.de (Absender @notify.pixelkiez.de, SPF/DKIM „pass“ im Mail-Header). Zurück + erneut senden und
-dieselbe URL erneut anfragen: keine zweite Mail. Auf einem iPhone: Startseite zeigt Video oder Standbild, keine
-schwarze Fläche. Danach Testdaten löschen:
+dieselbe URL erneut anfragen: keine zweite Mail. Auf einem iPhone: beide Videos laufen (sonst Standbild, nie eine
+schwarze Fläche). Danach Testdaten löschen:
 `DELETE FROM notifications WHERE order_id IN (SELECT id FROM orders WHERE reference = 'PXA-…'); DELETE FROM orders WHERE reference = 'PXA-…'`.
 
 ## 10. Release und Rollback

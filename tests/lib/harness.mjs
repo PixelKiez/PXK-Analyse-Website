@@ -212,9 +212,20 @@ export const COMPATIBILITY_DATE = /^compatibility_date\s*=\s*"([^"]+)"/m.exec(re
 export const MIGRATION = readFileSync(join(ROOT, 'worker/migrations/0001_init.sql'), 'utf8');
 const statements = sql => sql.replace(/^\s*--.*$/gm, '').split(';').map(s => s.trim()).filter(Boolean);
 
+/* Ausgehende Anfragen des Workers abfangen (Miniflare outboundService): https://api.resend.com geht an den Mock-Resend,
+   alles andere wird abgewiesen. So lässt sich der Produktionsmodus (fest api.resend.com) ohne echten Versand prüfen. */
+export function resendOutbound(mail) {
+  return async request => {
+    const url = new URL(request.url);
+    if (url.origin !== 'https://api.resend.com') return new miniflare.Response('nicht erlaubt', { status: 502 });
+    const r = await fetch(mail.origin + url.pathname + url.search, { method: request.method, headers: Object.fromEntries(request.headers), body: request.method === 'POST' ? await request.text() : undefined });
+    return new miniflare.Response(await r.text(), { status: r.status, headers: Object.fromEntries(r.headers) });
+  };
+}
+
 /* base: Basis-URL (BASE_URL); scheme 'https' ergibt https://127.0.0.1:PORT. env: Overrides (undefined entfernt den Schlüssel).
-   db: false startet ohne D1-Binding; migrate: false lässt das Schema weg. */
-export async function startWorker({ google, mail, base, scheme = 'http', authEndpoint, env = {}, db = true, migrate = true } = {}) {
+   db: false startet ohne D1-Binding; migrate: false lässt das Schema weg. outbound: siehe resendOutbound. */
+export async function startWorker({ google, mail, base, scheme = 'http', authEndpoint, env = {}, db = true, migrate = true, outbound } = {}) {
   base ??= `${scheme}://127.0.0.1:${await freePort()}`;
   const bindings = {
     ENV: 'local', BASE_URL: base,
@@ -231,6 +242,7 @@ export async function startWorker({ google, mail, base, scheme = 'http', authEnd
   const mf = new miniflare.Miniflare({
     modules: true, scriptPath: await bundle(), modulesRoot: bundled.dir, compatibilityDate: COMPATIBILITY_DATE, bindings,
     ...(db ? { d1Databases: { DB: 'pxwa-test-' + randomBytes(6).toString('hex') } } : {}),
+    ...(outbound ? { outboundService: outbound } : {}),
     handleRuntimeStdio(stdout, stderr) { stdout.on('data', d => { logs += d; }); stderr.on('data', d => { logs += d; }); },
   });
   await mf.ready;
@@ -264,7 +276,7 @@ export async function startWorker({ google, mail, base, scheme = 'http', authEnd
 /* Was `wrangler pages deploy` aus public/ NICHT als Datei hochlädt (Konfiguration verarbeitet Pages gesondert) – wie in Wrangler */
 export const PAGES_IGNORED = [/^_worker\.js$/, /^_redirects$/, /^_headers$/, /^_routes\.json$/, /^functions(\/|$)/, /(^|\/)\.DS_Store$/, /(^|\/)node_modules(\/|$)/, /(^|\/)\.git(\/|$)/, /^\.wrangler(\/|$)/];
 
-/* Dateien in public/, die ein Upload von genau diesem Arbeitsstand ausliefern würde (inkl. nicht versionierter Medien) */
+/* Dateien in public/, die ein Upload von genau diesem Arbeitsstand ausliefern würde (auch ignorierte lokale Dateien; den Commit prüft tests/release.test.mjs) */
 export function uploadFiles() {
   const out = [];
   const walk = dir => {
@@ -297,12 +309,16 @@ export function buildPagesFunctions() {
   return compiled;
 }
 
-/* Kompilierte Pages Function in workerd. api: Skript eines Workers hinter dem Service Binding API; null = kein Binding (Vorschau) */
-export async function startPagesFunction({ api = null } = {}) {
+/* Antwort für Ersatz-Bindings in Node (Miniflare erwartet seine eigene Response-Klasse) */
+export const MfResponse = miniflare?.Response;
+
+/* Kompilierte Pages Function in workerd. api: Skript eines Workers hinter dem Service Binding API; null = kein Binding (Vorschau).
+   assets: Ersatz für das Pages-Binding ASSETS (Node-Funktion Request → MfResponse); Standard: immer „statische Datei“ */
+export async function startPagesFunction({ api = null, assets } = {}) {
   const fn = buildPagesFunctions();
   const workers = [{
     name: 'pages', modules: true, scriptPath: fn.script, modulesRoot: fn.dir, compatibilityDate: COMPATIBILITY_DATE,
-    serviceBindings: { ...(api ? { API: 'pxwa-api' } : {}), ASSETS: () => new Response('statische Datei', { status: 200 }) },
+    serviceBindings: { ...(api ? { API: 'pxwa-api' } : {}), ASSETS: assets ?? (() => new MfResponse('statische Datei', { status: 200 })) },
   }];
   if (api) workers.push({ name: 'pxwa-api', modules: true, script: api, compatibilityDate: COMPATIBILITY_DATE });
   const mf = new miniflare.Miniflare({ workers });

@@ -13,6 +13,8 @@ const read = p => readFileSync(join(ROOT, p), 'utf8');
 const git = (...a) => execFileSync('git', a, { cwd: ROOT, encoding: 'utf8' });
 const PAGES = ['public/index.html', 'public/pruefkriterien.html', 'public/impressum.html', 'public/datenschutz.html', 'public/404.html'];
 const FUNCTION = 'functions/api/[[path]].ts';
+const MEDIA_FUNCTION = 'functions/media/[file].ts';
+const MEDIA = ['media/360-pixelkiez-video-1080p.mp4', 'media/360-pixelkiez-video-poster.jpg', 'media/report-pdf-de-1x1.mp4', 'media/report-pdf-poster.jpg'];
 const VIEW = 'worker/src/view.ts';
 const WORKER_SRC = readdirSync(join(ROOT, 'worker/src')).filter(f => f.endsWith('.ts')).map(f => 'worker/src/' + f);
 /* Alle Dateien, die committet würden (versioniert oder neu, nicht ignoriert) */
@@ -211,8 +213,8 @@ test('Design: styles.css unverändert gegenüber vision.html; alle verwendeten K
   assert.deepEqual(unknown, []);
 });
 
-test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, Function nur unter /api/*, Sicherheits-Header, keine Railway- oder PHP-Reste', () => {
-  assert.deepEqual(artifactFiles(), ['404.html', '_headers', '_routes.json', 'assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'datenschutz.html', 'impressum.html', 'index.html', 'pruefkriterien.html']);
+test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, Functions nur unter /api/* und für zwei Videos, Sicherheits-Header, keine Railway- oder PHP-Reste', () => {
+  assert.deepEqual(artifactFiles(), ['404.html', '_headers', '_routes.json', 'assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'datenschutz.html', 'impressum.html', 'index.html', ...MEDIA, 'pruefkriterien.html']);
   assert.deepEqual(repoFiles().filter(f => /\.(php|phtml)$|(^|\/)\.htaccess$|^(server|bin)\/|railway|Dockerfile|Caddyfile|\.dockerignore/i.test(f)), [], 'keine PHP-, Railway- oder Docker-Bestandteile');
   const pages = read('wrangler.toml');
   const active = pages.split('\n').filter(l => !l.trim().startsWith('#')).join('\n');
@@ -235,9 +237,19 @@ test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, F
   assert.match(fn, /if \(!env\.API\) return unavailable\(\);/);
   const code = fn.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
   assert.ok(!/console\.|\bfetch\(|env\.ASSETS|next\(/.test(code.replace('env.API.fetch(', '')), 'keine Logs, keine weiteren Aufrufe, kein Rückfall auf statische Dateien');
-  for (const f of ['.dev.vars', 'worker/.dev.vars', '.wrangler/state/v3/d1/x.sqlite', 'node_modules/x', 'public/media/360-pixelkiez-video-1080p.mp4', '360-pixelkiez-video-1080p.mp4']) {
+  for (const f of ['.dev.vars', 'worker/.dev.vars', '.wrangler/state/v3/d1/x.sqlite', 'node_modules/x', '360-pixelkiez-video-1080p.mp4', 'public/media/anderes-video.mp4', 'public/media/entwurf.jpg']) {
     assert.equal(spawnSync('git', ['check-ignore', '-q', f], { cwd: ROOT }).status, 0, `${f} ist ignoriert`);
   }
+  /* Genau die vier freigegebenen Medien sind versioniert (frischer Checkout: tests/release.test.mjs) */
+  for (const f of MEDIA) assert.equal(spawnSync('git', ['check-ignore', '-q', 'public/' + f], { cwd: ROOT }).status, 1, `public/${f} ist nicht ignoriert`);
+  /* Video-Function: nur zwei feste Pfade, nur das eigene Assets-Binding, keine Logs, keine Header der Anfrage an ASSETS */
+  const media = read(MEDIA_FUNCTION);
+  const mediaCode = media.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
+  assert.match(mediaCode, /const VIDEOS: readonly string\[\] = \['\/media\/360-pixelkiez-video-1080p\.mp4', '\/media\/report-pdf-de-1x1\.mp4'\];/);
+  assert.deepEqual([...mediaCode.matchAll(/\bfetch\(([^)]*\))?/g)].map(m => m[0]), ['fetch(new URL(video, url.origin)'], 'einziger Abruf: feste Videodatei aus ASSETS');
+  assert.match(mediaCode, /env\.ASSETS\.fetch\(new URL\(video, url\.origin\)\.href\)/);
+  assert.ok(!/console\.|caches\.|Set-Cookie|R2|env\.(?!ASSETS)\w+/i.test(mediaCode), 'keine Logs, kein Cache, keine Cookies, keine weiteren Bindings');
+  assert.deepEqual(JSON.parse(read('public/_routes.json')).include, ['/api/*', '/media/360-pixelkiez-video-1080p.mp4', '/media/report-pdf-de-1x1.mp4'], 'Poster bleiben statisch');
 });
 
 test('Release-Scan des Pages-Uploads (public/ wie `wrangler pages deploy`): nur Website-Dateien, keine Quellen, kein PHP/Railway, keine Secrets, höchstens 25 MiB je Datei', () => {
@@ -278,6 +290,7 @@ test('Release-Grenze API (privater Worker): keine Route, keine workers.dev-Adres
   assert.match(config, /export const AUTHORIZED_MAIL_API_HOSTS: readonly string\[\] = \['api\.resend\.com'\];/);
   assert.match(config, /export const AUTHORIZED_MAIL_FROM_DOMAINS: readonly string\[\] = \['notify\.pixelkiez\.de'\];/);
   assert.match(config, /export const PRODUCTION_BASE_URL = 'https:\/\/360\.pixelkiez\.de';/);
+  assert.match(config, /export const PRODUCTION_NOTIFY_TO = 'kontakt@pixelkiez\.de';/, 'fester interner Empfänger in Produktion');
 });
 
 test('D1-Schema: nur die nötigen Tabellen und Spalten (Datenminimierung), keine Tokens', () => {

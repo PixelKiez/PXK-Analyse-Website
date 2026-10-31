@@ -21,6 +21,10 @@ export const AUTHORIZED_MAIL_API_HOSTS: readonly string[] = ['api.resend.com'];
 /* Absender nur aus der eigenen Versanddomain (bei Resend zu verifizieren, getrennt von den Postfächern unter pixelkiez.de) */
 export const AUTHORIZED_MAIL_FROM_DOMAINS: readonly string[] = ['notify.pixelkiez.de'];
 
+/* Einziger Empfänger der internen Benachrichtigung in Produktion. MAIL_NOTIFY_TO muss diese Adresse sein (Groß-/Klein-
+   schreibung egal, nur ASCII); versendet wird immer an genau diese Schreibweise. Jede andere Adresse sperrt die API. */
+export const PRODUCTION_NOTIFY_TO = 'kontakt@pixelkiez.de';
+
 export const LIMITS = {
   startPerIp: [20, 600],         // Anfragestarts je IP: 20 in 10 Minuten
   callbackPerIp: [30, 600],
@@ -144,7 +148,10 @@ export function loadConfig(env: Env): Config {
   if (!mail.apiToken) missing.push('MAIL_API_TOKEN');
   const fromDomain = mail.from.slice(mail.from.lastIndexOf('@') + 1).toLowerCase();
   if (!isEmail(mail.from) || (production && !AUTHORIZED_MAIL_FROM_DOMAINS.includes(fromDomain))) missing.push('MAIL_FROM');
-  if (!isEmail(mail.notifyTo)) missing.push('MAIL_NOTIFY_TO');
+  /* Nur ASCII vergleichen: toLowerCase() bildet sonst z. B. das Kelvin-Zeichen (U+212A) auf „k“ ab */
+  const notifyTo = /^[\x21-\x7e]+$/.test(mail.notifyTo) ? mail.notifyTo.toLowerCase() : '';
+  if (!isEmail(mail.notifyTo) || (production && notifyTo !== PRODUCTION_NOTIFY_TO)) missing.push('MAIL_NOTIFY_TO');
+  if (production) mail.notifyTo = PRODUCTION_NOTIFY_TO;
 
   const retention = str(env.ORDER_RETENTION_DAYS);
   const retentionDays = retention === '' ? null : Number(retention);

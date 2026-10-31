@@ -1,5 +1,5 @@
 {
   "version": 1,
-  "include": ["/api/*"],
+  "include": ["/api/*", "/media/360-pixelkiez-video-1080p.mp4", "/media/report-pdf-de-1x1.mp4"],
   "exclude": []
 }

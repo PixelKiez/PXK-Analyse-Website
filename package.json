@@ -9,7 +9,8 @@
   "scripts": {
     "typecheck": "tsc -p worker/tsconfig.json && tsc -p functions/tsconfig.json",
     "test": "node --test tests/static.test.mjs tests/worker.test.mjs tests/notifier.test.mjs tests/pages.test.mjs",
-    "test:browser": "node --test tests/browser.test.mjs"
+    "test:browser": "node --test tests/browser.test.mjs",
+    "test:release": "node --test tests/release.test.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261030.1",

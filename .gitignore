@@ -6,6 +6,11 @@ node_modules/
 .dev.vars
 .dev.vars.*
 !.dev.vars.example
-# Videos: Quelldateien und Kopie in public/media/ (nicht versioniert; per Direct Upload mit ausgeliefert, siehe docs/deploy-cloudflare-pages.md)
+# Video-Quelldateien im Repository-Root (nicht versioniert)
 /*.mp4
-public/media/
+# public/media/: versioniert sind genau die vier freigegebenen Website-Medien; alles andere dort bleibt ignoriert
+public/media/*
+!public/media/360-pixelkiez-video-1080p.mp4
+!public/media/360-pixelkiez-video-poster.jpg
+!public/media/report-pdf-de-1x1.mp4
+!public/media/report-pdf-poster.jpg

@@ -3,7 +3,7 @@
    node --test tests/notifier.test.mjs   Echte Provider (Google, Resend, Cloudflare-D1) werden hier NICHT getestet. */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mockGoogle, mockResend, startWorker, Client, login, confirm, waitFor, sleep, workerAvailable, CUSTOMER, NOTIFY_TO, MAIL_FROM, MAIL_TOKEN, PRODUCTION_BASE } from './lib/harness.mjs';
+import { mockGoogle, mockResend, startWorker, resendOutbound, Client, login, confirm, waitFor, sleep, workerAvailable, CUSTOMER, NOTIFY_TO, MAIL_FROM, MAIL_TOKEN, PRODUCTION_BASE } from './lib/harness.mjs';
 
 const skip = workerAvailable ? false : 'NOT_RUN: miniflare/esbuild fehlen (npm ci)';
 let google, mail, app;
@@ -50,24 +50,50 @@ test('Fehlgeschlagener Mailversand: Auftrag bleibt gespeichert und bestätigt; C
   assert.deepEqual(await app.sql('SELECT status, attempts FROM notifications'), [{ status: 'sent', attempts: 2 }]);
 });
 
-test('Mail-API lehnt dauerhaft ab: kontrollierte Wiederholung mit Backoff, nach zehn Versuchen endgültig fehlgeschlagen', { skip }, async () => {
+test('Vorübergehender Fehler der Mail-API (503): kontrollierte Wiederholung mit Backoff, nach zehn Versuchen endgültig fehlgeschlagen', { skip }, async () => {
   await reset();
-  mail.state.mode = 'reject';
+  mail.state.mode = 'fail';
   const c = new Client(app);
   await login(c, google);
   assert.equal((await confirm(c)).res.status, 303);
   await settled();
   const [n] = await app.sql("SELECT status, attempts, last_error, next_attempt_at > datetime('now', '+4 minutes') AS later FROM notifications");
-  assert.deepEqual(n, { status: 'pending', attempts: 1, last_error: 'permanent:422:validation_error', later: 1 });
+  assert.deepEqual(n, { status: 'pending', attempts: 1, last_error: 'temporary:503:service_unavailable', later: 1 });
   for (let i = 2; i <= 10; i++) {
-    await app.run("UPDATE notifications SET next_attempt_at = '2000-01-01 00:00:00'");
+    await due();
     await app.cron();
   }
   assert.deepEqual(await app.sql('SELECT status, attempts FROM notifications'), [{ status: 'failed', attempts: 10 }]);
-  await app.run("UPDATE notifications SET next_attempt_at = '2000-01-01 00:00:00'");
+  await due();
   await app.cron();
   assert.equal(mail.state.attempts, 10, 'kein elfter Versuch');
-  assert.match(app.logs(), /Versuch 10, endgültig/);
+  assert.match(app.logs(), /Versuch 10, endgültig\)/);
+  assert.equal((await orders()).length, 1, 'Auftrag bleibt gespeichert');
+});
+
+test('Mail-API lehnt dauerhaft ab (401, 403, 422): sofort „failed“ ohne automatische Wiederholung; Auftrag bleibt; nach Korrektur manuell neu eingereiht genau eine Mail', { skip }, async () => {
+  for (const [i, [mode, code]] of [['auth', 'permanent:401:validation_error'], ['forbidden', 'permanent:403:validation_error'], ['reject', 'permanent:422:validation_error']].entries()) {
+    await reset();
+    mail.state.mode = mode;
+    const before = app.logs().length;
+    const c = new Client(app, { ip: `198.51.100.${60 + i}` });
+    await login(c, google, { website: `firma-${mode}.de` });
+    assert.equal((await confirm(c)).res.status, 303, mode);
+    assert.match((await c.req('GET', '/api/anfrage')).text, /Ihre Anfrage liegt bei uns/, `${mode}: Annahme hängt nicht an Resend`);
+    await settled();
+    assert.deepEqual(await app.sql('SELECT status, attempts, last_error, sent_at FROM notifications'), [{ status: 'failed', attempts: 1, last_error: code, sent_at: null }], `${mode}: überprüfbarer Status in D1`);
+    assert.match(app.logs().slice(before), /Versuch 1, dauerhaft abgelehnt – keine automatische Wiederholung, Konfiguration prüfen\)/, mode);
+    /* Auch wenn die Zeile fällig wäre: der Cron wiederholt dauerhafte Fehler nicht */
+    for (let k = 0; k < 3; k++) { await due(); assert.match((await app.cron()).log, /PXWA: 0 versendet, 0 fehlgeschlagen/, mode); }
+    assert.equal(mail.state.attempts, 1, `${mode}: genau ein Versuch, keine sinnlose Wiederholung`);
+    assert.deepEqual((await orders()).map(o => o.website_url), [`https://firma-${mode}.de`], `${mode}: Auftrag bleibt unverändert`);
+  }
+  /* Nach Korrektur der Konfiguration (docs/deploy-cloudflare-pages.md, Abschnitt 8): manuell neu einreihen */
+  mail.state.mode = 'ok';
+  await app.run("UPDATE notifications SET status = 'pending', next_attempt_at = '2000-01-01 00:00:00' WHERE status = 'failed' AND last_error LIKE 'permanent:%'");
+  assert.match((await app.cron()).log, /PXWA: 1 versendet, 0 fehlgeschlagen/);
+  assert.deepEqual(await app.sql('SELECT status, attempts, last_error FROM notifications'), [{ status: 'sent', attempts: 2, last_error: null }]);
+  assert.equal(mail.state.accepted.length, 1, 'genau eine Mail');
 });
 
 test('Benachrichtigung scheitert nach der Speicherung an der Datenbank: Annahme bleibt bestätigt, keine Fehlerseite, Cron versendet genau einmal', { skip }, async () => {
@@ -147,6 +173,51 @@ test('Produktion: falscher Mail-Anbieter oder Pfad, fremder Absender, Datenschut
   }
 });
 
+test('Produktion: interner Empfänger ausschließlich kontakt@pixelkiez.de – jede andere Adresse sperrt die API (503, kein Cron-Versand, kein Aufruf von Resend)', { skip }, async () => {
+  const variants = [
+    ['anderes Postfach', 'info@pixelkiez.de'], ['andere Domain', 'kontakt@pixelkiez.com'], ['Versanddomain statt Postfach', 'kontakt@notify.pixelkiez.de'],
+    ['angehängte Fremddomain', 'kontakt@pixelkiez.de.example.net'], ['Subdomain-Präfix', 'kontakt@mail.pixelkiez.de'], ['Plus-Adresse', 'kontakt+test@pixelkiez.de'],
+    ['zwei Empfänger', 'kontakt@pixelkiez.de,angreifer@example.net'], ['Anzeigename', 'Pixelkiez <kontakt@pixelkiez.de>'],
+    ['Unicode-Doppelgänger (Kelvin-Zeichen U+212A)', 'Kontakt@pixelkiez.de'], ['Unicode-Doppelgänger (kyrillisches о)', 'kontakt@pixelkiez.de'.replace('o', 'о')],
+    ['nachgestellter Punkt', 'kontakt@pixelkiez.de.'], ['leer', ''], ['nicht gesetzt', undefined],
+  ];
+  for (const [name, to] of variants) {
+    mail.reset();
+    const w = await startWorker({ base: PRODUCTION_BASE, env: { ...PROD, MAIL_NOTIFY_TO: to }, outbound: resendOutbound(mail) });
+    try {
+      const r = await new Client(w).req('POST', '/api/anfrage', { form: { action: 'start', website: 'musterfirma.de' } });
+      assert.equal(r.status, 503, name);
+      assert.equal(r.location, null, `${name}: keine Weiterleitung`);
+      assert.match(r.text, /Gerade nicht verfügbar/, `${name}: sichere Fehlerseite`);
+      assert.ok(!r.text.includes('MAIL_NOTIFY_TO') && !(to && r.text.includes(to)), `${name}: Antwort nennt weder Schlüssel noch Adresse`);
+      assert.equal((await w.cron()).outcome, 'exception', `${name}: Cron versendet nichts`);
+      await waitFor(() => /Ungültige oder fehlende Werte: MAIL_NOTIFY_TO/.test(w.logs()), { what: `Log ${name}` });
+      assert.ok(!(to && w.logs().includes(to)), `${name}: Log nennt nur den Schlüssel, nie den Wert`);
+      assert.equal(mail.state.attempts, 0, `${name}: kein Aufruf der Mail-API`);
+    } finally {
+      await w.stop();
+    }
+  }
+});
+
+test('Produktion: Groß-/Kleinschreibung von kontakt@pixelkiez.de wird angenommen; versendet wird immer an die kleingeschriebene Adresse über api.resend.com', { skip }, async () => {
+  for (const to of ['kontakt@pixelkiez.de', 'Kontakt@PixelKiez.de', 'KONTAKT@PIXELKIEZ.DE']) {
+    mail.reset();
+    const w = await startWorker({ base: PRODUCTION_BASE, env: { ...PROD, MAIL_NOTIFY_TO: to }, outbound: resendOutbound(mail) });
+    try {
+      assert.equal((await new Client(w).req('POST', '/api/anfrage', { form: { action: 'start', website: 'musterfirma.de' } })).status, 303, `${to}: Konfiguration angenommen`);
+      await w.run("INSERT INTO orders (reference, idempotency_key, google_sub, email, website_url, privacy_version, created_at) VALUES ('PXA-TEST-0001', 'k1', 's', ?1, 'https://firma.de', '2026-11-01', '2026-11-01 10:00:00')", CUSTOMER);
+      await w.run("INSERT INTO notifications (order_id, next_attempt_at, created_at) SELECT id, '2000-01-01 00:00:00', created_at FROM orders");
+      assert.match((await w.cron()).log, /PXWA: 1 versendet, 0 fehlgeschlagen/, to);
+      assert.equal(mail.state.accepted.length, 1, to);
+      assert.deepEqual(mail.state.accepted[0].to, ['kontakt@pixelkiez.de'], `${to}: kanonischer Empfänger`);
+      assert.equal(mail.state.accepted[0].from, PROD.MAIL_FROM);
+    } finally {
+      await w.stop();
+    }
+  }
+});
+
 test('Cron-Aufräumen: abgelaufene Sessions und alte Rate-Limit-Fenster werden gelöscht, Aufträge bleiben', { skip }, async () => {
   await reset();
   const c = new Client(app);
@@ -183,13 +254,13 @@ test('Resend-Vertrag: POST /emails mit Bearer-Token, User-Agent, JSON und Idempo
   assert.ok(!app.logs().includes(CUSTOMER) && !app.logs().includes('musterfirma'));
 });
 
-test('Resend-Fehler: je Fehlerart kontrollierte Wiederholung mit Backoff; Auftrag bleibt angenommen; gespeichert wird nur der feste Fehlername', { skip }, async () => {
+test('Resend-Fehler: vorübergehende Fehler mit Backoff wiederholt, dauerhafte sofort „failed“; Auftrag bleibt angenommen; gespeichert wird nur der feste Fehlername', { skip }, async () => {
   const cases = [
-    ['auth', 'permanent:401:validation_error'], ['forbidden', 'permanent:403:validation_error'], ['reject', 'permanent:422:validation_error'],
-    ['ratelimit', 'temporary:429:rate_limit_exceeded'], ['quota', 'temporary:429:daily_quota_exceeded'], ['busy', 'temporary:409:concurrent_idempotent_requests'],
-    ['error', 'temporary:500:application_error'], ['fail', 'temporary:503:service_unavailable'], ['drop', 'connect'],
+    ['auth', 'failed', 'permanent:401:validation_error'], ['forbidden', 'failed', 'permanent:403:validation_error'], ['reject', 'failed', 'permanent:422:validation_error'],
+    ['ratelimit', 'pending', 'temporary:429:rate_limit_exceeded'], ['quota', 'pending', 'temporary:429:daily_quota_exceeded'], ['busy', 'pending', 'temporary:409:concurrent_idempotent_requests'],
+    ['error', 'pending', 'temporary:500:application_error'], ['fail', 'pending', 'temporary:503:service_unavailable'], ['drop', 'pending', 'connect'],
   ];
-  for (const [i, [mode, code]] of cases.entries()) {
+  for (const [i, [mode, status, code]] of cases.entries()) {
     await reset();
     mail.state.mode = mode;
     const c = new Client(app, { ip: `198.51.100.${150 + i}` });
@@ -198,8 +269,11 @@ test('Resend-Fehler: je Fehlerart kontrollierte Wiederholung mit Backoff; Auftra
     assert.match((await c.req('GET', '/api/anfrage')).text, /Ihre Anfrage liegt bei uns/, `${mode}: Annahme hängt nicht an Resend`);
     await settled();
     const [n] = await app.sql("SELECT status, attempts, last_error, next_attempt_at > datetime('now', '+4 minutes') AS later FROM notifications");
-    assert.deepEqual(n, { status: 'pending', attempts: 1, last_error: code, later: 1 }, mode);
+    assert.deepEqual(n, { status, attempts: 1, last_error: code, later: 1 }, mode);
     assert.equal((await orders()).length, 1, `${mode}: Auftrag bleibt gespeichert`);
+    await due();
+    await app.cron();
+    assert.equal(mail.state.attempts, status === 'failed' ? 1 : 2, `${mode}: ${status === 'failed' ? 'keine' : 'eine'} automatische Wiederholung`);
   }
   assert.ok(!app.logs().includes('Invalid `to` field'), 'Freitext von Resend (kann Adressen enthalten) landet nicht im Log');
   /* Gleicher Key mit anderem Inhalt (z. B. nach Konfigurationsänderung): 409 invalid_idempotent_request, dauerhaft */
@@ -213,7 +287,11 @@ test('Resend-Fehler: je Fehlerart kontrollierte Wiederholung mit Backoff; Auftra
   mail.state.keys.set(`pxwa-${(await orders())[0].reference}`, { raw: '{}', id: 'alt' });
   await due();
   await app.cron();
-  assert.deepEqual(await app.sql('SELECT status, last_error FROM notifications'), [{ status: 'pending', last_error: 'permanent:409:invalid_idempotent_request' }]);
+  assert.deepEqual(await app.sql('SELECT status, last_error FROM notifications'), [{ status: 'failed', last_error: 'permanent:409:invalid_idempotent_request' }]);
+  await due();
+  await app.cron();
+  assert.equal(mail.state.attempts, 2, 'keine Wiederholung nach dauerhaftem Fehler');
+  assert.equal((await orders()).length, 1);
 });
 
 test('Antwort von Resend geht verloren (Verbindungsabbruch, Zeitüberschreitung): Wiederholung mit gleichem Idempotency-Key, genau eine Mail je Auftrag', { skip }, async () => {

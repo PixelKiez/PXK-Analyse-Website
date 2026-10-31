@@ -5,11 +5,11 @@
      PXK_PLAYWRIGHT=/pfad/zu/node_modules/playwright [PXK_AXE=/pfad/zu/axe.min.js] [PXK_SCREENSHOT_DIR=…] node --test tests/browser.test.mjs
    Die Google-Anmeldeseite ersetzt ein lokaler Mock-Endpunkt (/auth), der sofort mit einem Einmal-Code zurückleitet,
    so wie Google es nach erfolgreicher Anmeldung täte. (Playwright-Routen greifen bei Redirect-Zielen nicht.)
-   Die Videos kommen aus der lokalen, nicht versionierten Kopie in public/media/.
+   Die Videos kommen aus public/media/ (versioniert) über die Video-Function functions/media/[file].ts (Byte-Ranges, 206).
    Ohne Playwright, Wrangler oder Worker-Abhängigkeiten: NOT_RUN statt bestanden. */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, existsSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { mockGoogle, mockResend, startPages, waitFor, workerAvailable, wranglerAvailable, ROOT } from './lib/harness.mjs';
@@ -22,7 +22,19 @@ const pw = await (async () => {
   try { return dir ? await import(pathToFileURL(join(dir, 'index.mjs')).href) : await import('playwright'); } catch { return null; }
 })();
 const skip = !pw ? 'NOT_RUN: Playwright nicht verfügbar (PXK_PLAYWRIGHT setzen)' : !workerAvailable ? 'NOT_RUN: miniflare/esbuild fehlen (npm ci)' : !wranglerAvailable ? 'NOT_RUN: wrangler fehlt (npm ci)' : false;
-const skipVideo = skip || (!existsSync(join(ROOT, 'public/media/360-pixelkiez-video-1080p.mp4')) && 'NOT_RUN: lokale Videokopie in public/media/ fehlt');
+/* Antworten auf Video-Anfragen einer Seite: Pfad, Range-Kopf der Anfrage, Status */
+function trackVideos(page) {
+  const seen = [];
+  page.on('response', r => { if (new URL(r.url()).pathname.endsWith('.mp4')) seen.push(r); });
+  return () => Promise.all(seen.map(async r => ({ path: new URL(r.url()).pathname, range: (await r.request().allHeaders()).range ?? null, status: r.status() })));
+}
+/* Jede Range-Anfrage an ein Video bekam 206 (nie die ganze Datei mit 200), und jedes genannte Video wurde so geladen */
+function assertRanges(list, paths, what) {
+  const ranged = list.filter(x => x.range);
+  assert.ok(ranged.length > 0, `${what}: Browser fragt Videos mit Range an (${JSON.stringify(list)})`);
+  assert.deepEqual(ranged.filter(x => x.status !== 206), [], `${what}: Range-Anfragen ohne 206`);
+  for (const p of paths) assert.ok(ranged.some(x => x.path === p), `${what}: ${p} nicht per Range geladen`);
+}
 
 let google, mail, app, browser;
 before(async () => {
@@ -133,7 +145,7 @@ test('Hero beim Öffnen: Überschrift, Text und Website-Eingabe vollständig im 
   }
 });
 
-test('Video unter dem Hero: mittig, abgerundet, ohne Bedienelemente, startet beim Hineinscrollen und läuft in Schleife', { skip: skipVideo }, async () => {
+test('Video unter dem Hero: mittig, abgerundet, ohne Bedienelemente, startet beim Hineinscrollen und läuft in Schleife (Range-Antworten 206)', { skip }, async () => {
   const state = page => page.evaluate(() => {
     const v = document.querySelector('.showcase-video'), f = v.closest('.showcase-frame'), r = f.getBoundingClientRect(), cs = getComputedStyle(f);
     return { paused: v.paused, time: v.currentTime, loop: v.loop, muted: v.muted, controls: v.controls, inline: v.playsInline,
@@ -141,6 +153,7 @@ test('Video unter dem Hero: mittig, abgerundet, ohne Bedienelemente, startet bei
   });
   for (const [width, height] of [[1440, 900], [390, 844]]) {
     const { context, page, errors, blocked } = await open('/index.html', { width, height, reducedMotion: 'no-preference' });
+    const videos = trackVideos(page);
     const before = await state(page);
     assert.ok(before.top >= before.vh - 1, `${width}: Video liegt unter dem ersten Bildschirm`);
     assert.equal(before.paused, true, `${width}: läuft vor dem Scrollen noch nicht`);
@@ -154,6 +167,7 @@ test('Video unter dem Hero: mittig, abgerundet, ohne Bedienelemente, startet bei
     /* Schleife: kurz vor dem Ende springt das Video wieder an den Anfang */
     await page.evaluate(() => { const v = document.querySelector('.showcase-video'); v.currentTime = v.duration - 0.3; });
     await page.waitForFunction(() => { const v = document.querySelector('.showcase-video'); return !v.paused && v.currentTime < 2; }, null, { timeout: 5000 });
+    assertRanges(await videos(), ['/media/360-pixelkiez-video-1080p.mp4'], `Chromium ${width}`);
     assert.deepEqual(errors, [], `${width}: Konsolenfehler`);
     assert.deepEqual(blocked, [], `${width}: unerwartete Fremd-Requests`);
     await context.close();
@@ -166,9 +180,10 @@ test('Video unter dem Hero: mittig, abgerundet, ohne Bedienelemente, startet bei
   await context.close();
 });
 
-test('Video bei „Ihr Bericht“: rechts neben dem Text (mobil darunter), abgerundet, lädt und startet erst beim Hineinscrollen', { skip: skipVideo }, async () => {
+test('Video bei „Ihr Bericht“: rechts neben dem Text (mobil darunter), abgerundet, lädt und startet erst beim Hineinscrollen (Range-Antworten 206)', { skip }, async () => {
   for (const [width, height] of [[1440, 900], [390, 844]]) {
     const { context, page, errors, blocked } = await open('/index.html', { width, height, reducedMotion: 'no-preference' });
+    const videos = trackVideos(page);
     const report = () => page.evaluate(() => {
       const v = document.querySelector('#bericht .showcase-video'), f = v.closest('.showcase-frame'), t = document.querySelector('#bericht .split-copy');
       const fr = f.getBoundingClientRect(), tr = t.getBoundingClientRect();
@@ -187,44 +202,61 @@ test('Video bei „Ihr Bericht“: rechts neben dem Text (mobil darunter), abger
     assert.ok(m.radius >= 12 && m.overflow === 'hidden', `${width}: abgerundete Ecken`);
     assert.ok(m.square && m.width <= 560, `${width}: quadratisch, höchstens 560 px (${m.width})`);
     assert.equal(await page.evaluate(() => document.querySelector('.showcase-video').paused), true, `${width}: Video unter dem Hero hält außerhalb des Bildes an`);
+    assertRanges(await videos(), ['/media/report-pdf-de-1x1.mp4'], `Chromium ${width}`);
     assert.deepEqual(errors, [], `${width}: Konsolenfehler`);
     assert.deepEqual(blocked, [], `${width}: unerwartete Fremd-Requests`);
     await context.close();
   }
 });
 
-test('Safari-Engine (WebKit): Pages beantwortet Range-Anfragen mit 200 – dann steht statt einer schwarzen Fläche das Standbild in gleicher Größe da', { skip: skipVideo }, async t => {
+test('Safari-Engine (WebKit): beide Videos laufen – Range-Anfragen bekommen 206 von der Video-Function; scheitert das Laden, steht das Standbild in gleicher Größe da', { skip }, async t => {
   let wk;
   try { wk = await pw.webkit.launch(); } catch { t.skip('NOT_RUN: Playwright-WebKit nicht installiert (playwright install webkit)'); return; }
+  const frames = page => page.evaluate(() => [...document.querySelectorAll('.showcase-video')].map(e => {
+    const r = e.getBoundingClientRect(), f = e.closest('.showcase-frame').getBoundingClientRect();
+    return { tag: e.tagName, label: e.alt || e.getAttribute('aria-label'), fills: Math.abs(r.width - f.width) <= 1 && Math.abs(r.height - f.height) <= 1 };
+  }));
   try {
     for (const [width, height] of [[390, 844], [1440, 900]]) {
       const ctx = await wk.newContext({ viewport: { width, height }, reducedMotion: 'no-preference' });
       const page = await ctx.newPage();
-      const errors = [], ranges = [];
+      const errors = [];
       page.on('pageerror', e => errors.push(String(e)));
-      page.on('response', r => { if (r.url().endsWith('.mp4')) ranges.push(`${r.request().headers().range ?? 'ohne Range'} → ${r.status()}`); });
+      const videos = trackVideos(page);
       await page.goto(app.base + '/', { waitUntil: 'load' });
       for (const sel of ['.showcase', '#bericht .showcase-frame']) {
         await page.evaluate(s => document.querySelector(s).scrollIntoView({ block: 'center' }), sel);
-        /* Entweder läuft das Video (Server mit 206) oder das Poster ersetzt es (Server mit 200) – nie eine leere Fläche */
+        /* Echte Wiedergabe: das Element bleibt ein Video (kein Standbild-Ersatz) und die Zeit läuft */
         await page.waitForFunction(s => {
           const e = document.querySelector(s).querySelector('.showcase-video');
-          return e.tagName === 'IMG' ? e.complete && e.naturalWidth > 0 : !e.paused && e.currentTime > 0.3;
-        }, sel, { timeout: 10000 });
+          return e.tagName === 'VIDEO' && !e.paused && e.currentTime > 0.3 && e.readyState >= 3;
+        }, sel, { timeout: 15000 });
       }
-      const shown = await page.evaluate(() => [...document.querySelectorAll('.showcase-video')].map(e => {
-        const r = e.getBoundingClientRect(), f = e.closest('.showcase-frame').getBoundingClientRect();
-        return { tag: e.tagName, label: e.alt || e.getAttribute('aria-label'), fills: Math.abs(r.width - f.width) <= 1 && Math.abs(r.height - f.height) <= 1 };
-      }));
+      const shown = await frames(page);
+      assert.deepEqual(shown.map(e => e.tag), ['VIDEO', 'VIDEO'], `${width}: beide Videos spielen, kein Standbild`);
       for (const e of shown) {
         assert.ok(e.fills, `${width}: füllt den abgerundeten Rahmen`);
         assert.match(e.label, /^Animierte/, `${width}: Alternativtext bleibt`);
       }
+      const list = await videos();
+      assertRanges(list, ['/media/360-pixelkiez-video-1080p.mp4', '/media/report-pdf-de-1x1.mp4'], `WebKit ${width}`);
       assert.deepEqual(errors, [], `${width}: Skriptfehler`);
       if (SHOTS) await page.screenshot({ path: join(SHOTS, `webkit-${width}.png`) });
-      t.diagnostic(`WebKit ${width}: ${shown.map(e => e.tag === 'IMG' ? 'Standbild' : 'Video').join(' + ')}; MP4-Antworten: ${ranges.join(', ')}`);
+      t.diagnostic(`WebKit ${width}: beide Videos spielen; MP4-Antworten: ${list.map(x => `${x.path.slice(7)} ${x.range ?? 'ohne Range'} → ${x.status}`).join(', ')}`);
       await ctx.close();
     }
+    /* Poster-Fallback bleibt: Ist ein Video nicht ladbar (Netz, Kontingent, Fehler), ersetzt das Standbild es in gleicher Größe */
+    const ctx = await wk.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'no-preference' });
+    await ctx.route('**/*.mp4', r => r.abort());
+    const page = await ctx.newPage();
+    await page.goto(app.base + '/', { waitUntil: 'load' });
+    for (const sel of ['.showcase', '#bericht .showcase-frame']) {
+      await page.evaluate(s => document.querySelector(s).scrollIntoView({ block: 'center' }), sel);
+      await page.waitForFunction(s => { const e = document.querySelector(s).querySelector('.showcase-video'); return e.tagName === 'IMG' && e.complete && e.naturalWidth > 0; }, sel, { timeout: 10000 });
+    }
+    const still = await frames(page);
+    assert.deepEqual(still.map(e => [e.tag, e.fills, /^Animierte/.test(e.label)]), [['IMG', true, true], ['IMG', true, true]], 'Standbild statt schwarzer Fläche');
+    await ctx.close();
   } finally {
     await wk.close();
   }
