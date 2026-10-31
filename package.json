@@ -1,0 +1,22 @@
+{
+  "name": "pxwa",
+  "private": true,
+  "description": "360°Pixelkiez – kostenlose Website-Analyse: Website auf Cloudflare Pages, API als privater Cloudflare Worker mit D1 (Service Binding)",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "tsc -p worker/tsconfig.json && tsc -p functions/tsconfig.json",
+    "test": "node --test tests/static.test.mjs tests/worker.test.mjs tests/notifier.test.mjs tests/pages.test.mjs",
+    "test:browser": "node --test tests/browser.test.mjs",
+    "test:release": "node --test tests/release.test.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261030.1",
+    "esbuild": "0.28.2",
+    "miniflare": "4.20260730.0",
+    "typescript": "7.0.2",
+    "wrangler": "4.156.0"
+  }
+}

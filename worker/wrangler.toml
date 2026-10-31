@@ -1,0 +1,41 @@
+# 360°Pixelkiez – privater API-Worker. Erreichbar nur über das Service Binding "API" der Pages-Website
+# (Root-wrangler.toml, functions/api/[[path]].ts). Vorlage ohne Secrets; Deploy nur mit eigener Freigabe für genau einen Commit-SHA.
+# Secrets (nie hier eintragen): npx wrangler secret put GOOGLE_CLIENT_SECRET | SECRET | MAIL_API_TOKEN
+name = "pxwa-api"
+main = "src/index.ts"
+compatibility_date = "2026-07-30"
+
+# Keine öffentliche Adresse: keine *.workers.dev-Adresse, keine Vorschau-URLs und keine Route.
+# Eine Cloudflare-Zone ist nicht nötig; das DNS von pixelkiez.de bleibt bei Hostinger.
+workers_dev = false
+preview_urls = false
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+# D1 mit EU-Jurisdiktion anlegen (erst nach Freigabe): npx wrangler d1 create pxwa --jurisdiction eu → database_id hier eintragen
+[[d1_databases]]
+binding = "DB"
+database_name = "pxwa"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[vars]
+ENV = "production"
+BASE_URL = "https://360.pixelkiez.de"
+GOOGLE_CLIENT_ID = ""
+# Version der Datenschutzerklärung, die mit jedem Auftrag gespeichert wird. Mit "ENTWURF-…" nimmt die Produktion keine Aufträge an.
+PRIVACY_VERSION = "ENTWURF-2026-10-31"
+# Version der AGB, die im Hero akzeptiert werden muss (gleich dem Feld agb_version in public/index.html und der Angabe in
+# public/agb.html). Mit "ENTWURF-…" nimmt die Produktion keine Aufträge an – erst die rechtlich freigegebene Fassung eintragen.
+TERMS_VERSION = "ENTWURF-2026-10-31"
+# Einzige freigegebene Mail-API (Resend). Der API-Key kommt als Secret MAIL_API_TOKEN.
+MAIL_API_URL = "https://api.resend.com/emails"
+# Absender erst eintragen, wenn die Versanddomain notify.pixelkiez.de bei Resend verifiziert ist (Adresse @notify.pixelkiez.de)
+MAIL_FROM = ""
+MAIL_NOTIFY_TO = "kontakt@pixelkiez.de"
+# Löschfrist für erledigte Aufträge in Tagen – bewusst nicht gesetzt, solange die Aufbewahrungsfrist (D-5) offen ist
+# ORDER_RETENTION_DAYS = "<tage>"
+
+[observability]
+enabled = true
