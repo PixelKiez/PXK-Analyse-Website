@@ -1,0 +1,86 @@
+/* Pixelkiez Analyse – Ergänzungen für Anfrageablauf und Hinweise. Baut auf den Tokens aus styles.css auf. */
+.request .section-head { margin-bottom: clamp(28px, 4vw, 40px); }
+.request-form { justify-items: start; margin-top: 0; }
+.request-notice { margin-bottom: 20px; padding: 14px 16px; border-radius: 12px; background: var(--accent-soft); font-size: 15px; color: var(--ink-70); }
+.request-grid { display: grid; grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); gap: clamp(28px, 5vw, 64px); align-items: start; }
+@media (max-width: 960px) { .request-grid { grid-template-columns: minmax(0, 1fr); } }
+.request-side { display: grid; gap: 18px; align-content: start; }
+.request-h { font-size: 22px; letter-spacing: -.02em; line-height: 1.25; }
+.request-notes { display: grid; gap: 10px; margin: 0; padding: 0 0 0 18px; font-size: 15px; color: var(--ink-70); }
+.request-small { font-size: 14px; color: var(--ink-45); }
+.request-link { text-decoration: underline; text-underline-offset: 3px; }
+.request-link:hover { color: var(--accent-text); }
+.request-break { overflow-wrap: anywhere; }
+.request-ref { font-size: 17px; }
+.request-ref b { font-weight: 500; letter-spacing: .04em; }
+.consent { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; font-size: 15px; cursor: pointer; }
+.consent input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--ink); }
+.consent input:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.consent a { text-decoration: underline; text-underline-offset: 3px; }
+.consent a:hover, .hero-note a:hover { color: var(--accent-text); }
+/* Fehlertexte an Formularfeldern: dunkleres Rot als --bad, damit 14 px Text auch auf Papier den Kontrast 4,5:1 erreicht (WCAG AA) */
+.form-error { color: #B42318; }
+/* Hero: AGB-Häkchen (Pflicht, nie vorausgewählt) und Hinweis unter dem Eingabefeld – kompakt, der Hero bleibt im ersten Bildschirm */
+.consent--hero { min-height: 24px; gap: 10px; align-items: center; line-height: 1.4; color: var(--ink-70); text-align: left; }
+.consent--hero input { margin: 0; }
+.hero-note { margin-top: -4px; font-size: 14px; line-height: 1.4; color: var(--ink-70); }
+.hero-note a { text-decoration: underline; text-underline-offset: 3px; }
+
+/* Hero: Überschrift und Website-Eingabe stehen beim Öffnen vollständig im ersten Bildschirm.
+   Der Hero füllt die Fensterhöhe unter der Navigation (72 px); Schrift und Abstände richten sich auch nach der Höhe. */
+.hero { min-height: calc(100vh - 72px); min-height: calc(100svh - 72px); align-content: center; gap: clamp(12px, 2.4svh, 28px); padding-block: clamp(20px, 4svh, 64px); }
+.hero .h1 { font-size: clamp(46px, min(7.4vw, 10.5svh), 104px); }
+.hero .lead { color: var(--ink-70); }
+.hero .analyze { margin-top: clamp(0px, 1svh, 12px); gap: clamp(10px, 1.6svh, 14px); }
+.hero .url-field { border-color: var(--ink-45); box-shadow: 0 10px 30px rgb(12 12 12 / .08); }
+.hero .url-field input { color: var(--ink); }
+.hero .url-field input::placeholder { color: var(--ink-70); }
+.hero .facts { color: var(--ink-70); }
+@media (max-width: 620px) {
+  .hero .h1 { font-size: clamp(34px, min(12vw, 6.2svh), 46px); }
+  .hero .lead { font-size: clamp(16px, 2.3svh, 18px); }
+}
+
+/* Rechtsseiten (Impressum, Datenschutz) */
+.legal-body { display: grid; gap: 12px; max-width: 68ch; color: var(--ink-70); }
+.legal-h { margin-top: 18px; font-size: 20px; letter-spacing: -.01em; line-height: 1.3; color: var(--ink); }
+.legal-h:first-child { margin-top: 0; }
+
+/* Längerer Name 360°Pixelkiez: auf schmalen Handys entfällt der Zusatz „Analyse“ im Navigationslogo, damit der Button in der Pille bleibt */
+@media (max-width: 379px) { .nav .logo span { display: none; } }
+
+/* Video unter dem Hero: zentriertes Widget mit abgerundeten Ecken, nicht über die ganze Breite */
+.showcase { padding: 0 var(--gutter) clamp(56px, 8vw, 104px); }
+.showcase-media { width: min(100%, 960px); margin: 0 auto; }
+.showcase-frame { overflow: hidden; isolation: isolate; border-radius: clamp(14px, 2vw, 24px); background: #0E1416; box-shadow: 0 24px 60px rgb(12 12 12 / .16); }
+.showcase-video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; }
+.showcase-note { margin-top: 14px; text-align: center; font: 400 12px var(--font-mono); color: var(--ink-45); }
+/* Zweites Video rechts neben dem Text im Abschnitt „Ihr Bericht“ (Spalte aus .split); quadratisch, höchstens 560 px */
+.report-media { width: 100%; max-width: 560px; min-width: 0; margin: 0; justify-self: center; }
+.showcase-video--square { aspect-ratio: 1 / 1; }
+
+/* Startseite: Schritte („So funktioniert's“) als lila Karten, Bereiche („Was wir prüfen“) als Pfirsich-Karten.
+   Farben und Linien kommen aus .cw-lilac bzw. .cw-peach (styles.css). */
+.steps--cards { gap: clamp(12px, 1.6vw, 20px); }
+.steps--cards .step, .steps--cards .step:first-child { padding: clamp(22px, 2.6vw, 32px); border: 1px solid var(--line-soft); border-radius: clamp(14px, 2vw, 24px); }
+.steps--cards .step p, .spec--cards .spec-row p { color: var(--ink-70); }
+.spec--cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(12px, 1.6vw, 20px); border-bottom: 0; }
+.spec--cards .spec-row { grid-template-columns: minmax(0, 1fr); gap: 14px; align-content: start; padding: clamp(22px, 2.6vw, 32px); border: 1px solid var(--line-soft); border-radius: clamp(14px, 2vw, 24px); }
+@media (max-width: 860px) { .spec--cards { grid-template-columns: minmax(0, 1fr); } }
+
+/* Karten in der Farbe ihres Abschnitts (keine neue Farbe): Umriss in der Linienfarbe des Abschnitts */
+.uses--cards { gap: clamp(10px, 1.2vw, 14px); border-bottom: 0; }
+.uses--cards .use { padding: clamp(18px, 2vw, 24px); border: 1px solid var(--line); border-radius: clamp(14px, 1.6vw, 20px); }
+.why--cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(12px, 1.6vw, 20px); border-bottom: 0; }
+.why--cards .why-item { padding: clamp(22px, 2.6vw, 32px); border: 1px solid var(--line); border-radius: clamp(14px, 2vw, 24px); }
+.uses--cards .use p, .why--cards .why-item p { color: var(--ink-70); }
+.steps--cards .step h3, .spec--cards .spec-row h3, .uses--cards .use h3, .why--cards .why-item h3 { line-height: 1.25; }
+@media (max-width: 860px) { .why--cards { grid-template-columns: minmax(0, 1fr); } }
+
+/* Scrollen: Sprungziele landen unter der festen Navigation; Navigation mit feinem Schatten, sobald gescrollt wird */
+section[id] { scroll-margin-top: 88px; }
+.nav { transition: max-width .3s var(--ease), padding .3s var(--ease), box-shadow .3s var(--ease); }
+.nav-wrap.is-scrolled .nav { box-shadow: 0 10px 30px rgb(12 12 12 / .07); }
+/* Sanftes Einblenden beim Scrollen; die Klassen setzt app.js (nicht bei „Bewegung reduzieren“) */
+.reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s var(--ease), transform .7s var(--ease); transition-delay: var(--reveal-delay, 0ms); }
+.reveal.is-visible { opacity: 1; transform: none; }

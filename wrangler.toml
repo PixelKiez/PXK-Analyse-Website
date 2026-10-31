@@ -1,0 +1,19 @@
+# 360°Pixelkiez – Cloudflare Pages: statische Website aus public/ und eine Pages Function unter /api/* (functions/api/).
+# Gilt nur für `wrangler pages …` im Repository-Root. Der API-Worker hat eine eigene Konfiguration (worker/wrangler.toml);
+# `wrangler deploy` im Root warnt („Pages project“) und bricht ohne Worker-Einstiegspunkt ab.
+# Keine Secrets, keine Variablen: Die Website enthält keine Logik außer der Weiterleitung von /api/* an den Worker.
+# Deploy nur mit eigener Freigabe für genau einen Commit-SHA (docs/deploy-cloudflare-pages.md).
+name = "pxwa"
+pages_build_output_dir = "./public"
+compatibility_date = "2026-07-30"
+
+# Produktion (und lokale Entwicklung): /api/* geht über ein internes Service Binding an den privaten Worker pxwa-api.
+# Der Worker hat keine öffentliche Adresse (workers_dev = false, keine Route).
+[[services]]
+binding = "API"
+service = "pxwa-api"
+
+# Vorschau-Deployments (andere Branches, *.pxwa.pages.dev) bekommen bewusst kein Binding: /api/* antwortet dort mit 503,
+# Vorschau-Code erreicht den produktiven Worker und die D1-Daten nicht. Wranglers Hinweis „services … not inherited“ ist gewollt.
+[env.preview]
+services = []

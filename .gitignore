@@ -1,1 +1,16 @@
 .DS_Store
+# Abhängigkeiten und lokale Wrangler-/Miniflare-Daten
+node_modules/
+.wrangler/
+# Lokale Worker-Secrets (wrangler dev) – nie committen
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+# Video-Quelldateien im Repository-Root (nicht versioniert)
+/*.mp4
+# public/media/: versioniert sind genau die vier freigegebenen Website-Medien; alles andere dort bleibt ignoriert
+public/media/*
+!public/media/360-pixelkiez-video-1080p.mp4
+!public/media/360-pixelkiez-video-poster.jpg
+!public/media/report-pdf-de-1x1.mp4
+!public/media/report-pdf-poster.jpg
