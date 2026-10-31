@@ -1,16 +1,18 @@
-/* Lokale Test-Umgebung für PXWA – nur Mocks, keine echten Provider.
+/* Lokale Test-Umgebung für PXWA – nur Mocks, keine echten Provider (kein Cloudflare-Konto, kein Google, kein Resend).
    - API-Worker in workerd (Miniflare) mit lokaler D1-Datenbank (SQLite, im Speicher), Bundle per esbuild aus worker/src
    - Mock-Google: Token-Endpunkt (prüft client_secret, redirect_uri, PKCE, Einmal-Code) und JWKS mit Testschlüssel
-   - Mock-Mail-API (HTTPS-Mail-API-Ersatz): prüft Bearer-Token, zählt angenommene Nachrichten, kann 503/422 liefern
-   - Caddy mit deploy/railway/Caddyfile als statischer Ursprung (Railway-Ersatz) und ein Edge-Proxy als Cloudflare-Ersatz:
-     /api/* → Worker, alles andere → Caddy (wie die Cloudflare-Route <domain>/api/*)
+   - Mock-Resend: Vertrag von POST https://api.resend.com/emails (User-Agent, Bearer-Token, JSON-Schema, Idempotency-Key,
+     Fehlerantworten { statusCode, name, message }); kann Fehler, Verbindungsabbruch und ausbleibende Antworten simulieren
+   - Pages Function: mit `wrangler pages functions build` kompiliert und in workerd ausgeführt (Vertrag an der Binding-Grenze)
+   - Lokales Cloudflare Pages: `wrangler pages dev` mit public/, _routes.json, _headers und functions/ aus dem Repository,
+     optional mit dem API-Worker in derselben Sitzung, verbunden über das Service Binding API wie in Produktion
    Die Google-Autorisierungsseite selbst wird nicht nachgebaut: Tests lesen state/nonce/code_challenge aus der
    Weiterleitungs-URL und rufen den Callback so auf, wie Google es nach erfolgreicher Anmeldung täte. */
 import http from 'node:http';
 import net from 'node:net';
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
-import { generateKeyPairSync, createHash, sign, randomBytes } from 'node:crypto';
-import { mkdtempSync, rmSync, readFileSync, cpSync, mkdirSync, existsSync } from 'node:fs';
+import { generateKeyPairSync, createHash, sign, randomBytes, randomUUID } from 'node:crypto';
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,16 +21,19 @@ export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CLIENT_ID = 'pxwa-test-client.apps.googleusercontent.com';
 export const CLIENT_SECRET = 'test-only-secret';
 export const MAIL_TOKEN = 'test-only-mail-token';
-export const MAIL_FROM = 'analyse@pixelkiez.de';
+export const MAIL_FROM = 'analyse@notify.pixelkiez.de';
 export const NOTIFY_TO = 'kontakt@pixelkiez.de';
 export const CUSTOMER = 'kunde@beispiel-kunde.de';
 export const GOOGLE_AUTH = 'https://accounts.google.com/o/oauth2/v2/auth';
+export const PRODUCTION_BASE = 'https://360.pixelkiez.de';
 
 const load = async name => { try { return await import(name); } catch { return null; } };
 const miniflare = await load('miniflare');
 const esbuild = await load('esbuild');
 export const workerAvailable = Boolean(miniflare && esbuild);
-export const caddyAvailable = spawnSync('caddy', ['version']).status === 0;
+const WRANGLER = join(ROOT, 'node_modules/.bin/wrangler');
+export const wranglerAvailable = existsSync(WRANGLER);
+const wranglerEnv = (extra = {}) => ({ ...process.env, WRANGLER_SEND_METRICS: 'false', ...extra });
 
 const b64url = b => Buffer.from(b).toString('base64url');
 export const freePort = () => new Promise(r => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => r(p)); }); });
@@ -117,30 +122,74 @@ export function mockGoogle() {
   };
 }
 
-/* ---------- Mock-Mail-API ---------- */
+/* ---------- Mock-Resend ---------- */
 
-/* mode: 'ok' | 'fail' (503, vorübergehend) | 'reject' (422, dauerhaft) */
-export function mockMailApi() {
-  const state = { mode: 'ok', accepted: [], attempts: 0, requests: [] };
+/* Antwortet wie POST https://api.resend.com/emails laut Dokumentation: ohne User-Agent 403, ohne/mit falschem Bearer-Token 401,
+   Schemafehler 422, Idempotency-Key (1–256 Zeichen): gleiche Anfrage erneut → gleiche Antwort ohne zweite Mail,
+   anderer Inhalt → 409 invalid_idempotent_request. Erfolgreich: 200 { id }.
+   mode: 'ok' | 'fail' (503) | 'error' (500) | 'ratelimit' (429) | 'quota' (429 Tageskontingent) | 'busy' (409 parallel)
+         | 'forbidden' (403 Domain nicht verifiziert) | 'reject' (422) | 'auth' (401)
+         | 'drop' (nimmt an, trennt dann die Verbindung) | 'hang' (nimmt an, antwortet nie) */
+const RESEND_FIELDS = ['from', 'to', 'subject', 'bcc', 'cc', 'reply_to', 'html', 'text', 'headers', 'attachments', 'tags', 'scheduled_at', 'template'];
+const RESEND_ERRORS = {
+  fail: [503, 'service_unavailable', 'API is temporarily unavailable'], error: [500, 'application_error', 'An unexpected error occurred.'],
+  ratelimit: [429, 'rate_limit_exceeded', 'Too many requests. Please limit the number of requests per second.'],
+  quota: [429, 'daily_quota_exceeded', 'You have exceeded your daily email sending quota.'],
+  busy: [409, 'concurrent_idempotent_requests', 'There is another request in progress with the same key.'],
+  forbidden: [403, 'validation_error', 'The notify.pixelkiez.de domain is not verified.'],
+  reject: [422, 'validation_error', 'Invalid `to` field. kontakt@pixelkiez.de'], auth: [401, 'validation_error', 'API key is invalid'],
+};
+const addresses = v => (typeof v === 'string' ? [v] : Array.isArray(v) ? v : null);
+const isAddress = v => typeof v === 'string' && /^(?:[^<>]+ <)?[^\s@<>]+@[^\s@<>]+\.[a-z]{2,}>?$/i.test(v);
+function resendSchemaProblem(json) {
+  if (typeof json !== 'object' || json === null || Array.isArray(json)) return 'body must be an object';
+  const unknown = Object.keys(json).filter(k => !RESEND_FIELDS.includes(k));
+  if (unknown.length) return `unknown field ${unknown[0]}`;
+  if (!isAddress(json.from)) return 'from';
+  const to = addresses(json.to);
+  if (!to || to.length < 1 || to.length > 50 || !to.every(isAddress)) return 'to';
+  if (typeof json.subject !== 'string' || !json.subject) return 'subject';
+  if (typeof json.text !== 'string' && typeof json.html !== 'string') return 'text or html';
+  if (json.reply_to !== undefined && !(addresses(json.reply_to) ?? []).every(isAddress)) return 'reply_to';
+  return null;
+}
+
+export function mockResend() {
+  const state = { mode: 'ok', accepted: [], attempts: 0, requests: [], keys: new Map() };
+  const json = (res, status, body) => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
+  const error = (res, statusCode, name, message) => json(res, statusCode, { statusCode, name, message });
   const server = http.createServer(async (req, res) => {
     const raw = (await readBody(req)).toString('utf8');
     const url = new URL(req.url, 'http://mock');
-    if (req.method !== 'POST' || url.pathname !== '/v1/send') { res.writeHead(404); return res.end(); }
+    if (url.pathname !== '/emails') return error(res, 404, 'not_found', 'The requested endpoint does not exist.');
+    if (req.method !== 'POST') return error(res, 405, 'method_not_allowed', 'Method is not allowed for the requested path.');
     state.attempts++;
     state.requests.push({ headers: req.headers, raw });
-    if (req.headers.authorization !== `Bearer ${MAIL_TOKEN}`) { res.writeHead(401); return res.end('{"error":"unauthorized"}'); }
-    if (state.mode === 'fail') { res.writeHead(503, { 'content-type': 'application/json' }); return res.end('{"error":"try again later"}'); }
-    if (state.mode === 'reject') { res.writeHead(422, { 'content-type': 'application/json' }); return res.end('{"error":"invalid"}'); }
-    let json;
-    try { json = JSON.parse(raw); } catch { res.writeHead(400); return res.end(); }
-    state.accepted.push({ ...json, idempotencyKey: req.headers['idempotency-key'], contentType: req.headers['content-type'] });
-    res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ id: 'mock-' + state.accepted.length }));
+    if (!req.headers['user-agent']) { res.writeHead(403, { 'content-type': 'text/plain' }); return res.end('error code: 1010'); }
+    if (!req.headers.authorization) return error(res, 401, 'missing_api_key', 'Missing API key in the authorization header.');
+    if (req.headers.authorization !== `Bearer ${MAIL_TOKEN}`) return error(res, 401, 'validation_error', 'API key is invalid');
+    if (RESEND_ERRORS[state.mode]) return error(res, ...RESEND_ERRORS[state.mode]);
+    if (!/^application\/json/.test(req.headers['content-type'] || '')) return error(res, 422, 'validation_error', 'Content-Type must be application/json');
+    let body;
+    try { body = JSON.parse(raw); } catch { return error(res, 422, 'validation_error', 'Invalid JSON'); }
+    const problem = resendSchemaProblem(body);
+    if (problem) return error(res, 422, 'validation_error', `Invalid ${problem}`);
+    const key = req.headers['idempotency-key'];
+    if (key !== undefined && (key.length < 1 || key.length > 256)) return error(res, 400, 'invalid_idempotency_key', 'Idempotency keys, if present, must have between 1 and 256 characters.');
+    const seen = key && state.keys.get(key);
+    if (seen && seen.raw !== raw) return error(res, 409, 'invalid_idempotent_request', 'This idempotency key has been used on a request that had a different payload.');
+    if (seen) return json(res, 200, { id: seen.id });   // gleiche Anfrage: gleiche Antwort, keine zweite Mail
+    const id = randomUUID();
+    state.accepted.push({ ...body, id, idempotencyKey: key, contentType: req.headers['content-type'], userAgent: req.headers['user-agent'] });
+    if (key) state.keys.set(key, { raw, id });
+    if (state.mode === 'drop') return req.socket.destroy();
+    if (state.mode === 'hang') return;
+    json(res, 200, { id });
   });
   return {
     state,
-    async start() { this.port = await listen(server); this.origin = `http://127.0.0.1:${this.port}`; this.url = `${this.origin}/v1/send`; return this; },
-    reset() { state.mode = 'ok'; state.accepted.length = 0; state.requests.length = 0; state.attempts = 0; },
+    async start() { this.port = await listen(server); this.origin = `http://127.0.0.1:${this.port}`; this.url = `${this.origin}/emails`; return this; },
+    reset() { state.mode = 'ok'; state.accepted.length = 0; state.requests.length = 0; state.attempts = 0; state.keys.clear(); },
     stop: () => new Promise(r => { server.closeAllConnections?.(); server.close(r); }),
   };
 }
@@ -159,7 +208,7 @@ async function bundle() {
   return bundled.outfile;
 }
 
-const COMPATIBILITY_DATE = /^compatibility_date\s*=\s*"([^"]+)"/m.exec(readFileSync(join(ROOT, 'worker/wrangler.toml'), 'utf8'))[1];
+export const COMPATIBILITY_DATE = /^compatibility_date\s*=\s*"([^"]+)"/m.exec(readFileSync(join(ROOT, 'worker/wrangler.toml'), 'utf8'))[1];
 export const MIGRATION = readFileSync(join(ROOT, 'worker/migrations/0001_init.sql'), 'utf8');
 const statements = sql => sql.replace(/^\s*--.*$/gm, '').split(';').map(s => s.trim()).filter(Boolean);
 
@@ -210,65 +259,114 @@ export async function startWorker({ google, mail, base, scheme = 'http', authEnd
   return app;
 }
 
-/* ---------- Statischer Ursprung (Caddy, wie auf Railway) und Edge (wie die Cloudflare-Route) ---------- */
+/* ---------- Cloudflare Pages: Artefakt, kompilierte Function, lokale Pages-Sitzung ---------- */
 
-/* Dateien, die ins Railway-Artefakt gehen: versionierte bzw. nicht ignorierte Dateien in public/ ohne public/media/ (.dockerignore) */
-export const artifactFiles = () => execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', 'public'], { cwd: ROOT, encoding: 'utf8' })
-  .split('\n').filter(f => f && existsSync(join(ROOT, f)) && !f.startsWith('public/media/') && !f.endsWith('.DS_Store')).map(f => f.slice('public/'.length)).sort();
+/* Was `wrangler pages deploy` aus public/ NICHT als Datei hochlädt (Konfiguration verarbeitet Pages gesondert) – wie in Wrangler */
+export const PAGES_IGNORED = [/^_worker\.js$/, /^_redirects$/, /^_headers$/, /^_routes\.json$/, /^functions(\/|$)/, /(^|\/)\.DS_Store$/, /(^|\/)node_modules(\/|$)/, /(^|\/)\.git(\/|$)/, /^\.wrangler(\/|$)/];
 
-/* media: lokale Testkopie der Videos aus public/media/ ergänzen (Ersatz für den späteren Medien-Dienst; nicht Teil des Artefakts) */
-export function siteRoot({ media = false } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'pxwa-site-'));
-  for (const f of artifactFiles()) { mkdirSync(dirname(join(dir, f)), { recursive: true }); cpSync(join(ROOT, 'public', f), join(dir, f)); }
-  if (media && existsSync(join(ROOT, 'public/media'))) cpSync(join(ROOT, 'public/media'), join(dir, 'media'), { recursive: true });
-  return dir;
+/* Dateien in public/, die ein Upload von genau diesem Arbeitsstand ausliefern würde (inkl. nicht versionierter Medien) */
+export function uploadFiles() {
+  const out = [];
+  const walk = dir => {
+    for (const name of readdirSync(join(ROOT, 'public', dir))) {
+      const rel = dir ? `${dir}/${name}` : name;
+      if (PAGES_IGNORED.some(re => re.test(rel))) continue;
+      if (statSync(join(ROOT, 'public', rel)).isDirectory()) walk(rel); else out.push(rel);
+    }
+  };
+  walk('');
+  return out.sort();
 }
 
-export async function startCaddy(root) {
+/* Versionierte bzw. nicht ignorierte Dateien in public/ (das, was ein Commit enthält) */
+export const artifactFiles = () => execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', 'public'], { cwd: ROOT, encoding: 'utf8' })
+  .split('\n').filter(f => f && existsSync(join(ROOT, f)) && !f.endsWith('.DS_Store')).map(f => f.slice('public/'.length)).sort();
+
+/* functions/ mit Wrangler kompilieren (wie beim Pages-Deploy); liefert Skript und die von Wrangler erzeugten Routen */
+let compiled = null;
+export function buildPagesFunctions() {
+  if (!compiled) {
+    const dir = mkdtempSync(join(tmpdir(), 'pxwa-functions-'));
+    const routes = join(dir, 'routes.json');
+    const r = spawnSync(WRANGLER, ['pages', 'functions', 'build', '--outdir', join(dir, 'out'), '--output-routes-path', routes, '--compatibility-date', COMPATIBILITY_DATE],
+      { cwd: ROOT, env: wranglerEnv(), encoding: 'utf8' });
+    if (r.status !== 0) throw new Error('wrangler pages functions build: ' + r.stdout + r.stderr);
+    compiled = { dir: join(dir, 'out'), script: join(dir, 'out', 'index.js'), routes: JSON.parse(readFileSync(routes, 'utf8')) };
+    process.once('exit', () => rmSync(dir, { recursive: true, force: true }));
+  }
+  return compiled;
+}
+
+/* Kompilierte Pages Function in workerd. api: Skript eines Workers hinter dem Service Binding API; null = kein Binding (Vorschau) */
+export async function startPagesFunction({ api = null } = {}) {
+  const fn = buildPagesFunctions();
+  const workers = [{
+    name: 'pages', modules: true, scriptPath: fn.script, modulesRoot: fn.dir, compatibilityDate: COMPATIBILITY_DATE,
+    serviceBindings: { ...(api ? { API: 'pxwa-api' } : {}), ASSETS: () => new Response('statische Datei', { status: 200 }) },
+  }];
+  if (api) workers.push({ name: 'pxwa-api', modules: true, script: api, compatibilityDate: COMPATIBILITY_DATE });
+  const mf = new miniflare.Miniflare({ workers });
+  await mf.ready;
+  return { fetch: (url, init) => mf.dispatchFetch(url, init), stop: () => mf.dispose() };
+}
+
+/* Lokales Cloudflare Pages (`wrangler pages dev` mit wrangler.toml aus dem Root). worker: true startet den API-Worker aus
+   worker/wrangler.toml in derselben Sitzung (-c … -c …), erreichbar nur über das Service Binding API. Seine [vars] werden
+   durch Testwerte ersetzt (lokaler Modus, Mock-Google, Mock-Resend); D1 ist lokal, mit `wrangler d1 migrations apply --local`.
+   worker: false: nur die Website, das Binding ist dann nicht verbunden. */
+export async function startPages({ google, mail, worker = true, env = {} } = {}) {
   const port = await freePort();
-  const home = mkdtempSync(join(tmpdir(), 'pxwa-caddy-'));
-  const proc = spawn('caddy', ['run', '--config', join(ROOT, 'deploy/railway/Caddyfile'), '--adapter', 'caddyfile'], {
-    env: { ...process.env, PORT: String(port), SITE_ROOT: root, XDG_DATA_HOME: home, XDG_CONFIG_HOME: home, HOME: home }, stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  const base = `http://127.0.0.1:${port}`;
+  const dir = mkdtempSync(join(tmpdir(), 'pxwa-pages-'));
+  const state = join(dir, 'state');
+  /* Ein einzelnes -c lehnt Wrangler für Pages ab; ohne -c gilt wrangler.toml im Root, mit Worker beide Dateien */
+  const args = ['pages', 'dev'];
+  const authEndpoint = google ? `${google.origin}/auth` : GOOGLE_AUTH;
+  if (worker) {
+    const vars = {
+      ENV: 'local', BASE_URL: base, GOOGLE_CLIENT_ID: CLIENT_ID, GOOGLE_CLIENT_SECRET: CLIENT_SECRET, GOOGLE_AUTH_ENDPOINT: authEndpoint,
+      GOOGLE_TOKEN_ENDPOINT: `${google.origin}/token`, GOOGLE_JWKS_URI: `${google.origin}/certs`, SECRET: randomBytes(32).toString('hex'),
+      PRIVACY_VERSION: 'TEST-2026-10-31', MAIL_API_URL: mail.url, MAIL_API_TOKEN: MAIL_TOKEN, MAIL_FROM, MAIL_NOTIFY_TO: NOTIFY_TO, ...env,
+    };
+    const toml = readFileSync(join(ROOT, 'worker/wrangler.toml'), 'utf8')
+      .replace(/^main = .*$/m, `main = ${JSON.stringify(join(ROOT, 'worker/src/index.ts'))}`)
+      .replace(/^migrations_dir = .*$/m, `migrations_dir = ${JSON.stringify(join(ROOT, 'worker/migrations'))}`)
+      .replace(/^\[vars\][\s\S]*?(?=^\[)/m, '[vars]\n' + Object.entries(vars).filter(([, v]) => v !== undefined).map(([k, v]) => `${k} = ${JSON.stringify(v)}`).join('\n') + '\n\n');
+    writeFileSync(join(dir, 'worker.toml'), toml);
+    const m = spawnSync(WRANGLER, ['d1', 'migrations', 'apply', 'pxwa', '--local', '--persist-to', state, '-c', join(dir, 'worker.toml')], { cwd: ROOT, env: wranglerEnv(), encoding: 'utf8' });
+    if (m.status !== 0) throw new Error('wrangler d1 migrations apply: ' + m.stdout + m.stderr);
+    args.push('-c', 'wrangler.toml', '-c', join(dir, 'worker.toml'));
+    google.setRedirectUri(`${base}/api/auth/callback`);
+  }
+  args.push('--ip', '127.0.0.1', '--port', String(port), '--inspector-port', String(await freePort()), '--persist-to', state, '--show-interactive-dev-session=false');
+  /* Eigene Prozessgruppe (zum vollständigen Beenden) und eigene Dev-Registry (parallele Sitzungen verbinden sich nicht) */
+  const proc = spawn(WRANGLER, args, { cwd: ROOT, env: wranglerEnv({ WRANGLER_REGISTRY_PATH: join(dir, 'registry') }), stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   let logs = '';
   proc.stdout.on('data', d => { logs += d; });
   proc.stderr.on('data', d => { logs += d; });
-  const url = `http://127.0.0.1:${port}`;
-  await waitFor(async () => { try { return (await fetch(url + '/index.html')).ok; } catch { return false; } }, { timeout: 10000, what: 'Caddy-Start' });
-  return {
-    url, logs: () => logs,
-    async stop() { proc.kill(); await new Promise(r => proc.exitCode !== null ? r() : proc.once('exit', r)); rmSync(home, { recursive: true, force: true }); },
+  await waitFor(async () => {
+    if (proc.exitCode !== null) throw new Error('wrangler pages dev beendet: ' + logs);
+    try { await fetch(base + '/', { redirect: 'manual', signal: AbortSignal.timeout(2000) }); return true; } catch { return false; }
+  }, { timeout: 60000, what: 'wrangler pages dev' });
+  const { DatabaseSync } = await import('node:sqlite');
+  const d1 = join(state, 'v3/d1/miniflare-D1DatabaseObject');
+  const withDb = fn => {
+    const file = readdirSync(d1).find(f => f.endsWith('.sqlite') && f !== 'metadata.sqlite');
+    const db = new DatabaseSync(join(d1, file));
+    try { return fn(db); } finally { db.close(); }
   };
-}
-
-const HOP = new Set(['host', 'connection', 'keep-alive', 'transfer-encoding', 'content-length', 'upgrade', 'te', 'trailer', 'proxy-connection']);
-
-export async function startEdge({ port, worker, origin }) {
-  const server = http.createServer(async (req, res) => {
-    try {
-      const body = await readBody(req);
-      const headers = {};
-      for (const [k, v] of Object.entries(req.headers)) if (!HOP.has(k)) headers[k] = Array.isArray(v) ? v.join(', ') : v;
-      const init = { method: req.method, headers, body: ['GET', 'HEAD'].includes(req.method) ? undefined : body, redirect: 'manual' };
-      let r;
-      if (req.url.startsWith('/api/')) {
-        headers['cf-connecting-ip'] = req.socket.remoteAddress.replace(/^::ffff:/, '');
-        r = await worker.fetch(`http://127.0.0.1:${port}${req.url}`, init);
-      } else {
-        r = await fetch(origin + req.url, init);
-      }
-      res.statusCode = r.status;
-      for (const [k, v] of r.headers) if (!HOP.has(k) && k !== 'set-cookie' && k !== 'content-encoding') res.setHeader(k, v);
-      const cookies = r.headers.getSetCookie();
-      if (cookies.length) res.setHeader('set-cookie', cookies);
-      res.end(Buffer.from(await r.arrayBuffer()));
-    } catch {
-      res.statusCode = 502;
-      res.end();
-    }
-  });
-  await listen(server, port);
-  return { url: `http://127.0.0.1:${port}`, stop: () => new Promise(r => { server.closeAllConnections?.(); server.close(r); }) };
+  return {
+    base, authEndpoint,
+    logs: () => logs,
+    fetch: (url, init) => fetch(url, init),
+    sql: (q, ...params) => withDb(db => db.prepare(q).all(...params).map(r => ({ ...r }))),
+    exec: q => withDb(db => db.exec(q)),
+    async stop() {
+      try { process.kill(-proc.pid, 'SIGTERM'); } catch { /* bereits beendet */ }
+      await new Promise(r => (proc.exitCode !== null || proc.signalCode !== null ? r() : proc.once('exit', r)));
+      rmSync(dir, { recursive: true, force: true });
+    },
+  };
 }
 
 /* ---------- HTTP-Client mit Cookie-Speicher (wie ein Browser, ohne JavaScript), direkt gegen den Worker ---------- */

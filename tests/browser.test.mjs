@@ -1,17 +1,18 @@
-/* PXWA – Browser-Prüfungen (Chromium über Playwright) gegen den lokalen Nachbau der Zielarchitektur:
-   Caddy mit deploy/railway/Caddyfile (Railway-Ersatz) und Edge-Proxy (Cloudflare-Route /api/* → API-Worker in workerd mit D1).
+/* PXWA – Browser-Prüfungen (Chromium, optional WebKit, über Playwright) gegen lokales Cloudflare Pages:
+   `wrangler pages dev` mit public/, _routes.json, _headers und der Pages Function; /api/* geht über das Service Binding an den
+   API-Worker (workerd, lokale D1). Das ist eine lokale Nachbildung, kein Test gegen echtes Cloudflare.
    Playwright ist bewusst keine Projekt-Abhängigkeit:
      PXK_PLAYWRIGHT=/pfad/zu/node_modules/playwright [PXK_AXE=/pfad/zu/axe.min.js] [PXK_SCREENSHOT_DIR=…] node --test tests/browser.test.mjs
    Die Google-Anmeldeseite ersetzt ein lokaler Mock-Endpunkt (/auth), der sofort mit einem Einmal-Code zurückleitet,
    so wie Google es nach erfolgreicher Anmeldung täte. (Playwright-Routen greifen bei Redirect-Zielen nicht.)
-   Die Videos kommen aus der lokalen Testkopie in public/media/ (nicht Teil des Artefakts).
-   Ohne Playwright, Caddy oder Worker-Abhängigkeiten: NOT_RUN statt bestanden. */
+   Die Videos kommen aus der lokalen, nicht versionierten Kopie in public/media/.
+   Ohne Playwright, Wrangler oder Worker-Abhängigkeiten: NOT_RUN statt bestanden. */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, rmSync, existsSync } from 'node:fs';
+import { mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { mockGoogle, mockMailApi, startWorker, startCaddy, startEdge, siteRoot, freePort, waitFor, workerAvailable, caddyAvailable, ROOT } from './lib/harness.mjs';
+import { mockGoogle, mockResend, startPages, waitFor, workerAvailable, wranglerAvailable, ROOT } from './lib/harness.mjs';
 
 const SHOTS = process.env.PXK_SCREENSHOT_DIR || '';
 const AXE = process.env.PXK_AXE || '';
@@ -20,26 +21,21 @@ const pw = await (async () => {
   const dir = process.env.PXK_PLAYWRIGHT;
   try { return dir ? await import(pathToFileURL(join(dir, 'index.mjs')).href) : await import('playwright'); } catch { return null; }
 })();
-const skip = !pw ? 'NOT_RUN: Playwright nicht verfügbar (PXK_PLAYWRIGHT setzen)' : !workerAvailable ? 'NOT_RUN: miniflare/esbuild fehlen (npm ci)' : !caddyAvailable ? 'NOT_RUN: caddy fehlt' : false;
+const skip = !pw ? 'NOT_RUN: Playwright nicht verfügbar (PXK_PLAYWRIGHT setzen)' : !workerAvailable ? 'NOT_RUN: miniflare/esbuild fehlen (npm ci)' : !wranglerAvailable ? 'NOT_RUN: wrangler fehlt (npm ci)' : false;
 const skipVideo = skip || (!existsSync(join(ROOT, 'public/media/360-pixelkiez-video-1080p.mp4')) && 'NOT_RUN: lokale Videokopie in public/media/ fehlt');
 
-let google, mail, app, site, caddy, edge, browser;
+let google, mail, app, browser;
 before(async () => {
   if (skip) return;
   google = await mockGoogle().start();
-  mail = await mockMailApi().start();
-  site = siteRoot({ media: true });
-  caddy = await startCaddy(site);
-  const port = await freePort();
-  app = await startWorker({ google, mail, base: `http://127.0.0.1:${port}`, authEndpoint: `${google.origin}/auth` });
-  edge = await startEdge({ port, worker: app, origin: caddy.url });
+  mail = await mockResend().start();
+  app = await startPages({ google, mail });
   browser = await pw.chromium.launch();
   if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 });
 after(async () => {
   if (skip) return;
-  await browser.close(); await edge.stop(); await app.stop(); await caddy.stop(); await google.stop(); await mail.stop();
-  rmSync(site, { recursive: true, force: true });
+  await browser.close(); await app.stop(); await google.stop(); await mail.stop();
 });
 
 async function open(path, { width = 1440, height = 900, reducedMotion = 'reduce', bypassCSP = false } = {}) {
@@ -55,7 +51,7 @@ async function open(path, { width = 1440, height = 900, reducedMotion = 'reduce'
   });
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', e => errors.push(String(e)));
-  /* 'load' statt 'networkidle': Caddy beantwortet Video-Range-Anfragen mit 206, Chromium hält die Video-Anfrage (preload) dann offen */
+  /* 'load' statt 'networkidle': Video-Anfragen (preload) können länger offen bleiben */
   await page.goto(app.base + path, { waitUntil: 'load' });
   await page.evaluate(() => document.fonts.ready);
   return { context, page, errors, blocked };
@@ -83,7 +79,7 @@ async function tabTo(page, pred, max = 40) {
 
 test('Mobile Hauptansicht: kein horizontaler Überlauf, Formular sichtbar, Navigationsbutton in der Pille (320/390/768/1440)', { skip }, async t => {
   for (const width of [320, 390, 768, 1440]) {
-    for (const path of ['/index.html', '/pruefkriterien.html', '/api/anfrage', '/impressum.html', '/datenschutz.html']) {
+    for (const path of ['/index.html', '/pruefkriterien.html', '/api/anfrage', '/impressum.html', '/datenschutz.html', '/gibt/es/nicht']) {
       const { context, page, errors, blocked } = await open(path, { width, height: 800 });
       await page.$$eval('details', ds => ds.forEach(d => { d.open = true; }));
       assert.ok(await overflow(page) <= 0, `${path} ${width}: Überlauf`);
@@ -97,7 +93,9 @@ test('Mobile Hauptansicht: kein horizontaler Überlauf, Formular sichtbar, Navig
         assert.deepEqual(form, [true, true], `${path} ${width}: Eingabefeld und Button vollständig sichtbar`);
       }
       if (SHOTS) await page.screenshot({ path: join(SHOTS, `${path.slice(1).replace(/\W/g, '_')}-${width}.png`), fullPage: true });
-      assert.deepEqual(errors, [], `${path} ${width}: Konsolenfehler (inkl. CSP)`);
+      /* Die 404-Seite kommt korrekt mit Status 404; Chromium meldet das für das Dokument selbst als Konsolenfehler */
+      const expected = path === '/gibt/es/nicht' ? ['Failed to load resource: the server responded with a status of 404 (Not Found)'] : [];
+      assert.deepEqual(errors, expected, `${path} ${width}: Konsolenfehler (inkl. CSP)`);
       assert.deepEqual(blocked, [], `${path} ${width}: unerwartete Fremd-Requests`);
       await context.close();
     }
@@ -195,6 +193,43 @@ test('Video bei „Ihr Bericht“: rechts neben dem Text (mobil darunter), abger
   }
 });
 
+test('Safari-Engine (WebKit): Pages beantwortet Range-Anfragen mit 200 – dann steht statt einer schwarzen Fläche das Standbild in gleicher Größe da', { skip: skipVideo }, async t => {
+  let wk;
+  try { wk = await pw.webkit.launch(); } catch { t.skip('NOT_RUN: Playwright-WebKit nicht installiert (playwright install webkit)'); return; }
+  try {
+    for (const [width, height] of [[390, 844], [1440, 900]]) {
+      const ctx = await wk.newContext({ viewport: { width, height }, reducedMotion: 'no-preference' });
+      const page = await ctx.newPage();
+      const errors = [], ranges = [];
+      page.on('pageerror', e => errors.push(String(e)));
+      page.on('response', r => { if (r.url().endsWith('.mp4')) ranges.push(`${r.request().headers().range ?? 'ohne Range'} → ${r.status()}`); });
+      await page.goto(app.base + '/', { waitUntil: 'load' });
+      for (const sel of ['.showcase', '#bericht .showcase-frame']) {
+        await page.evaluate(s => document.querySelector(s).scrollIntoView({ block: 'center' }), sel);
+        /* Entweder läuft das Video (Server mit 206) oder das Poster ersetzt es (Server mit 200) – nie eine leere Fläche */
+        await page.waitForFunction(s => {
+          const e = document.querySelector(s).querySelector('.showcase-video');
+          return e.tagName === 'IMG' ? e.complete && e.naturalWidth > 0 : !e.paused && e.currentTime > 0.3;
+        }, sel, { timeout: 10000 });
+      }
+      const shown = await page.evaluate(() => [...document.querySelectorAll('.showcase-video')].map(e => {
+        const r = e.getBoundingClientRect(), f = e.closest('.showcase-frame').getBoundingClientRect();
+        return { tag: e.tagName, label: e.alt || e.getAttribute('aria-label'), fills: Math.abs(r.width - f.width) <= 1 && Math.abs(r.height - f.height) <= 1 };
+      }));
+      for (const e of shown) {
+        assert.ok(e.fills, `${width}: füllt den abgerundeten Rahmen`);
+        assert.match(e.label, /^Animierte/, `${width}: Alternativtext bleibt`);
+      }
+      assert.deepEqual(errors, [], `${width}: Skriptfehler`);
+      if (SHOTS) await page.screenshot({ path: join(SHOTS, `webkit-${width}.png`) });
+      t.diagnostic(`WebKit ${width}: ${shown.map(e => e.tag === 'IMG' ? 'Standbild' : 'Video').join(' + ')}; MP4-Antworten: ${ranges.join(', ')}`);
+      await ctx.close();
+    }
+  } finally {
+    await wk.close();
+  }
+});
+
 test('Scrollen: Inhalte blenden beim Hineinscrollen ein; oben nichts versteckt; ohne JavaScript und bei „Bewegung reduzieren“ alles sofort sichtbar', { skip }, async () => {
   const { context, page, errors } = await open('/index.html', { width: 1440, height: 900, reducedMotion: 'no-preference' });
   const info = await page.evaluate(() => ({ hiddenAbove: [...document.querySelectorAll('.reveal')].filter(e => e.getBoundingClientRect().top <= innerHeight).length, hiddenBelow: document.querySelectorAll('.reveal:not(.is-visible)').length }));
@@ -227,7 +262,7 @@ test('Tastatur: ungültige Eingabe bleibt im Feld; gültige Anfrage komplett per
     await page.keyboard.type('keine adresse');
     await page.keyboard.press('Enter');
     assert.equal(await page.isVisible('#url-error'), true);
-    assert.deepEqual(await page.evaluate(() => [document.activeElement.id, document.activeElement.getAttribute('aria-invalid'), location.pathname]), ['url', 'true', '/index.html']);
+    assert.deepEqual(await page.evaluate(() => [document.activeElement.id, document.activeElement.getAttribute('aria-invalid'), location.pathname]), ['url', 'true', '/'], 'Pages liefert /index.html unter / aus');
     await page.fill('#url', '');
     await page.keyboard.type('musterfirma.de');
     await Promise.all([page.waitForURL(`${app.base}/api/anfrage`), page.keyboard.press('Enter')]);

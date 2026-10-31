@@ -1,6 +1,0 @@
-# Railway-Build (deploy/railway/Dockerfile): nur ausgelieferte Dateien in den Build-Kontext
-*
-!public/
-!deploy/railway/Caddyfile
-public/media/
-**/.DS_Store

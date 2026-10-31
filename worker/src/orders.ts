@@ -67,6 +67,19 @@ export class OrderService {
   }
 }
 
+/* Löschung nach Frist – vorbereitet, aber nicht aktiv: Die Aufbewahrungsfrist (D-5) ist nicht entschieden, wrangler.toml
+   setzt ORDER_RETENTION_DAYS deshalb nicht. Gelöscht würden nur Aufträge, die Pixelkiez nach dem Versand des Berichts
+   manuell auf status = 'completed' gesetzt hat und deren Eingang länger als die Frist zurückliegt, samt Benachrichtigung.
+   Offene Aufträge (status 'received') bleiben unabhängig vom Alter erhalten. */
+export async function purgeCompletedOrders(db: Db, days: number, now: number): Promise<number> {
+  const before = utcText(now - days * 86400);
+  const [, deleted] = await db.batch<{ id: number }>([
+    ["DELETE FROM notifications WHERE order_id IN (SELECT id FROM orders WHERE status = 'completed' AND created_at < ?1)", [before]],
+    ["DELETE FROM orders WHERE status = 'completed' AND created_at < ?1 RETURNING id", [before]],
+  ]);
+  return deleted?.length ?? 0;
+}
+
 /* Referenz wie PXA-7K3M-Q9TD (Crockford-Base32 ohne I, L, O, U) */
 export function newReference(): string {
   const alphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';

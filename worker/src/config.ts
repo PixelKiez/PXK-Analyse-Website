@@ -9,10 +9,17 @@ export const GOOGLE_TOKEN = 'https://oauth2.googleapis.com/token';
 export const GOOGLE_JWKS = 'https://www.googleapis.com/oauth2/v3/certs';
 export const GOOGLE_ISSUERS = ['https://accounts.google.com', 'accounts.google.com'] as const;
 
-/* Hosts der HTTPS-Mail-APIs, an die Auftragsdaten (E-Mail-Adresse, Website) gehen dürfen. Ein Eintrag braucht eine
-   menschliche Freigabe des Anbieters (Auftragsverarbeitungsvertrag, Datenschutzerklärung). Solange die Liste leer ist,
-   ist die Produktionskonfiguration ungültig: Es werden keine Aufträge angenommen und keine Daten verschickt. */
-export const AUTHORIZED_MAIL_API_HOSTS: readonly string[] = [];
+/* Einzige produktive Adresse der Website (Cloudflare Pages, DNS bei Hostinger). Daraus folgt die
+   Google-Weiterleitungs-URI https://360.pixelkiez.de/api/auth/callback. */
+export const PRODUCTION_BASE_URL = 'https://360.pixelkiez.de';
+
+/* Hosts der HTTPS-Mail-APIs, an die Auftragsdaten (E-Mail-Adresse, Website) gehen dürfen. Freigegeben ist nur Resend
+   (Endpunkt /emails). Produktive Mails setzen zusätzlich die verifizierte Absenderdomain, den API-Key als Secret,
+   den Auftragsverarbeitungsvertrag und die fertige Datenschutzerklärung voraus. */
+export const AUTHORIZED_MAIL_API_HOSTS: readonly string[] = ['api.resend.com'];
+
+/* Absender nur aus der eigenen Versanddomain (bei Resend zu verifizieren, getrennt von den Postfächern unter pixelkiez.de) */
+export const AUTHORIZED_MAIL_FROM_DOMAINS: readonly string[] = ['notify.pixelkiez.de'];
 
 export const LIMITS = {
   startPerIp: [20, 600],         // Anfragestarts je IP: 20 in 10 Minuten
@@ -41,6 +48,8 @@ export interface Env {
   MAIL_API_TOKEN?: string;
   MAIL_FROM?: string;
   MAIL_NOTIFY_TO?: string;
+  /* Löschfrist erledigter Aufträge in Tagen. Nicht gesetzt = keine Löschung (Aufbewahrungsfrist D-5 offen). */
+  ORDER_RETENTION_DAYS?: string;
 }
 
 export interface GoogleConfig {
@@ -71,6 +80,7 @@ export interface Config {
   secret: string;
   privacyVersion: string;
   mail: MailConfig;
+  retentionDays: number | null;
   db: D1Database;
 }
 
@@ -95,7 +105,7 @@ export function loadConfig(env: Env): Config {
   const base = parseUrl(baseUrl);
   if (!base || baseUrl.endsWith('/') || base.search || base.hash || base.username || base.password
     || !(base.protocol === 'https:' || (local && base.protocol === 'http:'))
-    || (production && /(^|\.)example$|DOMAIN-FEHLT/i.test(base.hostname))) {
+    || (production && baseUrl !== PRODUCTION_BASE_URL)) {
     missing.push('BASE_URL');
   }
 
@@ -117,7 +127,8 @@ export function loadConfig(env: Env): Config {
   const secret = typeof env.SECRET === 'string' ? env.SECRET : '';
   if (secret.length < 32) missing.push('SECRET');
   const privacyVersion = str(env.PRIVACY_VERSION);
-  if (!privacyVersion) missing.push('PRIVACY_VERSION');
+  /* Jeder Auftrag speichert die Version der Datenschutzerklärung. Ein Entwurf ist keine Grundlage für echte Aufträge. */
+  if (!privacyVersion || (production && /^entwurf/i.test(privacyVersion))) missing.push('PRIVACY_VERSION');
 
   const mail: MailConfig = {
     apiUrl: str(env.MAIL_API_URL),
@@ -127,12 +138,17 @@ export function loadConfig(env: Env): Config {
   };
   const mailUrl = parseUrl(mail.apiUrl);
   if (!mailUrl || mailUrl.username || mailUrl.password || !(mailUrl.protocol === 'https:' || (local && mailUrl.protocol === 'http:'))
-    || (production && !AUTHORIZED_MAIL_API_HOSTS.includes(mailUrl.hostname))) {
+    || (production && (!AUTHORIZED_MAIL_API_HOSTS.includes(mailUrl.hostname) || mailUrl.port || mailUrl.pathname !== '/emails' || mailUrl.search))) {
     missing.push('MAIL_API_URL');
   }
   if (!mail.apiToken) missing.push('MAIL_API_TOKEN');
-  if (!isEmail(mail.from)) missing.push('MAIL_FROM');
+  const fromDomain = mail.from.slice(mail.from.lastIndexOf('@') + 1).toLowerCase();
+  if (!isEmail(mail.from) || (production && !AUTHORIZED_MAIL_FROM_DOMAINS.includes(fromDomain))) missing.push('MAIL_FROM');
   if (!isEmail(mail.notifyTo)) missing.push('MAIL_NOTIFY_TO');
+
+  const retention = str(env.ORDER_RETENTION_DAYS);
+  const retentionDays = retention === '' ? null : Number(retention);
+  if (retentionDays !== null && !(/^\d{1,4}$/.test(retention) && retentionDays >= 1)) missing.push('ORDER_RETENTION_DAYS');
 
   if (!env.DB) missing.push('DB');
 
@@ -151,6 +167,7 @@ export function loadConfig(env: Env): Config {
     secret,
     privacyVersion,
     mail,
+    retentionDays,
     db: env.DB,
   };
 }

@@ -1,9 +1,9 @@
 /* PXWA – Integrationstests des API-Workers in workerd (Miniflare) mit lokaler D1 und lokalen Mocks.
    Ausführen im Repo-Root nach `npm ci`:  node --test tests/worker.test.mjs
-   Echte Provider (Google, Mail-API, Cloudflare-D1) werden hier NICHT getestet. */
+   Echte Provider (Google, Resend, Cloudflare-D1) werden hier NICHT getestet; Resend ist ein Mock nach dessen dokumentiertem Vertrag. */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mockGoogle, mockMailApi, startWorker, Client, login, confirm, field, waitFor, sleep, workerAvailable, CLIENT_ID, CUSTOMER, NOTIFY_TO, MAIL_FROM, MAIL_TOKEN } from './lib/harness.mjs';
+import { mockGoogle, mockResend, startWorker, Client, login, confirm, field, waitFor, sleep, workerAvailable, CLIENT_ID, CUSTOMER, NOTIFY_TO, MAIL_FROM, MAIL_TOKEN } from './lib/harness.mjs';
 
 const skip = workerAvailable ? false : 'NOT_RUN: miniflare/esbuild fehlen (npm ci)';
 let google, mail, app;
@@ -11,7 +11,7 @@ let google, mail, app;
 before(async () => {
   if (skip) return;
   google = await mockGoogle().start();
-  mail = await mockMailApi().start();
+  mail = await mockResend().start();
   app = await startWorker({ google, mail });
 });
 after(async () => {
@@ -192,7 +192,7 @@ test('Erfolgreiche Annahme: genau ein Auftrag, genau eine interne Benachrichtigu
   assert.equal(m.idempotencyKey, `pxwa-${ref}`);
   assert.match(m.contentType, /^application\/json/);
   assert.equal(mail.state.requests[0].headers.authorization, `Bearer ${MAIL_TOKEN}`, 'Token aus der Worker-Konfiguration');
-  assert.deepEqual(Object.keys(m).filter(k => !['idempotencyKey', 'contentType'].includes(k)).sort(), ['from', 'reply_to', 'subject', 'text', 'to'], 'kein Anhang, kein HTML');
+  assert.deepEqual(Object.keys(m).filter(k => !['idempotencyKey', 'contentType', 'userAgent', 'id'].includes(k)).sort(), ['from', 'reply_to', 'subject', 'text', 'to'], 'kein Anhang, kein HTML');
   assert.ok(m.text.includes(ref) && m.text.includes('https://www.musterfirma.de') && m.text.includes(CUSTOMER));
   assert.deepEqual(await app.sql('SELECT status, attempts FROM notifications'), [{ status: 'sent', attempts: 1 }]);
   /* Keine Tokens in Datenbank (inkl. Sessions) oder Log; Log ohne E-Mail-Adresse und Website */
@@ -270,74 +270,6 @@ test('Fehlgeschlagene Speicherung: keine Bestätigung, kein halber Auftrag, kein
   assert.equal(mail.state.accepted.length, 1);
 });
 
-test('Fehlgeschlagener Mailversand: Auftrag bleibt gespeichert und bestätigt; Cron versendet genau einmal nach', { skip }, async () => {
-  await reset();
-  mail.state.mode = 'fail';
-  const c = new Client(app);
-  await login(c, google);
-  assert.equal((await confirm(c)).res.status, 303);
-  assert.match((await c.req('GET', '/api/anfrage')).text, /Ihre Anfrage liegt bei uns/, 'Annahme hängt an der Speicherung, nicht am Mailversand');
-  await settled();
-  assert.deepEqual(await app.sql('SELECT status, attempts, last_error FROM notifications'), [{ status: 'pending', attempts: 1, last_error: 'temporary:503' }]);
-  mail.state.mode = 'ok';
-  assert.match((await app.cron()).log, /PXWA: 0 versendet, 0 fehlgeschlagen/, 'Backoff: noch nicht fällig');
-  await app.run("UPDATE notifications SET next_attempt_at = '2000-01-01 00:00:00'");
-  const run = await app.cron();
-  assert.equal(run.outcome, 'ok');
-  assert.match(run.log, /PXWA: 1 versendet, 0 fehlgeschlagen/);
-  assert.ok(!run.log.includes(CUSTOMER));
-  assert.equal(mail.state.accepted.length, 1);
-  assert.ok(mail.state.accepted[0].text.includes((await orders())[0].reference));
-  assert.equal(new Set(mail.state.requests.map(r => r.headers['idempotency-key'])).size, 1, 'gleicher Idempotency-Key bei jedem Versuch');
-  await app.run("UPDATE notifications SET next_attempt_at = '2000-01-01 00:00:00'");
-  assert.match((await app.cron()).log, /0 versendet/);
-  assert.equal(mail.state.accepted.length, 1, 'keine Doppel-Mail');
-  assert.deepEqual(await app.sql('SELECT status, attempts FROM notifications'), [{ status: 'sent', attempts: 2 }]);
-});
-
-test('Mail-API lehnt dauerhaft ab: kontrollierte Wiederholung mit Backoff, nach zehn Versuchen endgültig fehlgeschlagen', { skip }, async () => {
-  await reset();
-  mail.state.mode = 'reject';
-  const c = new Client(app);
-  await login(c, google);
-  assert.equal((await confirm(c)).res.status, 303);
-  await settled();
-  const [n] = await app.sql("SELECT status, attempts, last_error, next_attempt_at > datetime('now', '+4 minutes') AS later FROM notifications");
-  assert.deepEqual(n, { status: 'pending', attempts: 1, last_error: 'permanent:422', later: 1 });
-  for (let i = 2; i <= 10; i++) {
-    await app.run("UPDATE notifications SET next_attempt_at = '2000-01-01 00:00:00'");
-    await app.cron();
-  }
-  assert.deepEqual(await app.sql('SELECT status, attempts FROM notifications'), [{ status: 'failed', attempts: 10 }]);
-  await app.run("UPDATE notifications SET next_attempt_at = '2000-01-01 00:00:00'");
-  await app.cron();
-  assert.equal(mail.state.attempts, 10, 'kein elfter Versuch');
-  assert.match(app.logs(), /Versuch 10, endgültig/);
-});
-
-test('Benachrichtigung scheitert nach der Speicherung an der Datenbank: Annahme bleibt bestätigt, keine Fehlerseite, Cron versendet genau einmal', { skip }, async () => {
-  await reset();
-  const c = new Client(app);
-  await login(c, google);
-  /* Auftrag und Outbox-Eintrag werden gespeichert; erst das Beanspruchen der Benachrichtigung (UPDATE) schlägt fehl */
-  await app.run("CREATE TRIGGER pxwa_test_block BEFORE UPDATE ON notifications BEGIN SELECT RAISE(ABORT, 'pxwa test'); END");
-  const before = app.logs().length;
-  let res;
-  try {
-    ({ res } = await confirm(c));
-    await waitFor(() => app.logs().slice(before).includes('nicht sofort versendet'), { what: 'Log der verschobenen Zustellung' });
-  } finally {
-    await app.run('DROP TRIGGER pxwa_test_block');
-  }
-  assert.equal(res.status, 303, 'Auftrag ist gespeichert – keine Fehlerseite, die zu erneutem Absenden verleitet');
-  assert.match((await c.req('GET', '/api/anfrage')).text, /Ihre Anfrage liegt bei uns/);
-  assert.equal((await orders()).length, 1);
-  assert.deepEqual(await app.sql('SELECT status, attempts FROM notifications'), [{ status: 'pending', attempts: 0 }], 'Benachrichtigung bleibt fällig');
-  assert.ok(!app.logs().includes(CUSTOMER) && !app.logs().includes('musterfirma'));
-  assert.match((await app.cron()).log, /1 versendet, 0 fehlgeschlagen/);
-  assert.equal(mail.state.accepted.length, 1, 'genau eine Mail');
-});
-
 test('Störungen: fehlende Tabelle, fehlende Konfiguration, kein D1-Binding, Google-Ausfall → ehrliche Fehlerseite, keine Annahme', { skip }, async () => {
   await reset();
   await app.run('ALTER TABLE rate_limits RENAME TO rate_limits_off');
@@ -380,34 +312,6 @@ test('Störungen: fehlende Tabelle, fehlende Konfiguration, kein D1-Binding, Goo
   } finally {
     for (const [, w] of broken) await w.stop();
     await g2.stop();
-  }
-});
-
-test('Produktion: nicht freigegebener Mail-Anbieter, Test-Endpunkte oder Platzhalter-Domain sperren die API (fail closed, keine Daten an Dritte)', { skip }, async () => {
-  const g = await mockGoogle().start();
-  const variants = [
-    ['Mail-API nicht freigegeben', { ENV: 'production', BASE_URL: 'https://360.beispiel-domain.de', GOOGLE_TOKEN_ENDPOINT: undefined, GOOGLE_JWKS_URI: undefined, MAIL_API_URL: 'https://api.mail-anbieter.example.net/v1/send' }, /MAIL_API_URL/],
-    ['Mock-Google in Produktion', { ENV: 'production', BASE_URL: 'https://360.beispiel-domain.de' }, /GOOGLE_TOKEN_ENDPOINT, GOOGLE_JWKS_URI/],
-    ['Platzhalter-Domain', { ENV: 'production', BASE_URL: 'https://DOMAIN-FEHLT.example' }, /BASE_URL/],
-    ['http in Produktion', { ENV: 'production', BASE_URL: 'http://360.beispiel-domain.de' }, /BASE_URL/],
-  ];
-  try {
-    for (const [name, env, key] of variants) {
-      mail.reset();
-      const w = await startWorker({ google: g, mail, base: env.BASE_URL, env });
-      try {
-        const r = await new Client(w).req('POST', '/api/anfrage', { form: { action: 'start', website: 'musterfirma.de' } });
-        assert.equal(r.status, 503, name);
-        assert.equal(r.location, null, `${name}: keine Weiterleitung`);
-        assert.equal((await w.cron()).outcome, 'exception', `${name}: Cron versendet nichts`);
-        await waitFor(() => key.test(w.logs()), { what: `Log ${name}` });
-        assert.equal(mail.state.attempts, 0, `${name}: kein Aufruf der Mail-API`);
-      } finally {
-        await w.stop();
-      }
-    }
-  } finally {
-    await g.stop();
   }
 });
 
@@ -535,20 +439,6 @@ test('Alias-Host (z. B. www/ohne www/workers.dev): GET leitet auf die Basis-URL 
   const post = await app.fetch(alias + '/api/anfrage', { method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded', origin: alias }, body: 'action=start&website=musterfirma.de' });
   assert.equal(post.status, 403);
   assert.equal((await orders()).length, 0);
-});
-
-test('Cron-Aufräumen: abgelaufene Sessions und alte Rate-Limit-Fenster werden gelöscht, Aufträge bleiben', { skip }, async () => {
-  await reset();
-  const c = new Client(app);
-  await login(c, google);
-  assert.equal((await confirm(c)).res.status, 303);
-  await settled();
-  await app.run("INSERT INTO sessions (id_hash, data, version, created_at, expires_at) VALUES ('alt', '{\"csrf\":\"x\"}', 0, 1, 2)");
-  await app.run("INSERT INTO rate_limits (bucket, window_start, hits) VALUES ('start:alt', 1, 1)");
-  const run = await app.cron();
-  assert.match(run.log, /1 Sessions und 1 Rate-Limit-Fenster gelöscht/);
-  assert.deepEqual((await app.sql('SELECT id_hash FROM sessions')).map(r => r.id_hash).includes('alt'), false);
-  assert.equal((await orders()).length, 1);
 });
 
 test('Worker-Log: keine unbehandelten Ausnahmen über alle Abläufe', { skip }, async () => {

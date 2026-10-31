@@ -13,7 +13,8 @@ import { View } from './view';
 
 /* Ablauf: URL eingeben (start) → Google-Anmeldung (callback) → bestätigen (confirm) → angenommen.
    Zustand liegt ausschließlich in der serverseitigen Session (D1); Tokens werden nie gespeichert.
-   Routen (Cloudflare-Route <domain>/api/*): /api/anfrage (GET, POST) und /api/auth/callback (GET). */
+   Routen (über die Pages Function /api/* und das Service Binding): /api/anfrage (GET, POST) und /api/auth/callback (GET).
+   Die Anfrage-URL ist die Original-URL der Website (https://360.pixelkiez.de/…); andere Hosts werden abgewiesen. */
 
 const log = (message: string): void => console.error('PXWA: ' + message);
 
@@ -158,7 +159,7 @@ class App {
          Fehlerseite auslösen; die Benachrichtigung bleibt in der Outbox und wird vom Cron-Lauf wiederholt. */
       const notifier = new Notifier(this.db, new MailApi(this.config.mail), this.config.mail.notifyTo);
       this.ctx.waitUntil(notifier.deliver(r.orderId, this.now).catch(e => {
-        log(`Benachrichtigung zu ${r.reference} nicht sofort versendet (${e instanceof Error ? e.name : 'Fehler'}), Cron wiederholt`);
+        log(`Benachrichtigung zu ${r.reference} nicht sofort abgeschlossen (${e instanceof Error ? e.name : 'Fehler'}), Cron wiederholt`);
       }));
     }
     session.data.done = { reference: r.reference, url: pending.url, email: identity.email, idem, kind: r.result === 'duplicate' ? 'duplicate' : 'created' };

@@ -1,17 +1,18 @@
 /* PXWA – statische Prüfungen (Node ≥ 22). Ausführen im Repo-Root: node --test tests/static.test.mjs
    Prüft Inhalte (kostenloses Angebot, vier Bereiche, sieben PDF-Seiten, GEO & AI Visibility), Methodik, Links,
-   unveränderte Design-Quelle, Release-Grenzen (Railway-Artefakt, Worker), Secrets und den Scope des API-Workers. */
+   unveränderte Design-Quelle, Release-Grenzen (Cloudflare-Pages-Artefakt, Pages Function, Worker), Secrets und den Scope des API-Workers. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { join, relative } from 'node:path';
 import * as H from './lib/html.mjs';
-import { ROOT, artifactFiles, MIGRATION } from './lib/harness.mjs';
+import { ROOT, artifactFiles, uploadFiles, MIGRATION } from './lib/harness.mjs';
 
 const read = p => readFileSync(join(ROOT, p), 'utf8');
 const git = (...a) => execFileSync('git', a, { cwd: ROOT, encoding: 'utf8' });
-const PAGES = ['public/index.html', 'public/pruefkriterien.html', 'public/impressum.html', 'public/datenschutz.html'];
+const PAGES = ['public/index.html', 'public/pruefkriterien.html', 'public/impressum.html', 'public/datenschutz.html', 'public/404.html'];
+const FUNCTION = 'functions/api/[[path]].ts';
 const VIEW = 'worker/src/view.ts';
 const WORKER_SRC = readdirSync(join(ROOT, 'worker/src')).filter(f => f.endsWith('.ts')).map(f => 'worker/src/' + f);
 /* Alle Dateien, die committet würden (versioniert oder neu, nicht ignoriert) */
@@ -156,14 +157,16 @@ test('Links: interne Anker gültig, keine Links zu pixelkiez.de, nur mailto als 
       const href = a.attrs.get('href');
       assert.ok(href && href !== '#', `${page}: Link ohne Ziel "${H.norm(H.textOf(a))}"`);
       if (/^(https?:|mailto:)/.test(href)) { assert.ok(EXTERNAL_OK.includes(href), `${page}: externer Link ${href}`); continue; }
-      const [file, frag] = href.split('#');
+      /* Nur 404.html verlinkt absolut (/…), weil Pages sie für Adressen in beliebiger Tiefe ausliefert */
+      assert.ok(page === '404.html' ? href.startsWith('/') : !href.startsWith('/'), `${page}: ${href}`);
+      const [file, frag] = href.replace(/^\//, '').split('#');
       const target = file || page;
       assert.ok(pages[target], `${page}: unbekannte Datei ${target}`);
       if (frag) assert.ok(H.byId(H.parse(pages[target]).root, frag), `${page}: Anker ${href} fehlt`);
     }
   }
   /* Auch serverseitig gerenderte Seiten und Konfigurationsvorlagen verweisen nicht auf die Webdesign-Website */
-  for (const f of [...PAGES, VIEW, 'worker/wrangler.toml', 'worker/.dev.vars.example', 'deploy/railway/Caddyfile']) {
+  for (const f of [...PAGES, VIEW, 'worker/wrangler.toml', 'worker/.dev.vars.example', 'wrangler.toml', 'public/_headers', FUNCTION]) {
     assert.ok(!/https?:\/\/(www\.)?pixelkiez\.de/i.test(read(f)), `${f}: kein Link zu pixelkiez.de`);
     assert.ok(!/Webdesign/i.test(read(f)), `${f}: kein Bezug auf Webdesign`);
   }
@@ -176,7 +179,7 @@ test('Eigenständige Website 360°Pixelkiez: Name in Titel, Logo und Footer; Imp
     assert.match(H.textOf(H.byTag(root, 'title')[0]), /360°Pixelkiez/, `${page}: Titel`);
     assert.ok(H.byClass(root, 'logo').every(l => H.norm(H.textOf(l)).startsWith('360°Pixelkiez')), `${page}: Logo`);
     const legal = H.find(root, e => e.tag === 'nav' && e.attrs.get('aria-label') === 'Rechtliches')[0];
-    assert.deepEqual(H.byTag(legal, 'a').map(a => a.attrs.get('href')), ['impressum.html', 'datenschutz.html'], `${page}: Rechtliches`);
+    assert.deepEqual(H.byTag(legal, 'a').map(a => a.attrs.get('href').replace(/^\//, '')), ['impressum.html', 'datenschutz.html'], `${page}: Rechtliches`);
     assert.match(H.norm(H.textOf(H.byClass(root, 'footer')[0])), /© 2026 360°Pixelkiez/, `${page}: Copyright`);
   }
   assert.match(view, /© 2026 360°Pixelkiez/);
@@ -187,7 +190,13 @@ test('Eigenständige Website 360°Pixelkiez: Name in Titel, Logo und Footer; Imp
   }
   const privacy = H.norm(H.textOf(H.byTag(H.parse(read('public/datenschutz.html')).root, 'main')[0]));
   assert.match(privacy, /in Vorbereitung/, 'Datenschutzerklärung als unvollständig gekennzeichnet, bis sie fertiggestellt ist');
+  assert.match(privacy, /ENTWURF – nicht rechtlich freigegeben/);
   assert.ok(privacy.includes('Vincent Schnetzer') && privacy.includes('kontakt@pixelkiez.de'), 'Verantwortlicher genannt');
+  /* Entwurf nennt die tatsächlich genutzten Dienste und Datenflüsse; offene Punkte stehen in eckigen Klammern */
+  for (const s of ['Cloudflare Pages', 'Cloudflare Workers', 'Cloudflare-D1-Datenbank mit EU-Jurisdiktion', 'Google Ireland Limited', '„openid“ und „email“', 'Resend', 'Schriftarten', '__Host-pxwa', 'HMAC', '[Frist noch nicht festgelegt']) {
+    assert.ok(privacy.includes(s), `Datenschutz-Entwurf nennt "${s}"`);
+  }
+  assert.ok(!/Railway|Hostinger-PHP|Supabase/.test(privacy), 'keine verworfenen Dienste');
 });
 
 test('Design: styles.css unverändert gegenüber vision.html; alle verwendeten Klassen sind definiert', () => {
@@ -202,38 +211,73 @@ test('Design: styles.css unverändert gegenüber vision.html; alle verwendeten K
   assert.deepEqual(unknown, []);
 });
 
-test('Release-Grenze Frontend (Railway): Artefakt enthält nur public/ ohne Medien; Caddy mit festem Digest; keine PHP-Laufzeit', () => {
-  assert.deepEqual(artifactFiles(), ['assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'datenschutz.html', 'impressum.html', 'index.html', 'pruefkriterien.html']);
-  assert.deepEqual(repoFiles().filter(f => /\.(php|phtml)$|(^|\/)\.htaccess$|^(server|bin)\//.test(f)), [], 'keine PHP-Komponenten mehr im Release');
-  const ignore = read('.dockerignore').split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
-  assert.deepEqual(ignore, ['*', '!public/', '!deploy/railway/Caddyfile', 'public/media/', '**/.DS_Store'], 'Build-Kontext nur mit ausgelieferten Dateien');
-  const docker = read('deploy/railway/Dockerfile');
-  assert.match(docker, /^FROM caddy:[\d.]+-alpine@sha256:[0-9a-f]{64}$/m, 'Basis-Image per Digest fixiert');
-  assert.deepEqual([...docker.matchAll(/^COPY .*$/gm)].map(m => m[0]), ['COPY deploy/railway/Caddyfile /etc/caddy/Caddyfile', 'COPY --chown=root:root public/ /srv/']);
-  assert.match(docker, /^USER nobody$/m, 'läuft nicht als root');
-  const railway = JSON.parse(read('railway.json'));
-  assert.equal(railway.build.builder, 'DOCKERFILE');
-  assert.equal(railway.build.dockerfilePath, 'deploy/railway/Dockerfile');
-  const caddy = read('deploy/railway/Caddyfile');
-  assert.match(caddy, /admin off/); assert.ok(!/\bbrowse\b|reverse_proxy|php_fastcgi|\blog\b/.test(caddy), 'kein Verzeichnis-Listing, kein Proxy, keine PHP-Ausführung, kein Zugriffslog (Cookies)');
-  assert.match(caddy, /handle \/api\/\* \{[^}]*respond "Anfragen sind im Moment nicht möglich\." 503/s, '/api/* ohne Worker-Route: 503');
-  for (const f of ['.dev.vars', 'worker/.dev.vars', '.wrangler/state/v3/d1/x.sqlite', 'node_modules/x', 'public/media/360-pixelkiez-video-1080p.mp4']) {
+test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, Function nur unter /api/*, Sicherheits-Header, keine Railway- oder PHP-Reste', () => {
+  assert.deepEqual(artifactFiles(), ['404.html', '_headers', '_routes.json', 'assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'datenschutz.html', 'impressum.html', 'index.html', 'pruefkriterien.html']);
+  assert.deepEqual(repoFiles().filter(f => /\.(php|phtml)$|(^|\/)\.htaccess$|^(server|bin)\/|railway|Dockerfile|Caddyfile|\.dockerignore/i.test(f)), [], 'keine PHP-, Railway- oder Docker-Bestandteile');
+  const pages = read('wrangler.toml');
+  const active = pages.split('\n').filter(l => !l.trim().startsWith('#')).join('\n');
+  assert.match(active, /^name = "pxwa"$/m);
+  assert.match(active, /^pages_build_output_dir = "\.\/public"$/m);
+  assert.ok(!/^\s*main\s*=/m.test(active), 'kein Worker-Einstiegspunkt in der Pages-Konfiguration');
+  assert.match(active, /^\[\[services\]\]\nbinding = "API"\nservice = "pxwa-api"$/m, 'Produktion: internes Service Binding zum privaten Worker');
+  assert.match(active, /^\[env\.preview\]\nservices = \[\]$/m, 'Vorschau-Deployments ohne Binding');
+  assert.ok(!/\[vars\]|d1_databases|kv_namespaces|r2_buckets|SECRET|TOKEN/i.test(active), 'Website ohne Variablen, Secrets oder Speicher');
+  assert.equal(read('worker/wrangler.toml').match(/^compatibility_date = .*$/m)[0], active.match(/^compatibility_date = .*$/m)[0], 'gleiches Kompatibilitätsdatum');
+  const headers = read('public/_headers');
+  for (const h of ['Strict-Transport-Security: max-age=31536000', 'X-Content-Type-Options: nosniff', 'X-Frame-Options: DENY', "Content-Security-Policy: frame-ancestors 'none'",
+    'Referrer-Policy: strict-origin-when-cross-origin', 'Cross-Origin-Opener-Policy: same-origin', 'Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()', '! Access-Control-Allow-Origin']) {
+    assert.ok(headers.includes(`\n  ${h}\n`), `_headers: ${h}`);
+  }
+  assert.match(headers, /^https:\/\/:project\.pages\.dev\/\*\n {2}X-Robots-Tag: noindex$/m, '*.pages.dev wird nicht indexiert');
+  for (const page of PAGES) assert.match(read(page), /<meta name="robots" content="noindex,nofollow">/, `${page}: noindex bis zur Launch-Freigabe`);
+  const fn = read(FUNCTION);
+  assert.match(fn, /return await env\.API\.fetch\(new Request\(request, \{ redirect: 'manual' \}\)\);/, 'Weitergabe der Original-Anfrage ohne Verfolgen von Weiterleitungen');
+  assert.match(fn, /if \(!env\.API\) return unavailable\(\);/);
+  const code = fn.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
+  assert.ok(!/console\.|\bfetch\(|env\.ASSETS|next\(/.test(code.replace('env.API.fetch(', '')), 'keine Logs, keine weiteren Aufrufe, kein Rückfall auf statische Dateien');
+  for (const f of ['.dev.vars', 'worker/.dev.vars', '.wrangler/state/v3/d1/x.sqlite', 'node_modules/x', 'public/media/360-pixelkiez-video-1080p.mp4', '360-pixelkiez-video-1080p.mp4']) {
     assert.equal(spawnSync('git', ['check-ignore', '-q', f], { cwd: ROOT }).status, 0, `${f} ist ignoriert`);
   }
 });
 
-test('Release-Grenze API (Cloudflare Worker): nur eigene Route, keine workers.dev-Adresse, D1-Binding, Cron, keine aktive Route ohne Freigabe', () => {
+test('Release-Scan des Pages-Uploads (public/ wie `wrangler pages deploy`): nur Website-Dateien, keine Quellen, kein PHP/Railway, keine Secrets, höchstens 25 MiB je Datei', () => {
+  const files = uploadFiles();
+  assert.deepEqual(files.filter(f => !f.startsWith('media/')), ['404.html', 'assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'datenschutz.html', 'impressum.html', 'index.html', 'pruefkriterien.html']);
+  assert.ok(files.filter(f => f.startsWith('media/')).every(f => /^media\/[\w-]+\.(mp4|jpg)$/.test(f)), 'in media/ nur Videos und Poster');
+  assert.ok(files.length < 20000);
+  for (const f of files) {
+    const buf = readFileSync(join(ROOT, 'public', f));
+    assert.ok(buf.length <= 25 * 1024 * 1024, `${f}: über 25 MiB`);
+    if (/\.(mp4|jpg)$/.test(f)) continue;
+    const text = buf.toString('utf8');
+    assert.ok(!/railway|<\?php|\.php\b|caddy/i.test(text), `${f}: Railway- oder PHP-Rest`);
+    assert.ok(!/-----BEGIN [A-Z ]*PRIVATE KEY|GOCSPX-|\bre_[A-Za-z0-9]{16,}|\bsk_[A-Za-z0-9]{16,}/.test(text), `${f}: Secret`);
+    assert.ok(!/test-only|mock-access-token|MAIL_API_TOKEN|GOOGLE_CLIENT_SECRET/.test(text), `${f}: Test- oder Konfigurationswerte`);
+  }
+});
+
+test('Release-Grenze API (privater Worker): keine Route, keine workers.dev-Adresse, D1, Cron; Produktionswerte für 360.pixelkiez.de und Resend', () => {
   const w = read('worker/wrangler.toml');
   const active = w.split('\n').filter(l => !l.trim().startsWith('#')).join('\n');
+  assert.match(active, /^name = "pxwa-api"$/m, 'Name passt zum Service Binding der Pages-Konfiguration');
   assert.match(active, /^main = "src\/index\.ts"$/m);
   assert.match(active, /^workers_dev = false$/m); assert.match(active, /^preview_urls = false$/m);
-  assert.ok(!/^\s*(routes?|route)\s*=/m.test(active), 'Route bleibt bis zur Freigabe der Domain auskommentiert');
-  assert.match(w, /# routes = \[\{ pattern = "<freigegebene-domain>\/api\/\*"/);
+  assert.ok(!/^\s*(routes?|route)\s*=|\[\[routes\]\]|custom_domain/m.test(active), 'keine öffentliche Route, keine Custom Domain');
+  assert.ok(!/pages_build_output_dir/.test(active));
   assert.match(active, /\[\[d1_databases\]\]\s*\nbinding = "DB"\s*\ndatabase_name = "pxwa"/);
   assert.match(w, /--jurisdiction eu/, 'D1 in EU-Jurisdiktion anlegen');
   assert.match(active, /crons = \["\*\/5 \* \* \* \*"\]/);
-  assert.match(active, /^ENV = "production"$/m); assert.match(active, /^MAIL_NOTIFY_TO = "kontakt@pixelkiez\.de"$/m);
-  assert.match(read('worker/src/config.ts'), /export const AUTHORIZED_MAIL_API_HOSTS: readonly string\[\] = \[\];/, 'kein Mail-Anbieter freigegeben, solange keine menschliche Freigabe vorliegt');
+  assert.match(active, /^ENV = "production"$/m);
+  assert.match(active, /^BASE_URL = "https:\/\/360\.pixelkiez\.de"$/m);
+  assert.match(active, /^MAIL_API_URL = "https:\/\/api\.resend\.com\/emails"$/m);
+  assert.match(active, /^MAIL_FROM = ""$/m, 'Absender erst nach Verifizierung der Versanddomain');
+  assert.match(active, /^PRIVACY_VERSION = "ENTWURF-/m, 'Datenschutzerklärung nicht freigegeben: Produktion nimmt keine Aufträge an');
+  assert.match(active, /^MAIL_NOTIFY_TO = "kontakt@pixelkiez\.de"$/m);
+  assert.ok(!/^ORDER_RETENTION_DAYS\s*=/m.test(active), 'Löschfrist nicht aktiv, solange die Aufbewahrungsfrist offen ist');
+  const config = read('worker/src/config.ts');
+  assert.match(config, /export const AUTHORIZED_MAIL_API_HOSTS: readonly string\[\] = \['api\.resend\.com'\];/);
+  assert.match(config, /export const AUTHORIZED_MAIL_FROM_DOMAINS: readonly string\[\] = \['notify\.pixelkiez\.de'\];/);
+  assert.match(config, /export const PRODUCTION_BASE_URL = 'https:\/\/360\.pixelkiez\.de';/);
 });
 
 test('D1-Schema: nur die nötigen Tabellen und Spalten (Datenminimierung), keine Tokens', () => {
@@ -257,6 +301,7 @@ test('Keine Secrets im Repository', () => {
     if (/\b(re|sk|key|pm|xkeysib)[_-][A-Za-z0-9_-]{20,}/.test(s)) hits.push(`${f}: API-Schlüssel`);
   }
   assert.deepEqual(hits, []);
+  assert.ok(!/=\s*"[^"]{20,}"/.test(read('wrangler.toml').replace(/^#.*$/gm, '')), 'Pages-Konfiguration ohne Schlüsselwerte');
   const vars = read('worker/wrangler.toml').split('[vars]')[1].split('\n[')[0];
   assert.ok(!/^\s*(GOOGLE_CLIENT_SECRET|SECRET|MAIL_API_TOKEN)\s*=/m.test(vars), 'Secrets nie als [vars]');
   assert.match(read('worker/.dev.vars.example'), /^GOOGLE_CLIENT_SECRET=$/m); assert.match(read('worker/.dev.vars.example'), /^MAIL_API_TOKEN=$/m); assert.match(read('worker/.dev.vars.example'), /^SECRET=$/m);
@@ -275,9 +320,11 @@ test('Scope des API-Workers: nur openid email, kein PDF, keine Kunden-Mail, kein
   assert.ok(!/localStorage|sessionStorage|indexedDB|document\.cookie|fetch\(/.test(read('public/assets/app.js')), 'app.js speichert und sendet nichts selbst');
 });
 
-test('TypeScript: Worker ohne Typfehler (tsc --noEmit, strict)', t => {
+test('TypeScript: Worker und Pages Function ohne Typfehler (tsc --noEmit, strict)', t => {
   const tsc = join(ROOT, 'node_modules/.bin/tsc');
   if (!existsSync(tsc)) { t.skip('NOT_RUN: typescript fehlt (npm ci)'); return; }
-  const r = spawnSync(tsc, ['-p', join(ROOT, 'worker/tsconfig.json')], { encoding: 'utf8' });
-  assert.equal(r.status, 0, r.stdout + r.stderr);
+  for (const project of ['worker/tsconfig.json', 'functions/tsconfig.json']) {
+    const r = spawnSync(tsc, ['-p', join(ROOT, project)], { encoding: 'utf8' });
+    assert.equal(r.status, 0, project + ': ' + r.stdout + r.stderr);
+  }
 });

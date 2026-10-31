@@ -31,6 +31,23 @@
   /* Videos (unter dem Hero und bei „Ihr Bericht“): starten, sobald sie ins Bild scrollen, und laufen dann in Schleife.
      Außerhalb des Bildes angehalten (spart Akku und Daten); bei „Bewegung reduzieren“ bleibt das Standbild. */
   const videos = document.querySelectorAll('.showcase-video');
+  /* Kann der Browser ein Video nicht laden (z. B. Safari/iOS, wenn der Server Range-Anfragen nicht mit 206 beantwortet),
+     steht statt einer schwarzen Fläche das Standbild (Poster) da: gleiche Klasse, gleiche Größe, gleicher Alternativtext. */
+  videos.forEach(v => {
+    const toStill = () => {
+      if (!v.isConnected || !v.poster) return;
+      const still = new Image(v.width, v.height);
+      still.src = v.poster;
+      still.alt = v.getAttribute('aria-label') || '';
+      still.className = v.className;
+      v.pause();
+      v.replaceWith(still);
+    };
+    const source = v.querySelector('source');
+    if (source) source.addEventListener('error', toStill);
+    /* Ist das Laden schon gescheitert, bevor dieses Skript lief, kam das error-Ereignis zu früh */
+    if (v.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) toStill();
+  });
   if (videos.length && !reduce && 'IntersectionObserver' in window) {
     /* intersectionRatio > 0: Ein Video, das nur an den Bildschirmrand stößt, gilt noch nicht als sichtbar */
     const io = new IntersectionObserver(entries => entries.forEach(e => {

@@ -6,6 +6,6 @@ node_modules/
 .dev.vars
 .dev.vars.*
 !.dev.vars.example
-# Videos: Quelldatei und lokale Testkopie; produktiv kommt das Video aus dem Railway-Bucket
+# Videos: Quelldateien und Kopie in public/media/ (nicht versioniert; per Direct Upload mit ausgeliefert, siehe docs/deploy-cloudflare-pages.md)
 /*.mp4
 public/media/

@@ -15,13 +15,16 @@ export class AuthError extends PxwaError {
 
 export class StorageError extends PxwaError {}
 
-/* Fehler der Mail-API. kind: connect | timeout | temporary | permanent | protocol; status ist der HTTP-Status (0 ohne Antwort). */
+/* Fehler der Mail-API. kind: connect | timeout | temporary | permanent | protocol; status ist der HTTP-Status (0 ohne Antwort);
+   code ist der feste Fehlername von Resend (z. B. "validation_error"), nie dessen Freitext. */
 export class MailError extends PxwaError {
   readonly kind: string;
   readonly status: number;
-  constructor(kind: string, status = 0) {
-    super('Mailversand fehlgeschlagen: ' + kind + (status ? ' ' + status : ''));
+  readonly code: string;
+  constructor(kind: string, status = 0, code = '') {
+    super('Mailversand fehlgeschlagen: ' + kind + (status ? ' ' + status : '') + (code ? ' ' + code : ''));
     this.kind = kind;
     this.status = status;
+    this.code = code;
   }
 }

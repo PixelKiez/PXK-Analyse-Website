@@ -1,14 +1,14 @@
 {
   "name": "pxwa",
   "private": true,
-  "description": "360°Pixelkiez – kostenlose Website-Analyse: statisches Frontend (Railway) und API-Worker (Cloudflare Workers + D1)",
+  "description": "360°Pixelkiez – kostenlose Website-Analyse: Website auf Cloudflare Pages, API als privater Cloudflare Worker mit D1 (Service Binding)",
   "type": "module",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "typecheck": "tsc -p worker/tsconfig.json",
-    "test": "node --test tests/static.test.mjs tests/worker.test.mjs tests/railway.test.mjs",
+    "typecheck": "tsc -p worker/tsconfig.json && tsc -p functions/tsconfig.json",
+    "test": "node --test tests/static.test.mjs tests/worker.test.mjs tests/notifier.test.mjs tests/pages.test.mjs",
     "test:browser": "node --test tests/browser.test.mjs"
   },
   "devDependencies": {
