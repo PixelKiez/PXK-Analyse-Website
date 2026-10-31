@@ -26,6 +26,8 @@ export const NOTIFY_TO = 'kontakt@pixelkiez.de';
 export const CUSTOMER = 'kunde@beispiel-kunde.de';
 export const GOOGLE_AUTH = 'https://accounts.google.com/o/oauth2/v2/auth';
 export const PRODUCTION_BASE = 'https://360.pixelkiez.de';
+/* AGB-Version, die der Hero zur Zustimmung anbietet (Feld agb_version); lokale Tests nutzen genau diesen Entwurf */
+export const TERMS_VERSION = /<input type="hidden" name="agb_version" value="([^"]+)">/.exec(readFileSync(join(ROOT, 'public/index.html'), 'utf8'))[1];
 
 const load = async name => { try { return await import(name); } catch { return null; } };
 const miniflare = await load('miniflare');
@@ -57,7 +59,9 @@ export function mockGoogle() {
   const jwk = { ...key.publicKey.export({ format: 'jwk' }), kid: 'test-key-1', alg: 'RS256', use: 'sig' };
   const codes = new Map();
   const log = { token: [], certs: 0 };
-  const state = { outage: false };   // true: Token- und Schlüssel-Endpunkt antworten mit 503 (Störung bei Google)
+  /* outage: Token- und Schlüssel-Endpunkt antworten mit 503 (Störung bei Google).
+     authPage: /auth zeigt statt sofortiger Rückleitung eine Seite mit „Weiter“ und „Abbrechen“ (Browser-Zurück, Abbruch) */
+  const state = { outage: false, authPage: false };
   let redirectUri = '';
 
   const idToken = ({ nonce, claims = {}, mode }) => {
@@ -91,7 +95,14 @@ export function mockGoogle() {
       log.lastAuth = Object.fromEntries(p);
       const code = '4/mock-' + randomBytes(12).toString('hex');
       codes.set(code, { nonce: p.get('nonce'), challenge: p.get('code_challenge'), redirectUri: p.get('redirect_uri') });
-      res.writeHead(302, { location: `${p.get('redirect_uri')}?state=${encodeURIComponent(p.get('state'))}&code=${encodeURIComponent(code)}&scope=email%20openid` });
+      const back = `${p.get('redirect_uri')}?state=${encodeURIComponent(p.get('state'))}`;
+      if (state.authPage) {
+        const esc = s => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+        return res.end(`<!doctype html><html lang="de"><title>Mock-Google</title><h1>Mock-Google-Anmeldung</h1>
+<a id="weiter" href="${esc(`${back}&code=${encodeURIComponent(code)}&scope=email%20openid`)}">Weiter</a> <a id="abbrechen" href="${esc(`${back}&error=access_denied`)}">Abbrechen</a></html>`);
+      }
+      res.writeHead(302, { location: `${back}&code=${encodeURIComponent(code)}&scope=email%20openid` });
       return res.end();
     }
     if (req.method === 'POST' && url.pathname === '/token') {
@@ -210,6 +221,8 @@ async function bundle() {
 
 export const COMPATIBILITY_DATE = /^compatibility_date\s*=\s*"([^"]+)"/m.exec(readFileSync(join(ROOT, 'worker/wrangler.toml'), 'utf8'))[1];
 export const MIGRATION = readFileSync(join(ROOT, 'worker/migrations/0001_init.sql'), 'utf8');
+/* Alle Migrationen in Reihenfolge, wie `wrangler d1 migrations apply` sie anwendet */
+export const MIGRATIONS = readdirSync(join(ROOT, 'worker/migrations')).filter(f => /^\d{4}_.*\.sql$/.test(f)).sort().map(f => readFileSync(join(ROOT, 'worker/migrations', f), 'utf8'));
 const statements = sql => sql.replace(/^\s*--.*$/gm, '').split(';').map(s => s.trim()).filter(Boolean);
 
 /* Ausgehende Anfragen des Workers abfangen (Miniflare outboundService): https://api.resend.com geht an den Mock-Resend,
@@ -232,21 +245,22 @@ export async function startWorker({ google, mail, base, scheme = 'http', authEnd
     GOOGLE_CLIENT_ID: CLIENT_ID, GOOGLE_CLIENT_SECRET: CLIENT_SECRET,
     GOOGLE_TOKEN_ENDPOINT: google ? `${google.origin}/token` : undefined, GOOGLE_JWKS_URI: google ? `${google.origin}/certs` : undefined,
     GOOGLE_AUTH_ENDPOINT: authEndpoint,
-    SECRET: randomBytes(32).toString('hex'), PRIVACY_VERSION: 'TEST-2026-10-30',
+    SECRET: randomBytes(32).toString('hex'), PRIVACY_VERSION: 'TEST-2026-10-30', TERMS_VERSION,
     MAIL_API_URL: mail?.url, MAIL_API_TOKEN: MAIL_TOKEN, MAIL_FROM, MAIL_NOTIFY_TO: NOTIFY_TO,
     ...env,
   };
   for (const k of Object.keys(bindings)) if (bindings[k] === undefined) delete bindings[k];
   google?.setRedirectUri(`${base}/api/auth/callback`);
   let logs = '';
-  const mf = new miniflare.Miniflare({
+  const options = {
     modules: true, scriptPath: await bundle(), modulesRoot: bundled.dir, compatibilityDate: COMPATIBILITY_DATE, bindings,
     ...(db ? { d1Databases: { DB: 'pxwa-test-' + randomBytes(6).toString('hex') } } : {}),
     ...(outbound ? { outboundService: outbound } : {}),
     handleRuntimeStdio(stdout, stderr) { stdout.on('data', d => { logs += d; }); stderr.on('data', d => { logs += d; }); },
-  });
+  };
+  const mf = new miniflare.Miniflare(options);
   await mf.ready;
-  const d1 = db ? await mf.getD1Database('DB') : null;
+  let d1 = db ? await mf.getD1Database('DB') : null;
   const run = (q, ...params) => d1.prepare(q).bind(...params).run();
   const app = {
     mf, base, authEndpoint: authEndpoint ?? GOOGLE_AUTH,
@@ -255,7 +269,14 @@ export async function startWorker({ google, mail, base, scheme = 'http', authEnd
     sql: async (q, ...params) => (await d1.prepare(q).bind(...params).all()).results,
     run,
     exec: async q => { for (const s of statements(q)) await run(s); },
-    migrate: async () => { for (const s of statements(MIGRATION)) await run(s); },
+    migrate: async () => { for (const m of MIGRATIONS) for (const s of statements(m)) await run(s); },
+    /* Neue Konfiguration wie nach einem Deploy (z. B. andere TERMS_VERSION); D1-Daten bleiben erhalten. undefined entfernt den Schlüssel. */
+    async reconfigure(env) {
+      const next = { ...bindings, ...env };
+      for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k];
+      await mf.setOptions({ ...options, bindings: next });
+      if (db) d1 = await mf.getD1Database('DB');
+    },
     /* Gesamter gespeicherter Inhalt aller Tabellen */
     dump: async () => JSON.stringify(await Promise.all(['orders', 'notifications', 'rate_limits', 'sessions'].map(t => app.sql(`SELECT * FROM ${t}`)))),
     /* Cron-Trigger auslösen; liefert Ergebnis und die dabei geschriebenen Log-Zeilen */
@@ -342,7 +363,7 @@ export async function startPages({ google, mail, worker = true, env = {} } = {})
     const vars = {
       ENV: 'local', BASE_URL: base, GOOGLE_CLIENT_ID: CLIENT_ID, GOOGLE_CLIENT_SECRET: CLIENT_SECRET, GOOGLE_AUTH_ENDPOINT: authEndpoint,
       GOOGLE_TOKEN_ENDPOINT: `${google.origin}/token`, GOOGLE_JWKS_URI: `${google.origin}/certs`, SECRET: randomBytes(32).toString('hex'),
-      PRIVACY_VERSION: 'TEST-2026-10-31', MAIL_API_URL: mail.url, MAIL_API_TOKEN: MAIL_TOKEN, MAIL_FROM, MAIL_NOTIFY_TO: NOTIFY_TO, ...env,
+      PRIVACY_VERSION: 'TEST-2026-10-31', TERMS_VERSION, MAIL_API_URL: mail.url, MAIL_API_TOKEN: MAIL_TOKEN, MAIL_FROM, MAIL_NOTIFY_TO: NOTIFY_TO, ...env,
     };
     const toml = readFileSync(join(ROOT, 'worker/wrangler.toml'), 'utf8')
       .replace(/^main = .*$/m, `main = ${JSON.stringify(join(ROOT, 'worker/src/index.ts'))}`)
@@ -414,21 +435,29 @@ export class Client {
 
 export const field = (html, name) => (html.match(new RegExp(`name="${name}" value="([^"]*)"`)) || [])[1];
 
-/* Kompletter Ablauf bis zur Rückkehr von Google. claims/mode steuern das ID-Token des Mock-Google. */
-export async function login(client, google, { website = 'musterfirma.de', claims, mode, state } = {}) {
-  const start = await client.req('POST', '/api/anfrage', { form: { action: 'start', website } });
+/* Formular des Hero: Website, AGB-Häkchen (agb: false lässt es weg) und die angezeigte AGB-Version */
+export const startForm = ({ website = 'musterfirma.de', agb = true, agbVersion = TERMS_VERSION, extra = {} } = {}) => ({
+  action: 'start', website, ...(agb === true ? { agb: '1' } : agb === false ? {} : { agb }), ...(agbVersion === null ? {} : { agb_version: agbVersion }), ...extra,
+});
+
+/* Hero absenden („Analysieren“) und – wenn der Worker zu Google weiterleitet – den Google-Teil bis zum Code nachbilden */
+export async function begin(client, google, opts = {}) {
+  const start = await client.req('POST', '/api/anfrage', { form: startForm(opts) });
   if (start.status !== 303 || !start.location?.startsWith(client.app.authEndpoint)) return { start };
   const auth = new URL(start.location);
   const p = auth.searchParams;
-  const code = google.issueCode({ nonce: p.get('nonce'), challenge: p.get('code_challenge'), redirectUri: p.get('redirect_uri'), claims, mode });
-  const callbackPath = `/api/auth/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state ?? p.get('state'))}&scope=email+openid`;
-  const callback = await client.req('GET', callbackPath);
-  return { start, auth, callback, callbackPath };
+  const code = google.issueCode({ nonce: p.get('nonce'), challenge: p.get('code_challenge'), redirectUri: p.get('redirect_uri'), claims: opts.claims, mode: opts.mode });
+  const callbackPath = `/api/auth/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(opts.state ?? p.get('state'))}&scope=email+openid`;
+  return { start, auth, code, callbackPath };
 }
 
-export async function confirm(client, { consent = true, csrf, idem } = {}) {
-  const page = await client.req('GET', '/api/anfrage');
-  const form = { action: 'confirm', csrf: csrf ?? field(page.text, 'csrf') ?? '', idem: idem ?? field(page.text, 'idem') ?? '' };
-  if (consent) form.zustimmung = '1';
-  return { page, form, res: await client.req('POST', '/api/anfrage', { form }) };
+/* Kompletter Ablauf: Hero mit AGB → Google → Rückkehr. Die Rückkehr legt bei gültiger Zustimmung den Auftrag an (kein zweiter Klick).
+   claims/mode steuern das ID-Token des Mock-Google. */
+export async function login(client, google, opts = {}) {
+  const flow = await begin(client, google, opts);
+  if (!flow.callbackPath) return flow;
+  return { ...flow, callback: await client.req('GET', flow.callbackPath) };
 }
+
+/* Referenz auf der Eingangsbestätigung */
+export const referenceOf = html => (html.match(/id="reference">(PXA-[0-9A-Z]{4}-[0-9A-Z]{4})</) || [])[1];

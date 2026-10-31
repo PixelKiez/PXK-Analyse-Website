@@ -3,7 +3,7 @@
    node --test tests/notifier.test.mjs   Echte Provider (Google, Resend, Cloudflare-D1) werden hier NICHT getestet. */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mockGoogle, mockResend, startWorker, resendOutbound, Client, login, confirm, waitFor, sleep, workerAvailable, CUSTOMER, NOTIFY_TO, MAIL_FROM, MAIL_TOKEN, PRODUCTION_BASE } from './lib/harness.mjs';
+import { mockGoogle, mockResend, startWorker, resendOutbound, Client, login, begin, startForm, waitFor, sleep, workerAvailable, CUSTOMER, NOTIFY_TO, MAIL_FROM, MAIL_TOKEN, PRODUCTION_BASE } from './lib/harness.mjs';
 
 const skip = workerAvailable ? false : 'NOT_RUN: miniflare/esbuild fehlen (npm ci)';
 let google, mail, app;
@@ -29,8 +29,7 @@ test('Fehlgeschlagener Mailversand: Auftrag bleibt gespeichert und bestätigt; C
   await reset();
   mail.state.mode = 'fail';
   const c = new Client(app);
-  await login(c, google);
-  assert.equal((await confirm(c)).res.status, 303);
+  assert.equal((await login(c, google)).callback.status, 303);
   assert.match((await c.req('GET', '/api/anfrage')).text, /Ihre Anfrage liegt bei uns/, 'Annahme hängt an der Speicherung, nicht am Mailversand');
   await settled();
   assert.deepEqual(await app.sql('SELECT status, attempts, last_error FROM notifications'), [{ status: 'pending', attempts: 1, last_error: 'temporary:503:service_unavailable' }]);
@@ -54,8 +53,7 @@ test('Vorübergehender Fehler der Mail-API (503): kontrollierte Wiederholung mit
   await reset();
   mail.state.mode = 'fail';
   const c = new Client(app);
-  await login(c, google);
-  assert.equal((await confirm(c)).res.status, 303);
+  assert.equal((await login(c, google)).callback.status, 303);
   await settled();
   const [n] = await app.sql("SELECT status, attempts, last_error, next_attempt_at > datetime('now', '+4 minutes') AS later FROM notifications");
   assert.deepEqual(n, { status: 'pending', attempts: 1, last_error: 'temporary:503:service_unavailable', later: 1 });
@@ -77,8 +75,7 @@ test('Mail-API lehnt dauerhaft ab (401, 403, 422): sofort „failed“ ohne auto
     mail.state.mode = mode;
     const before = app.logs().length;
     const c = new Client(app, { ip: `198.51.100.${60 + i}` });
-    await login(c, google, { website: `firma-${mode}.de` });
-    assert.equal((await confirm(c)).res.status, 303, mode);
+    assert.equal((await login(c, google, { website: `firma-${mode}.de` })).callback.status, 303, mode);
     assert.match((await c.req('GET', '/api/anfrage')).text, /Ihre Anfrage liegt bei uns/, `${mode}: Annahme hängt nicht an Resend`);
     await settled();
     assert.deepEqual(await app.sql('SELECT status, attempts, last_error, sent_at FROM notifications'), [{ status: 'failed', attempts: 1, last_error: code, sent_at: null }], `${mode}: überprüfbarer Status in D1`);
@@ -99,13 +96,13 @@ test('Mail-API lehnt dauerhaft ab (401, 403, 422): sofort „failed“ ohne auto
 test('Benachrichtigung scheitert nach der Speicherung an der Datenbank: Annahme bleibt bestätigt, keine Fehlerseite, Cron versendet genau einmal', { skip }, async () => {
   await reset();
   const c = new Client(app);
-  await login(c, google);
+  const { callbackPath } = await begin(c, google);
   /* Auftrag und Outbox-Eintrag werden gespeichert; erst das Beanspruchen der Benachrichtigung (UPDATE) schlägt fehl */
   await app.run("CREATE TRIGGER pxwa_test_block BEFORE UPDATE ON notifications BEGIN SELECT RAISE(ABORT, 'pxwa test'); END");
   const before = app.logs().length;
   let res;
   try {
-    ({ res } = await confirm(c));
+    res = await c.req('GET', callbackPath);
     await waitFor(() => app.logs().slice(before).includes('nicht sofort abgeschlossen'), { what: 'Log der verschobenen Zustellung' });
   } finally {
     await app.run('DROP TRIGGER pxwa_test_block');
@@ -122,15 +119,17 @@ test('Benachrichtigung scheitert nach der Speicherung an der Datenbank: Annahme 
 /* Gültige Produktionskonfiguration: echte Google-Endpunkte, Resend, Absender aus notify.pixelkiez.de, freigegebene Datenschutz-Version */
 const PROD = {
   ENV: 'production', BASE_URL: PRODUCTION_BASE, GOOGLE_TOKEN_ENDPOINT: undefined, GOOGLE_JWKS_URI: undefined, GOOGLE_AUTH_ENDPOINT: undefined,
-  MAIL_API_URL: 'https://api.resend.com/emails', MAIL_FROM: 'benachrichtigung@notify.pixelkiez.de', PRIVACY_VERSION: '2026-11-01',
+  MAIL_API_URL: 'https://api.resend.com/emails', MAIL_FROM: 'benachrichtigung@notify.pixelkiez.de', PRIVACY_VERSION: '2026-11-01', TERMS_VERSION: 'AGB-2026-11-01',
 };
+/* Hero-Formular gegen die Produktionskonfiguration (dort freigegebene AGB-Version) */
+const prodStart = () => startForm({ agbVersion: PROD.TERMS_VERSION });
 
 test('Produktion: gültige Konfiguration wird angenommen – Basis-URL 360.pixelkiez.de, Google-Callback /api/auth/callback, __Host-Cookie; ohne Aufträge kein Aufruf von Resend', { skip }, async () => {
   const w = await startWorker({ base: PRODUCTION_BASE, env: PROD });
   try {
     const c = new Client(w);
     assert.equal((await c.req('GET', '/api/anfrage')).status, 200);
-    const start = await c.req('POST', '/api/anfrage', { form: { action: 'start', website: 'musterfirma.de' } });
+    const start = await c.req('POST', '/api/anfrage', { form: prodStart() });
     assert.equal(start.status, 303);
     const auth = new URL(start.location);
     assert.equal(auth.origin + auth.pathname, 'https://accounts.google.com/o/oauth2/v2/auth');
@@ -144,12 +143,15 @@ test('Produktion: gültige Konfiguration wird angenommen – Basis-URL 360.pixel
   }
 });
 
-test('Produktion: falscher Mail-Anbieter oder Pfad, fremder Absender, Datenschutz-Entwurf, Test-Endpunkte, andere Domain oder ungültige Löschfrist sperren die API (fail closed)', { skip }, async () => {
+test('Produktion: falscher Mail-Anbieter oder Pfad, fremder Absender, Datenschutz- oder AGB-Entwurf, Test-Endpunkte, andere Domain oder ungültige Löschfrist sperren die API (fail closed)', { skip }, async () => {
   const variants = [
     ['Mail-API nicht Resend', { MAIL_API_URL: 'https://api.mail-anbieter.example.net/emails' }, /MAIL_API_URL/],
     ['Resend mit falschem Pfad', { MAIL_API_URL: 'https://api.resend.com/v1/send' }, /MAIL_API_URL/],
     ['Absender außerhalb von notify.pixelkiez.de', { MAIL_FROM: 'analyse@pixelkiez.de' }, /MAIL_FROM/],
     ['Datenschutzerklärung nur als Entwurf', { PRIVACY_VERSION: 'ENTWURF-2026-10-31' }, /PRIVACY_VERSION/],
+    ['AGB nur als Entwurf', { TERMS_VERSION: 'ENTWURF-2026-10-31' }, /TERMS_VERSION/],
+    ['AGB-Entwurf in Kleinschreibung', { TERMS_VERSION: 'entwurf-agb' }, /TERMS_VERSION/],
+    ['AGB-Version fehlt', { TERMS_VERSION: undefined }, /TERMS_VERSION/],
     ['Mock-Google in Produktion', { GOOGLE_TOKEN_ENDPOINT: 'http://127.0.0.1:9/token', GOOGLE_JWKS_URI: 'http://127.0.0.1:9/certs' }, /GOOGLE_TOKEN_ENDPOINT, GOOGLE_JWKS_URI/],
     ['andere Domain', { BASE_URL: 'https://360.beispiel-domain.de' }, /BASE_URL/],
     ['pages.dev statt eigener Domain', { BASE_URL: 'https://pxwa.pages.dev' }, /BASE_URL/],
@@ -161,7 +163,7 @@ test('Produktion: falscher Mail-Anbieter oder Pfad, fremder Absender, Datenschut
     mail.reset();
     const w = await startWorker({ base: env.BASE_URL ?? PRODUCTION_BASE, env: { ...PROD, ...env } });
     try {
-      const r = await new Client(w).req('POST', '/api/anfrage', { form: { action: 'start', website: 'musterfirma.de' } });
+      const r = await new Client(w).req('POST', '/api/anfrage', { form: prodStart() });
       assert.equal(r.status, 503, name);
       assert.equal(r.location, null, `${name}: keine Weiterleitung`);
       assert.equal((await w.cron()).outcome, 'exception', `${name}: Cron versendet nichts`);
@@ -185,7 +187,7 @@ test('Produktion: interner Empfänger ausschließlich kontakt@pixelkiez.de – j
     mail.reset();
     const w = await startWorker({ base: PRODUCTION_BASE, env: { ...PROD, MAIL_NOTIFY_TO: to }, outbound: resendOutbound(mail) });
     try {
-      const r = await new Client(w).req('POST', '/api/anfrage', { form: { action: 'start', website: 'musterfirma.de' } });
+      const r = await new Client(w).req('POST', '/api/anfrage', { form: prodStart() });
       assert.equal(r.status, 503, name);
       assert.equal(r.location, null, `${name}: keine Weiterleitung`);
       assert.match(r.text, /Gerade nicht verfügbar/, `${name}: sichere Fehlerseite`);
@@ -205,7 +207,7 @@ test('Produktion: Groß-/Kleinschreibung von kontakt@pixelkiez.de wird angenomme
     mail.reset();
     const w = await startWorker({ base: PRODUCTION_BASE, env: { ...PROD, MAIL_NOTIFY_TO: to }, outbound: resendOutbound(mail) });
     try {
-      assert.equal((await new Client(w).req('POST', '/api/anfrage', { form: { action: 'start', website: 'musterfirma.de' } })).status, 303, `${to}: Konfiguration angenommen`);
+      assert.equal((await new Client(w).req('POST', '/api/anfrage', { form: prodStart() })).status, 303, `${to}: Konfiguration angenommen`);
       await w.run("INSERT INTO orders (reference, idempotency_key, google_sub, email, website_url, privacy_version, created_at) VALUES ('PXA-TEST-0001', 'k1', 's', ?1, 'https://firma.de', '2026-11-01', '2026-11-01 10:00:00')", CUSTOMER);
       await w.run("INSERT INTO notifications (order_id, next_attempt_at, created_at) SELECT id, '2000-01-01 00:00:00', created_at FROM orders");
       assert.match((await w.cron()).log, /PXWA: 1 versendet, 0 fehlgeschlagen/, to);
@@ -221,8 +223,7 @@ test('Produktion: Groß-/Kleinschreibung von kontakt@pixelkiez.de wird angenomme
 test('Cron-Aufräumen: abgelaufene Sessions und alte Rate-Limit-Fenster werden gelöscht, Aufträge bleiben', { skip }, async () => {
   await reset();
   const c = new Client(app);
-  await login(c, google);
-  assert.equal((await confirm(c)).res.status, 303);
+  assert.equal((await login(c, google)).callback.status, 303);
   await settled();
   await app.run("INSERT INTO sessions (id_hash, data, version, created_at, expires_at) VALUES ('alt', '{\"csrf\":\"x\"}', 0, 1, 2)");
   await app.run("INSERT INTO rate_limits (bucket, window_start, hits) VALUES ('start:alt', 1, 1)");
@@ -235,8 +236,7 @@ test('Cron-Aufräumen: abgelaufene Sessions und alte Rate-Limit-Fenster werden g
 test('Resend-Vertrag: POST /emails mit Bearer-Token, User-Agent, JSON und Idempotency-Key; Antwort-ID im Log, keine Adressen im Log', { skip }, async () => {
   await reset();
   const c = new Client(app);
-  await login(c, google, { website: 'https://www.musterfirma.de' });
-  assert.equal((await confirm(c)).res.status, 303);
+  assert.equal((await login(c, google, { website: 'https://www.musterfirma.de' })).callback.status, 303);
   await settled();
   const [o] = await orders();
   assert.equal(mail.state.requests.length, 1);
@@ -264,8 +264,7 @@ test('Resend-Fehler: vorübergehende Fehler mit Backoff wiederholt, dauerhafte s
     await reset();
     mail.state.mode = mode;
     const c = new Client(app, { ip: `198.51.100.${150 + i}` });
-    await login(c, google, { website: `firma-${mode}.de` });
-    assert.equal((await confirm(c)).res.status, 303, mode);
+    assert.equal((await login(c, google, { website: `firma-${mode}.de` })).callback.status, 303, mode);
     assert.match((await c.req('GET', '/api/anfrage')).text, /Ihre Anfrage liegt bei uns/, `${mode}: Annahme hängt nicht an Resend`);
     await settled();
     const [n] = await app.sql("SELECT status, attempts, last_error, next_attempt_at > datetime('now', '+4 minutes') AS later FROM notifications");
@@ -280,8 +279,7 @@ test('Resend-Fehler: vorübergehende Fehler mit Backoff wiederholt, dauerhafte s
   await reset();
   mail.state.mode = 'fail';
   const c = new Client(app);
-  await login(c, google);
-  await confirm(c);
+  assert.equal((await login(c, google)).callback.status, 303);
   await settled();
   mail.state.mode = 'ok';
   mail.state.keys.set(`pxwa-${(await orders())[0].reference}`, { raw: '{}', id: 'alt' });
@@ -298,13 +296,11 @@ test('Antwort von Resend geht verloren (Verbindungsabbruch, Zeitüberschreitung)
   await reset();
   mail.state.mode = 'drop';
   const a = new Client(app, { ip: '198.51.100.31' });
-  await login(a, google, { website: 'firma-abbruch.de' });
-  await confirm(a);
+  assert.equal((await login(a, google, { website: 'firma-abbruch.de' })).callback.status, 303);
   await settled();
   mail.state.mode = 'hang';
   const b = new Client(app, { ip: '198.51.100.32' });
-  await login(b, google, { website: 'firma-zeitueberschreitung.de' });
-  await confirm(b);
+  assert.equal((await login(b, google, { website: 'firma-zeitueberschreitung.de' })).callback.status, 303);
   await settled(25000);
   assert.deepEqual((await app.sql('SELECT last_error FROM notifications ORDER BY id')).map(r => r.last_error), ['connect', 'timeout']);
   assert.equal(mail.state.accepted.length, 2, 'Resend hatte beide Mails angenommen, die Antworten gingen verloren');
@@ -319,11 +315,11 @@ test('Antwort von Resend geht verloren (Verbindungsabbruch, Zeitüberschreitung)
 test('Resend nimmt an, Speichern des Status in D1 scheitert: Benachrichtigung bleibt fällig, Wiederholung ohne zweite Mail', { skip }, async () => {
   await reset();
   const c = new Client(app);
-  await login(c, google);
+  const { callbackPath } = await begin(c, google);
   const before = app.logs().length;
   await app.run("CREATE TRIGGER pxwa_test_sent BEFORE UPDATE OF status ON notifications WHEN NEW.status = 'sent' BEGIN SELECT RAISE(ABORT, 'pxwa test'); END");
   try {
-    assert.equal((await confirm(c)).res.status, 303);
+    assert.equal((await c.req('GET', callbackPath)).status, 303);
     await waitFor(() => app.logs().slice(before).includes('nicht sofort abgeschlossen'), { what: 'Log' });
   } finally {
     await app.run('DROP TRIGGER pxwa_test_sent');
@@ -343,8 +339,7 @@ test('Parallele Zustellversuche und Cron-Fehler: gleichzeitige Cron-Läufe sende
   mail.state.mode = 'fail';
   for (const [i, site] of ['firma-eins.de', 'firma-zwei.de'].entries()) {
     const c = new Client(app, { ip: `198.51.100.${40 + i}` });
-    await login(c, google, { website: site });
-    await confirm(c);
+    assert.equal((await login(c, google, { website: site })).callback.status, 303);
   }
   await settled();
   mail.state.mode = 'ok';

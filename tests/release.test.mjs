@@ -24,7 +24,7 @@ const MEDIA = {
   'media/report-pdf-de-1x1.mp4': '028005b2cc077a4c610457029130dd080c70f27d0b59e47e8884cf868eeb6a97',
   'media/report-pdf-poster.jpg': '0654272d71a86d1de3473bba8c800aabd3ff546e12659b2374f9f313a0d5f477',
 };
-const SITE = ['404.html', '_headers', '_routes.json', 'assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'datenschutz.html', 'impressum.html', 'index.html', 'pruefkriterien.html'];
+const SITE = ['404.html', '_headers', '_routes.json', 'agb.html', 'assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'datenschutz.html', 'impressum.html', 'index.html', 'pruefkriterien.html'];
 
 let dir, sha;
 before(() => {

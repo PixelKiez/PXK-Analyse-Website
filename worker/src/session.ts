@@ -5,19 +5,31 @@ import type { Db } from './db';
    die ID selbst steht nirgends in der Datenbank. Unbekannte oder abgelaufene IDs werden nie übernommen.
    Tokens von Google landen nie in der Session. Abgelaufene Zeilen löscht der Cron-Lauf. */
 
-export interface Identity {
-  sub: string;
-  email: string;
+/* AGB-Zustimmung aus dem Hero: serverseitig vor der Google-Anmeldung erfasst. url ist die normalisierte Website,
+   version die beim Absenden gültige AGB-Version, at der Zeitpunkt laut Server (nie aus dem Formular). */
+export interface Consent {
+  url: string;
+  version: string;
   at: number;
+}
+
+/* Eine laufende Google-Anmeldung. Zustimmung und Idempotenzschlüssel hängen an genau diesem state: Der Callback, der den
+   Flow aus der Session entfernt, legt damit höchstens einen Auftrag an. */
+export interface OidcFlow {
+  state: string;
+  nonce: string;
+  verifier: string;
+  at: number;
+  idem: string;
+  consent: Consent;
 }
 
 export interface SessionData {
   csrf: string;
-  oidc?: { state: string; nonce: string; verifier: string; at: number };
+  oidc?: OidcFlow;
+  /* Zuletzt eingegebene Website, nur zum Vorausfüllen, falls die Anmeldung abgebrochen wird */
   pending?: { url: string; at: number };
-  identity?: Identity;
-  idem?: string;
-  done?: { reference: string; url: string; email: string; idem: string; kind: 'created' | 'duplicate' };
+  done?: { reference: string; url: string; email: string; kind: 'created' | 'duplicate' };
 }
 
 export interface Session {

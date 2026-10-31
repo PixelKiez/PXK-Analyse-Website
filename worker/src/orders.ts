@@ -6,7 +6,13 @@ import { StorageError } from './errors';
    gespeichert (Outbox): Erst danach gilt der Auftrag als angenommen. Fällt der Mailversand danach aus,
    bleibt der Auftrag erhalten und die Benachrichtigung wird später erneut versucht.
    D1 führt Schreibzugriffe nacheinander aus; Duplikat- und Tageslimit stehen deshalb als Bedingung im INSERT selbst,
-   parallele Bestätigungen können sie nicht umgehen. */
+   parallele Anmeldungen können sie nicht umgehen. Jeder Auftrag speichert die akzeptierte AGB-Version und den
+   serverseitigen Zeitpunkt der Zustimmung (Migration 0002). */
+
+export interface AcceptedTerms {
+  version: string;
+  at: number;
+}
 
 export type OrderResult =
   | { result: 'created' | 'idempotent' | 'duplicate'; reference: string; orderId: number }
@@ -21,7 +27,7 @@ interface Row {
 export class OrderService {
   constructor(private db: Db, private duplicateDays: number, private maxPerDay: number) {}
 
-  async submit(sub: string, email: string, websiteUrl: string, idempotencyKey: string, privacyVersion: string, now: number): Promise<OrderResult> {
+  async submit(sub: string, email: string, websiteUrl: string, idempotencyKey: string, privacyVersion: string, terms: AcceptedTerms, now: number): Promise<OrderResult> {
     const same = await this.byKey(idempotencyKey, sub);
     if (same !== null) return same;
     const dupSince = utcText(now - this.duplicateDays * 86400);
@@ -30,13 +36,13 @@ export class OrderService {
       const reference = newReference();
       try {
         const [inserted] = await this.db.batch<{ id: number }>([
-          [`INSERT INTO orders (reference, idempotency_key, google_sub, email, website_url, privacy_version, status, created_at)
-            SELECT ?1, ?2, ?3, ?4, ?5, ?6, 'received', ?7
+          [`INSERT INTO orders (reference, idempotency_key, google_sub, email, website_url, privacy_version, terms_version, terms_accepted_at, status, created_at)
+            SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?11, ?12, 'received', ?7
             WHERE NOT EXISTS (SELECT 1 FROM orders WHERE idempotency_key = ?2)
               AND NOT EXISTS (SELECT 1 FROM orders WHERE google_sub = ?3 AND website_url = ?5 AND created_at >= ?8)
               AND (SELECT COUNT(*) FROM orders WHERE google_sub = ?3 AND created_at >= ?9) < ?10
             RETURNING id`,
-          [reference, idempotencyKey, sub, email, websiteUrl, privacyVersion, utcText(now), dupSince, daySince, this.maxPerDay]],
+          [reference, idempotencyKey, sub, email, websiteUrl, privacyVersion, utcText(now), dupSince, daySince, this.maxPerDay, terms.version, utcText(terms.at)]],
           [`INSERT INTO notifications (order_id, status, attempts, next_attempt_at, created_at)
             SELECT id, 'pending', 0, ?2, ?2 FROM orders WHERE reference = ?1`, [reference, utcText(now)]],
         ]);

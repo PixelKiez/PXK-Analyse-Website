@@ -22,17 +22,21 @@ export const AUTHORIZED_MAIL_API_HOSTS: readonly string[] = ['api.resend.com'];
 export const AUTHORIZED_MAIL_FROM_DOMAINS: readonly string[] = ['notify.pixelkiez.de'];
 
 /* Einziger Empfänger der internen Benachrichtigung in Produktion. MAIL_NOTIFY_TO muss diese Adresse sein (Groß-/Klein-
-   schreibung egal, nur ASCII); versendet wird immer an genau diese Schreibweise. Jede andere Adresse sperrt die API. */
+   schreibung egal, nur ASCII); versendet wird immer an genau diese Schreibweise. Jede andere Adresse sperrt die API.
+   Beschlossenes künftiges Ziel ist 360@pixelkiez.de (Confluence PXWA §16). Umstellung erst nach eigener Freigabe, wenn das
+   Postfach eingerichtet und die Zustellung nachgewiesen ist – dann in einem Schritt: diese Konstante, MAIL_NOTIFY_TO in
+   worker/wrangler.toml, NOTIFY_TO in tests/lib/harness.mjs und die Empfänger-Tests in tests/notifier.test.mjs. Nie beide
+   Adressen zugleich und kein automatischer Rückfall auf die alte Adresse. */
 export const PRODUCTION_NOTIFY_TO = 'kontakt@pixelkiez.de';
 
 export const LIMITS = {
   startPerIp: [20, 600],         // Anfragestarts je IP: 20 in 10 Minuten
   callbackPerIp: [30, 600],
-  confirmPerIp: [10, 3600],
+  orderPerIp: [10, 3600],        // angelegte Aufträge je IP: 10 pro Stunde
   ordersPerAccountDay: 5,
   duplicateDays: 30,             // gleiche Website + gleiches Google-Konto gilt so lange als Duplikat
-  loginTtl: 1800,                // bestätigte Anmeldung gilt 30 Minuten für die Bestätigung
   stateTtl: 600,
+  consentTtl: 600,               // AGB-Zustimmung aus dem Hero gilt 10 Minuten für die Google-Anmeldung
   sessionTtl: 3600,              // Session (Cookie und D1-Zeile) läuft nach einer Stunde ab
 } as const;
 
@@ -48,6 +52,7 @@ export interface Env {
   GOOGLE_JWKS_URI?: string;
   SECRET?: string;
   PRIVACY_VERSION?: string;
+  TERMS_VERSION?: string;
   MAIL_API_URL?: string;
   MAIL_API_TOKEN?: string;
   MAIL_FROM?: string;
@@ -83,6 +88,7 @@ export interface Config {
   redirectUri: string;
   secret: string;
   privacyVersion: string;
+  termsVersion: string;
   mail: MailConfig;
   retentionDays: number | null;
   db: D1Database;
@@ -133,6 +139,10 @@ export function loadConfig(env: Env): Config {
   const privacyVersion = str(env.PRIVACY_VERSION);
   /* Jeder Auftrag speichert die Version der Datenschutzerklärung. Ein Entwurf ist keine Grundlage für echte Aufträge. */
   if (!privacyVersion || (production && /^entwurf/i.test(privacyVersion))) missing.push('PRIVACY_VERSION');
+  /* Version der AGB, die der Hero zur Zustimmung zeigt (Feld agb_version) und jeder Auftrag speichert. Ohne rechtlich
+     freigegebene Fassung ist sie ein „ENTWURF-…“: dann nimmt die Produktion keine Aufträge an (fail closed). */
+  const termsVersion = str(env.TERMS_VERSION);
+  if (!/^[A-Za-z0-9._-]{1,64}$/.test(termsVersion) || (production && /^entwurf/i.test(termsVersion))) missing.push('TERMS_VERSION');
 
   const mail: MailConfig = {
     apiUrl: str(env.MAIL_API_URL),
@@ -173,6 +183,7 @@ export function loadConfig(env: Env): Config {
     redirectUri: baseUrl + '/api/auth/callback',
     secret,
     privacyVersion,
+    termsVersion,
     mail,
     retentionDays,
     db: env.DB,

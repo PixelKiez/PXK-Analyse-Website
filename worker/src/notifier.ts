@@ -70,6 +70,9 @@ interface OrderRow {
   reference: string;
   email: string;
   website_url: string;
+  status: string;
+  terms_version: string | null;
+  terms_accepted_at: string | null;
   created_at: string;
   attempts: number;
 }
@@ -88,7 +91,8 @@ export class Notifier {
       [utcText(now + LOCK_SECONDS), orderId, utcText(now)]);
     if (claimed !== 1) return 'busy';
     const order = await this.db.first<OrderRow>(
-      'SELECT o.reference, o.email, o.website_url, o.created_at, n.attempts FROM orders o JOIN notifications n ON n.order_id = o.id WHERE o.id = ?1', [orderId]);
+      `SELECT o.reference, o.email, o.website_url, o.status, o.terms_version, o.terms_accepted_at, o.created_at, n.attempts
+       FROM orders o JOIN notifications n ON n.order_id = o.id WHERE o.id = ?1`, [orderId]);
     if (order === null) return 'busy';
     let id: string | null;
     try {
@@ -148,7 +152,9 @@ const text = (o: OrderRow): string =>
   + `Referenz: ${o.reference}\n`
   + `Eingegangen (UTC): ${o.created_at}\n`
   + `Website: ${o.website_url}\n`
-  + `Von Google bestätigte E-Mail-Adresse: ${o.email}\n\n`
+  + `Von Google bestätigte E-Mail-Adresse: ${o.email}\n`
+  + `Auftrag: Free (0 €), Status ${o.status}\n`
+  + `AGB: Version ${o.terms_version ?? 'nicht erfasst'}, akzeptiert (UTC) ${o.terms_accepted_at ?? 'nicht erfasst'}\n\n`
   + 'Nächster Schritt: Website manuell analysieren, den siebenseitigen PDF-Bericht außerhalb der Website erstellen\n'
   + 'und manuell an die oben genannte, von Google bestätigte E-Mail-Adresse senden.\n\n'
   + 'Achtung: Die Website-Adresse ist eine ungeprüfte Nutzereingabe. Bitte nur in einem isolierten Browserprofil öffnen.\n'

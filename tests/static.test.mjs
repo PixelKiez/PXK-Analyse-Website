@@ -7,11 +7,13 @@ import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { join, relative } from 'node:path';
 import * as H from './lib/html.mjs';
-import { ROOT, artifactFiles, uploadFiles, MIGRATION } from './lib/harness.mjs';
+import { ROOT, artifactFiles, uploadFiles, MIGRATIONS } from './lib/harness.mjs';
 
 const read = p => readFileSync(join(ROOT, p), 'utf8');
 const git = (...a) => execFileSync('git', a, { cwd: ROOT, encoding: 'utf8' });
-const PAGES = ['public/index.html', 'public/pruefkriterien.html', 'public/impressum.html', 'public/datenschutz.html', 'public/404.html'];
+const PAGES = ['public/index.html', 'public/pruefkriterien.html', 'public/impressum.html', 'public/datenschutz.html', 'public/agb.html', 'public/404.html'];
+/* Stand vor PXWA-BE-02 (Hero ohne AGB-Häkchen): Referenz für den Hero-Schutz */
+const BASE_SHA = '13ac821f94c754a94c330b5686f5bf12f4a0282d';
 const FUNCTION = 'functions/api/[[path]].ts';
 const MEDIA_FUNCTION = 'functions/media/[file].ts';
 const MEDIA = ['media/360-pixelkiez-video-1080p.mp4', 'media/360-pixelkiez-video-poster.jpg', 'media/report-pdf-de-1x1.mp4', 'media/report-pdf-poster.jpg'];
@@ -105,13 +107,66 @@ test('Startseite: kostenloses Angebot, vier Bereiche, sieben PDF-Seiten, GEO & A
   assert.match(txt(H.byClass(root, 'plan--featured')[0]), /0 €/);
   const form = H.byId(root, 'analyze');
   assert.equal(form.attrs.get('action'), '/api/anfrage', 'Formular geht an den API-Worker (Cloudflare-Route /api/*)'); assert.equal(form.attrs.get('method'), 'post');
-  assert.deepEqual(H.find(form, e => e.attrs.has('name')).map(e => e.attrs.get('name')), ['action', 'website']);
+  assert.deepEqual(H.find(form, e => e.attrs.has('name')).map(e => e.attrs.get('name')), ['action', 'agb_version', 'website', 'agb'], 'nur Website, AGB-Häkchen und angezeigte AGB-Version – per POST, nie in einer GET-URL');
+});
+
+test('Hero (PXWA-BE-02): AGB-Pflichthäkchen nicht vorausgewählt, AGB- und Datenschutz-Link, Button „Analysieren“, Hinweis „0 €, kein Abo“', () => {
+  const { root } = H.parse(read('public/index.html'));
+  const txt = el => H.norm(H.textOf(el));
+  const form = H.byId(root, 'analyze');
+  const box = H.byId(form, 'agb');
+  assert.deepEqual([box.tag, box.attrs.get('type'), box.attrs.get('name'), box.attrs.get('value')], ['input', 'checkbox', 'agb', '1']);
+  assert.ok(box.attrs.has('required') && !box.attrs.has('checked'), 'Pflicht und nicht vorausgewählt');
+  const label = H.find(form, e => e.tag === 'label' && H.find(e, x => x === box).length)[0];
+  assert.ok(label, 'Häkchen steht in seinem Label (ganzer Text klickbar)');
+  assert.equal(txt(label), 'Ich akzeptiere die AGB von 360°Pixelkiez.');
+  assert.deepEqual(H.byTag(label, 'a').map(a => [a.attrs.get('href'), txt(a)]), [['agb.html', 'AGB']]);
+  assert.deepEqual(H.byTag(form, 'a').map(a => a.attrs.get('href')), ['agb.html', 'datenschutz.html'], 'AGB- und separater Datenschutz-Link');
+  assert.equal(txt(H.find(form, e => e.tag === 'button')[0]), 'Analysieren');
+  assert.equal(txt(H.byClass(form, 'hero-note')[0]), 'Kostenlose Website-Analyse – 0 €, kein Abo. Datenschutzerklärung');
+  for (const id of ['url-error', 'agb-error']) assert.ok(H.byId(form, id).attrs.has('hidden'), `${id} zunächst verborgen`);
+  assert.equal(txt(H.byTag(H.byClass(root, 'hero')[0], 'h1')[0]), 'Sehen Sie, was Ihre Website ausbremst.', 'Original-H1');
+});
+
+test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen neu, Reihenfolge erhalten; außerhalb des Hero nur der Text von Schritt 02', () => {
+  const now = read('public/index.html');
+  const old = git('show', `${BASE_SHA}:public/index.html`);
+  const hero = html => { const i = html.indexOf('<section class="hero">'); return html.slice(i, html.indexOf('</section>', i) + '</section>'.length); };
+  const lines = html => hero(html).split('\n').map(l => l.trim());
+  const [a, b] = [lines(old), lines(now)];
+  assert.deepEqual(a.filter(l => !b.includes(l)), ['<button class="btn btn--accent" type="submit">Kostenlos anfragen <svg class="i"><use href="#i-arrow"/></svg></button>'], 'entfernt nur der alte Buttontext');
+  assert.deepEqual(b.filter(l => !a.includes(l)), [
+    '<input type="hidden" name="agb_version" value="ENTWURF-2026-10-31">',
+    '<button class="btn btn--accent" type="submit">Analysieren <svg class="i"><use href="#i-arrow"/></svg></button>',
+    '<label class="consent consent--hero"><input id="agb" type="checkbox" name="agb" value="1" required><span>Ich akzeptiere die <a href="agb.html">AGB</a> von 360°Pixelkiez.</span></label>',
+    '<p class="form-error" id="agb-error" hidden>Bitte akzeptieren Sie die AGB, damit wir Ihre Website analysieren können.</p>',
+    '<p class="hero-note">Kostenlose Website-Analyse – 0 €, kein Abo. <a href="datenschutz.html">Datenschutzerklärung</a></p>',
+  ], 'neu nur Häkchen, Fehlertext, Hinweis, Version und Buttontext');
+  const kept = a.filter(l => b.includes(l));
+  assert.deepEqual(b.filter(l => kept.includes(l)), kept, 'Badge, H1, Lead, URL-Feld und Faktenzeile in unveränderter Reihenfolge');
+  const outside = html => html.replace(hero(html), '').replace(/<div class="step cw-lilac"><span>02<\/span>.*?<\/div>/, '<SCHRITT-02>');
+  assert.equal(outside(now), outside(old), 'übrige Startseite unverändert (außer Schritt 02, der den zweiten Bestätigungsklick beschrieb)');
+  assert.match(now, /<span>02<\/span><h3>AGB akzeptieren und anmelden<\/h3>/);
+});
+
+test('AGB-Seite: eindeutig als Entwurf gekennzeichnet, keine erfundenen Vertragsklauseln; Version gleich Hero-Feld und TERMS_VERSION', () => {
+  const { root } = H.parse(read('public/agb.html'));
+  const main = H.norm(H.textOf(H.byTag(root, 'main')[0]));
+  for (const s of ['ENTWURF – nicht rechtlich freigegeben', 'in Vorbereitung', 'keine Vertragsbedingungen', 'Bis dahin nimmt diese Website keine Aufträge an']) assert.ok(main.includes(s), `AGB-Seite: „${s}“`);
+  assert.ok(!/§|Haftung|Gewährleistung|Gerichtsstand|Widerruf|Vertragsschluss|Kündigung|Leistungsumfang|Vergütung/i.test(main), 'keine Vertragsklauseln');
+  assert.deepEqual(H.byClass(root, 'legal-h').map(e => H.norm(H.textOf(e))), ['Version', 'Fragen']);
+  const version = H.norm(H.textOf(H.byId(root, 'agb-version')));
+  const hero = H.find(H.byId(H.parse(read('public/index.html')).root, 'analyze'), e => e.attrs.get('name') === 'agb_version')[0].attrs.get('value');
+  const toml = /^TERMS_VERSION = "([^"]+)"$/m.exec(read('worker/wrangler.toml'))[1];
+  assert.deepEqual([hero, toml], [version, version], 'eine AGB-Version in Hero, AGB-Seite und Worker-Konfiguration');
+  assert.match(version, /^ENTWURF-/, 'ohne freigegebene Fassung bleibt die Produktion gesperrt (config.ts lehnt ENTWURF ab)');
+  assert.ok(read('worker/src/config.ts').includes("(production && /^entwurf/i.test(termsVersion))) missing.push('TERMS_VERSION');"), 'Produktion lehnt AGB-Entwürfe ab');
 });
 
 test('Wahrheitsgemäße Aussagen: kein Premium/Checkout/Abo/Dashboard/Score, keine Garantien, keine DSGVO-Behauptung, keine Vorschau-Reste', () => {
   for (const page of PAGES) assert.deepEqual(claimProblems(surfaces(read(page))), [], page);
   assert.deepEqual(claimProblems([['view.ts', viewText()]]), []);
-  for (const s of ['Kostenlose Website-Analyse', '0 €, kein Abo, keine Folgekosten', 'PDF mit sieben Seiten', 'keinen Zugriff auf Ihr Postfach', 'nicht automatisch abgerufen oder gescannt']) {
+  for (const s of ['Kostenlose Website-Analyse – 0 €, kein Abo', 'PDF mit sieben Seiten', 'keinen Zugriff auf Ihr Postfach', 'nicht automatisch abgerufen oder gescannt', 'Version und Zeitpunkt Ihrer Zustimmung zu den AGB', 'Analysieren']) {
     assert.ok(viewText().includes(s), `view.ts enthält "${s}"`);
   }
   /* Negativprobe: der alte Stand mit Free/Premium wird erkannt */
@@ -214,7 +269,7 @@ test('Design: styles.css unverändert gegenüber vision.html; alle verwendeten K
 });
 
 test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, Functions nur unter /api/* und für zwei Videos, Sicherheits-Header, keine Railway- oder PHP-Reste', () => {
-  assert.deepEqual(artifactFiles(), ['404.html', '_headers', '_routes.json', 'assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'datenschutz.html', 'impressum.html', 'index.html', ...MEDIA, 'pruefkriterien.html']);
+  assert.deepEqual(artifactFiles(), ['404.html', '_headers', '_routes.json', 'agb.html', 'assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'datenschutz.html', 'impressum.html', 'index.html', ...MEDIA, 'pruefkriterien.html']);
   assert.deepEqual(repoFiles().filter(f => /\.(php|phtml)$|(^|\/)\.htaccess$|^(server|bin)\/|railway|Dockerfile|Caddyfile|\.dockerignore/i.test(f)), [], 'keine PHP-, Railway- oder Docker-Bestandteile');
   const pages = read('wrangler.toml');
   const active = pages.split('\n').filter(l => !l.trim().startsWith('#')).join('\n');
@@ -254,7 +309,7 @@ test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, F
 
 test('Release-Scan des Pages-Uploads (public/ wie `wrangler pages deploy`): nur Website-Dateien, keine Quellen, kein PHP/Railway, keine Secrets, höchstens 25 MiB je Datei', () => {
   const files = uploadFiles();
-  assert.deepEqual(files.filter(f => !f.startsWith('media/')), ['404.html', 'assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'datenschutz.html', 'impressum.html', 'index.html', 'pruefkriterien.html']);
+  assert.deepEqual(files.filter(f => !f.startsWith('media/')), ['404.html', 'agb.html', 'assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'datenschutz.html', 'impressum.html', 'index.html', 'pruefkriterien.html']);
   assert.ok(files.filter(f => f.startsWith('media/')).every(f => /^media\/[\w-]+\.(mp4|jpg)$/.test(f)), 'in media/ nur Videos und Poster');
   assert.ok(files.length < 20000);
   for (const f of files) {
@@ -284,6 +339,7 @@ test('Release-Grenze API (privater Worker): keine Route, keine workers.dev-Adres
   assert.match(active, /^MAIL_API_URL = "https:\/\/api\.resend\.com\/emails"$/m);
   assert.match(active, /^MAIL_FROM = ""$/m, 'Absender erst nach Verifizierung der Versanddomain');
   assert.match(active, /^PRIVACY_VERSION = "ENTWURF-/m, 'Datenschutzerklärung nicht freigegeben: Produktion nimmt keine Aufträge an');
+  assert.match(active, /^TERMS_VERSION = "ENTWURF-/m, 'AGB nicht freigegeben: Produktion nimmt keine Aufträge an');
   assert.match(active, /^MAIL_NOTIFY_TO = "kontakt@pixelkiez\.de"$/m);
   assert.ok(!/^ORDER_RETENTION_DAYS\s*=/m.test(active), 'Löschfrist nicht aktiv, solange die Aufbewahrungsfrist offen ist');
   const config = read('worker/src/config.ts');
@@ -293,16 +349,21 @@ test('Release-Grenze API (privater Worker): keine Route, keine workers.dev-Adres
   assert.match(config, /export const PRODUCTION_NOTIFY_TO = 'kontakt@pixelkiez\.de';/, 'fester interner Empfänger in Produktion');
 });
 
-test('D1-Schema: nur die nötigen Tabellen und Spalten (Datenminimierung), keine Tokens', () => {
-  const tables = Object.fromEntries([...MIGRATION.matchAll(/CREATE TABLE IF NOT EXISTS (\w+) \(([\s\S]*?)\n\);/g)].map(([, name, body]) => [name,
+test('D1-Schema: nur die nötigen Tabellen und Spalten (Datenminimierung), keine Tokens; Migration 0002 rein additiv', () => {
+  const sql = MIGRATIONS.join('\n');
+  const tables = Object.fromEntries([...sql.matchAll(/CREATE TABLE IF NOT EXISTS (\w+) \(([\s\S]*?)\n\);/g)].map(([, name, body]) => [name,
     body.split('\n').map(l => l.trim().split(/\s+/)[0]).filter(c => c && !['PRIMARY'].includes(c))]));
+  for (const [, table, column] of sql.matchAll(/^ALTER TABLE (\w+) ADD COLUMN (\w+)/gm)) tables[table].push(column);
+  assert.equal(MIGRATIONS.length, 2);
+  const additive = MIGRATIONS[1].replace(/^\s*--.*$/gm, '').split(';').map(x => x.trim()).filter(Boolean);
+  assert.deepEqual(additive, ['ALTER TABLE orders ADD COLUMN terms_version TEXT NULL', 'ALTER TABLE orders ADD COLUMN terms_accepted_at TEXT NULL'], '0002: nur neue Spalten, kein DROP/UPDATE/DELETE');
   assert.deepEqual(tables, {
-    orders: ['id', 'reference', 'idempotency_key', 'google_sub', 'email', 'website_url', 'privacy_version', 'status', 'created_at'],
+    orders: ['id', 'reference', 'idempotency_key', 'google_sub', 'email', 'website_url', 'privacy_version', 'status', 'created_at', 'terms_version', 'terms_accepted_at'],
     notifications: ['id', 'order_id', 'status', 'attempts', 'next_attempt_at', 'locked_until', 'last_error', 'sent_at', 'created_at'],
     rate_limits: ['bucket', 'window_start', 'hits'],
     sessions: ['id_hash', 'data', 'version', 'created_at', 'expires_at'],
   });
-  assert.ok(!/token|password|ip_address/i.test(MIGRATION.replace(/^\s*--.*$/gm, '')));
+  assert.ok(!/token|password|ip_address/i.test(sql.replace(/^\s*--.*$/gm, '')));
 });
 
 test('Keine Secrets im Repository', () => {

@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { mockGoogle, mockResend, startPages, waitFor, workerAvailable, wranglerAvailable, ROOT } from './lib/harness.mjs';
+import { mockGoogle, mockResend, startPages, waitFor, sleep, workerAvailable, wranglerAvailable, ROOT, TERMS_VERSION } from './lib/harness.mjs';
 
 const SHOTS = process.env.PXK_SCREENSHOT_DIR || '';
 const AXE = process.env.PXK_AXE || '';
@@ -50,10 +50,11 @@ after(async () => {
   await browser.close(); await app.stop(); await google.stop(); await mail.stop();
 });
 
-async function open(path, { width = 1440, height = 900, reducedMotion = 'reduce', bypassCSP = false } = {}) {
-  const context = await browser.newContext({ viewport: { width, height }, reducedMotion, bypassCSP });
+async function open(path, { width = 1440, height = 900, reducedMotion = 'reduce', bypassCSP = false, javaScriptEnabled = true } = {}) {
+  const context = await browser.newContext({ viewport: { width, height }, reducedMotion, bypassCSP, javaScriptEnabled });
   const page = await context.newPage();
-  const errors = [], blocked = [];
+  const errors = [], blocked = [], requests = [];
+  page.on('request', r => requests.push({ method: r.method(), url: r.url(), body: r.postData() ?? '' }));
   await context.route('**/*', route => {
     const u = new URL(route.request().url());
     if (u.origin === app.base || FONT_HOSTS.includes(u.hostname)) return route.continue();
@@ -65,9 +66,13 @@ async function open(path, { width = 1440, height = 900, reducedMotion = 'reduce'
   page.on('pageerror', e => errors.push(String(e)));
   /* 'load' statt 'networkidle': Video-Anfragen (preload) können länger offen bleiben */
   await page.goto(app.base + path, { waitUntil: 'load' });
-  await page.evaluate(() => document.fonts.ready);
-  return { context, page, errors, blocked };
+  if (javaScriptEnabled) await page.evaluate(() => document.fonts.ready);
+  return { context, page, errors, blocked, requests };
 }
+const resetData = async () => { await app.exec('DELETE FROM notifications; DELETE FROM orders; DELETE FROM rate_limits; DELETE FROM sessions'); mail.reset(); };
+const orderCount = () => app.sql('SELECT COUNT(*) AS n FROM orders')[0].n;
+/* Die eingegebene Website darf nur im POST-Body stehen, nie in einer URL (keine Übertragung per GET, nicht an Google) */
+const leaks = (requests, needle) => requests.filter(r => r.url.toLowerCase().includes(needle));
 
 const overflow = page => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 const focusInfo = page => page.evaluate(() => {
@@ -91,7 +96,7 @@ async function tabTo(page, pred, max = 40) {
 
 test('Mobile Hauptansicht: kein horizontaler Überlauf, Formular sichtbar, Navigationsbutton in der Pille (320/390/768/1440)', { skip }, async t => {
   for (const width of [320, 390, 768, 1440]) {
-    for (const path of ['/index.html', '/pruefkriterien.html', '/api/anfrage', '/impressum.html', '/datenschutz.html', '/gibt/es/nicht']) {
+    for (const path of ['/index.html', '/pruefkriterien.html', '/api/anfrage', '/impressum.html', '/datenschutz.html', '/agb.html', '/gibt/es/nicht']) {
       const { context, page, errors, blocked } = await open(path, { width, height: 800 });
       await page.$$eval('details', ds => ds.forEach(d => { d.open = true; }));
       assert.ok(await overflow(page) <= 0, `${path} ${width}: Überlauf`);
@@ -101,8 +106,10 @@ test('Mobile Hauptansicht: kein horizontaler Überlauf, Formular sichtbar, Navig
       });
       assert.ok(nav, `${path} ${width}: Navigationsbutton ragt aus der Pille`);
       if (['/index.html', '/api/anfrage'].includes(path)) {
-        const form = await page.evaluate(() => ['#url', '.url-field .btn'].map(s => { const r = document.querySelector(s).getBoundingClientRect(); return r.width > 0 && r.left >= 0 && r.right <= innerWidth; }));
-        assert.deepEqual(form, [true, true], `${path} ${width}: Eingabefeld und Button vollständig sichtbar`);
+        const form = await page.evaluate(() => ['#url', '.url-field .btn', '#agb', 'label.consent', 'label.consent a'].map(s => { const r = document.querySelector(s).getBoundingClientRect(); return r.width > 0 && r.left >= 0 && r.right <= innerWidth; }));
+        assert.deepEqual(form, [true, true, true, true, true], `${path} ${width}: Eingabefeld, Button, AGB-Häkchen und AGB-Link vollständig sichtbar`);
+        const target = await page.evaluate(() => document.querySelector('label.consent').getBoundingClientRect().height);
+        assert.ok(target >= 24, `${path} ${width}: AGB-Häkchen mit Beschriftung mindestens 24 px hoch (${target})`);
       }
       if (SHOTS) await page.screenshot({ path: join(SHOTS, `${path.slice(1).replace(/\W/g, '_')}-${width}.png`), fullPage: true });
       /* Die 404-Seite kommt korrekt mit Status 404; Chromium meldet das für das Dokument selbst als Konsolenfehler */
@@ -115,15 +122,18 @@ test('Mobile Hauptansicht: kein horizontaler Überlauf, Formular sichtbar, Navig
   t.diagnostic(SHOTS ? `Screenshots: ${SHOTS}` : 'Screenshots nicht gespeichert (PXK_SCREENSHOT_DIR nicht gesetzt)');
 });
 
-test('Hero beim Öffnen: Überschrift, Text und Website-Eingabe vollständig im ersten Bildschirm und kontrastreich (Desktop und Mobil)', { skip }, async () => {
-  /* Alles inklusive Faktenzeile sichtbar; beim sehr kleinen 320×568 mindestens Überschrift, Text, Eingabe und Button */
-  const full = ['1920x1080', '1440x900', '1366x768', '1280x720', '1024x768', '768x1024', '390x844', '375x667', '360x740', '360x640'];
+test('Hero beim Öffnen: Überschrift, Text, Website-Eingabe und AGB-Häkchen im ersten Bildschirm (ab 360×640) und kontrastreich (Desktop und Mobil)', { skip }, async () => {
+  /* Alles inklusive AGB-Häkchen, Hinweis und Faktenzeile sichtbar. 360×640: Faktenzeile darf seit dem AGB-Häkchen (BE-02) knapp unter
+     den Rand rutschen, Häkchen und Hinweis nicht. Beim sehr kleinen 320×568 wie bisher mindestens Überschrift, Text, Eingabe und Button;
+     das Häkchen liegt dort knapp darunter (ohne Häkchen setzt „Analysieren“ den Fokus mit Fehlertext darauf). */
+  const full = ['1920x1080', '1440x900', '1366x768', '1280x720', '1024x768', '768x1024', '390x844', '375x667', '360x740'];
+  const compact = ['360x640'];
   const contrast = (a, b) => {
     const lum = c => { const [r, g, bl] = c.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number).map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }); return .2126 * r + .7152 * g + .0722 * bl; };
     const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
     return (x + .05) / (y + .05);
   };
-  for (const size of [...full, '320x568']) {
+  for (const size of [...full, ...compact, '320x568']) {
     const [width, height] = size.split('x').map(Number);
     const { context, page } = await open('/index.html', { width, height });
     const m = await page.evaluate(() => {
@@ -131,12 +141,12 @@ test('Hero beim Öffnen: Überschrift, Text und Website-Eingabe vollständig im 
       const input = document.querySelector('#url');
       return {
         vh: innerHeight, nav: b('#nav'), h1Top: document.querySelector('.hero .h1').getBoundingClientRect().top,
-        h1: b('.hero .h1'), lead: b('.hero .lead'), field: b('.url-field'), button: b('.url-field .btn'), facts: b('.hero .facts'),
+        h1: b('.hero .h1'), lead: b('.hero .lead'), field: b('.url-field'), button: b('.url-field .btn'), agb: b('.hero .consent'), note: b('.hero .hero-note'), facts: b('.hero .facts'),
         leadColor: getComputedStyle(document.querySelector('.hero .lead')).color, bodyBg: getComputedStyle(document.body).backgroundColor,
         placeholder: getComputedStyle(input, '::placeholder').color, fieldBg: getComputedStyle(input.closest('.url-field')).backgroundColor,
       };
     });
-    const must = full.includes(size) ? ['h1', 'lead', 'field', 'button', 'facts'] : ['h1', 'lead', 'field', 'button'];
+    const must = full.includes(size) ? ['h1', 'lead', 'field', 'button', 'agb', 'note', 'facts'] : compact.includes(size) ? ['h1', 'lead', 'field', 'button', 'agb', 'note'] : ['h1', 'lead', 'field', 'button'];
     for (const k of must) assert.ok(m[k] <= m.vh, `${size}: ${k} endet bei ${Math.round(m[k])} px, sichtbar sind ${m.vh} px`);
     assert.ok(m.h1Top >= m.nav, `${size}: Überschrift liegt nicht unter der Navigation`);
     assert.ok(contrast(m.leadColor, m.bodyBg) >= 7, `${size}: Lauftext kontrastreich`);
@@ -281,14 +291,13 @@ test('Scrollen: Inhalte blenden beim Hineinscrollen ein; oben nichts versteckt; 
   }
 });
 
-test('Tastatur: ungültige Eingabe bleibt im Feld; gültige Anfrage komplett per Tab/Enter/Leertaste bis zur Referenz (mobil und Desktop)', { skip }, async () => {
+test('Tastatur: ungültige Adresse und fehlendes AGB-Häkchen bleiben im Formular (Fokus, nichts gesendet); mit Häkchen per Tab/Leertaste/Enter über Google direkt zur Referenz (mobil und Desktop)', { skip }, async () => {
   for (const width of [390, 1440]) {
-    await app.exec('DELETE FROM notifications; DELETE FROM orders; DELETE FROM rate_limits; DELETE FROM sessions');
-    mail.reset();
+    await resetData();
     /* bypassCSP nur hier: Die statische Meta-CSP erlaubt als Formularziel nur https://accounts.google.com, nicht den lokalen Mock.
        Die CSP selbst prüfen der Mobil-Test (keine CSP-Konsolenfehler) und tests/static.test.mjs (form-action). */
     const before = google.log.auth || 0;
-    const { context, page, errors, blocked } = await open('/index.html', { width, height: 800, bypassCSP: true });
+    const { context, page, errors, blocked, requests } = await open('/index.html', { width, height: 800, bypassCSP: true });
     const field = await tabTo(page, f => f.id === 'url');
     assert.ok(field.visible, 'Fokus im URL-Feld sichtbar');
     await page.keyboard.type('keine adresse');
@@ -297,23 +306,37 @@ test('Tastatur: ungültige Eingabe bleibt im Feld; gültige Anfrage komplett per
     assert.deepEqual(await page.evaluate(() => [document.activeElement.id, document.activeElement.getAttribute('aria-invalid'), location.pathname]), ['url', 'true', '/'], 'Pages liefert /index.html unter / aus');
     await page.fill('#url', '');
     await page.keyboard.type('musterfirma.de');
-    await Promise.all([page.waitForURL(`${app.base}/api/anfrage`), page.keyboard.press('Enter')]);
+    /* Gültige Adresse, aber kein AGB-Häkchen: Fehler am Häkchen, Fokus dorthin, keine Anfrage an Worker oder Google */
+    await page.keyboard.press('Enter');
+    assert.equal(await page.isVisible('#agb-error'), true);
+    assert.equal(await page.isVisible('#url-error'), false);
+    assert.deepEqual(await page.evaluate(() => [document.activeElement.id, document.activeElement.getAttribute('aria-invalid'), document.activeElement.getAttribute('aria-describedby'), location.pathname]), ['agb', 'true', 'agb-error', '/']);
+    await page.waitForTimeout(80);
+    assert.ok((await focusInfo(page)).visible, 'Fokus auf dem Häkchen sichtbar');
+    assert.equal(await page.isChecked('#agb'), false, 'nicht vorausgewählt');
+    assert.deepEqual(requests.filter(r => r.method === 'POST' || r.url.includes('/api/')), [], 'ohne Häkchen wird nichts gesendet');
+    assert.equal((google.log.auth || 0) - before, 0);
+    await page.keyboard.press('Space');
+    assert.equal(await page.isChecked('#agb'), true);
+    assert.equal(await page.isVisible('#agb-error'), false, 'Fehler verschwindet mit dem Häkchen');
+    await page.keyboard.press('Shift+Tab');
+    await page.waitForTimeout(80);
+    const submit = await focusInfo(page);
+    assert.deepEqual([submit.tag, submit.text], ['BUTTON', 'Analysieren']);
+    assert.ok(submit.visible, 'Fokus auf „Analysieren“ sichtbar');
+    await Promise.all([page.waitForSelector('#reference'), page.keyboard.press('Enter')]);
+    assert.equal(new URL(page.url()).pathname, '/api/anfrage');
+    assert.match(await page.textContent('#reference'), /^PXA-[0-9A-Z]{4}-[0-9A-Z]{4}$/);
+    assert.match(await page.textContent('h1'), /Ihre Anfrage liegt bei uns/);
+    assert.equal(await page.locator('form, input[type=checkbox]').count(), 0, 'kein zweiter Bestätigungsschritt');
     assert.equal(google.log.auth - before, 1, 'genau eine Google-Autorisierung');
     assert.equal(google.log.lastAuth.scope, 'openid email');
-    assert.match(await page.textContent('h1'), /Anfrage bestätigen/);
-    const box = await tabTo(page, f => f.type === 'checkbox');
-    assert.ok(box.visible, 'Fokus auf Checkbox sichtbar');
-    await page.keyboard.press('Space');
-    assert.equal(await page.isChecked('input[name=zustimmung]'), true);
-    const submit = await tabTo(page, f => f.tag === 'BUTTON');
-    assert.equal(submit.text, 'Kostenlos anfragen');
-    assert.ok(submit.visible, 'Fokus auf Absende-Button sichtbar');
-    await Promise.all([page.waitForSelector('#reference'), page.keyboard.press('Enter')]);
-    assert.match(await page.textContent('#reference'), /^PXA-[0-9A-Z]{4}-[0-9A-Z]{4}$/);
     assert.ok(await overflow(page) <= 0, `${width}: Überlauf auf der Bestätigung`);
-    assert.equal((await app.sql('SELECT COUNT(*) AS n FROM orders'))[0].n, 1);
+    assert.deepEqual(app.sql('SELECT website_url, terms_version FROM orders'), [{ website_url: 'https://musterfirma.de', terms_version: TERMS_VERSION }]);
     await waitFor(() => mail.state.accepted.length === 1, { what: 'interne Benachrichtigung' });
     assert.deepEqual(mail.state.accepted[0].to, ['kontakt@pixelkiez.de']);
+    assert.deepEqual(leaks(requests, 'musterfirma'), [], 'Website-Adresse nie in einer URL');
+    assert.ok(requests.some(r => r.method === 'POST' && /website=musterfirma\.de/.test(r.body) && /agb=1/.test(r.body) && r.body.includes(`agb_version=${TERMS_VERSION}`)), 'per POST mit Häkchen und AGB-Version');
     const cookies = await context.cookies();
     assert.ok(cookies.every(c => c.httpOnly && c.sameSite === 'Lax'), 'Session-Cookie HttpOnly/Lax');
     const storage = await page.evaluate(() => ({ local: localStorage.length, session: sessionStorage.length, cookie: document.cookie }));
@@ -324,14 +347,92 @@ test('Tastatur: ungültige Eingabe bleibt im Feld; gültige Anfrage komplett per
   }
 });
 
-test('Accessibility-Snapshot (axe-core): keine schweren Verstöße auf Startseite, Methodik, Eingabe- und Bestätigungsseite', { skip: skip || (!AXE && 'NOT_RUN: PXK_AXE nicht gesetzt') }, async t => {
+test('Ohne JavaScript: fehlendes Häkchen → Server-Fehlerseite mit Fokus am Häkchen, kein Auftrag; mit Häkchen Anfrage per POST bis zur Referenz; Adresse nie in einer GET-URL', { skip }, async () => {
+  await resetData();
+  const before = google.log.auth || 0;
+  const { context, page, requests, blocked } = await open('/index.html', { width: 390, height: 800, bypassCSP: true, javaScriptEnabled: false });
+  await page.fill('#url', 'musterfirma.de');
+  await Promise.all([page.waitForURL(`${app.base}/api/anfrage`), page.press('#url', 'Enter')]);
+  assert.match(await page.textContent('h1'), /Welche Website sollen wir analysieren/);
+  assert.equal(await page.isVisible('#agb-error'), true);
+  assert.deepEqual(await page.evaluate(() => [document.activeElement.id, document.querySelector('#url').value, document.querySelector('#agb').checked]), ['agb', 'musterfirma.de', false], 'Fokus per autofocus, Eingabe erhalten, Häkchen nicht gesetzt');
+  assert.equal((google.log.auth || 0) - before, 0, 'ohne Häkchen keine Weiterleitung zu Google');
+  assert.equal(orderCount(), 0);
+  await page.check('#agb');
+  await Promise.all([page.waitForSelector('#reference'), page.click('.url-field .btn')]);
+  assert.match(await page.textContent('#reference'), /^PXA-/);
+  assert.equal(orderCount(), 1);
+  await waitFor(() => mail.state.accepted.length === 1, { what: 'interne Benachrichtigung' });
+  assert.deepEqual(leaks(requests, 'musterfirma'), [], 'Website-Adresse nie in einer URL');
+  assert.deepEqual(requests.filter(r => /website=/.test(r.body)).map(r => r.method), ['POST', 'POST']);
+  assert.deepEqual(blocked, []);
+  await context.close();
+});
+
+test('Browser-Zurück und Abbruch bei Google: Formular wieder benutzbar, kein Auftrag ohne abgeschlossene Anmeldung; erneuter Rücksprung nach Erfolg legt nichts doppelt an', { skip }, async () => {
+  await resetData();
+  google.state.authPage = true;
+  try {
+    const { context, page, errors, requests } = await open('/index.html', { width: 1440, height: 900, bypassCSP: true });
+    await page.fill('#url', 'musterfirma.de');
+    await page.check('#agb');
+    await Promise.all([page.waitForURL(u => u.href.startsWith(`${google.origin}/auth`)), page.click('.url-field .btn')]);
+    assert.equal(orderCount(), 0, 'Google-Seite erreicht: noch kein Auftrag');
+    /* Zurück zur Startseite: Button wieder aktiv, erneutes Absenden möglich */
+    await page.goBack({ waitUntil: 'load' });
+    assert.equal(new URL(page.url()).pathname, '/');
+    assert.equal(await page.isDisabled('.url-field .btn'), false, 'Button nach Zurück wieder aktiv');
+    await page.fill('#url', 'musterfirma.de');
+    await page.check('#agb');
+    await Promise.all([page.waitForURL(u => u.href.startsWith(`${google.origin}/auth`)), page.click('.url-field .btn')]);
+    /* Abbruch bei Google */
+    await Promise.all([page.waitForURL(`${app.base}/api/auth/callback**`), page.click('#abbrechen')]);
+    assert.match(await page.textContent('h1'), /Anmeldung abgebrochen/);
+    assert.match(await page.textContent('main'), /Es wurde keine Anfrage gespeichert/);
+    assert.equal(orderCount(), 0);
+    await Promise.all([page.waitForURL(`${app.base}/api/anfrage`), page.click('a.btn:has-text("Erneut versuchen")')]);
+    assert.equal(await page.inputValue('#url'), 'https://musterfirma.de', 'Adresse vorausgefüllt');
+    assert.equal(await page.isChecked('#agb'), false, 'Häkchen muss erneut gesetzt werden');
+    await page.check('#agb');
+    await Promise.all([page.waitForURL(u => u.href.startsWith(`${google.origin}/auth`)), page.click('.url-field .btn')]);
+    await Promise.all([page.waitForSelector('#reference'), page.click('#weiter')]);
+    const ref = await page.textContent('#reference');
+    assert.equal(orderCount(), 1);
+    /* Zurück auf die Google-Seite und erneut „Weiter“: der state ist verbraucht, kein zweiter Auftrag */
+    await page.goBack({ waitUntil: 'load' });
+    assert.ok(page.url().startsWith(`${google.origin}/auth`), page.url());
+    await Promise.all([page.waitForURL(`${app.base}/api/auth/callback**`), page.click('#weiter')]);
+    assert.match(await page.textContent('h1'), /Anmeldung abgelaufen/);
+    await page.goto(app.base + '/api/anfrage');
+    assert.equal(await page.textContent('#reference'), ref, 'Bestätigung bleibt dieselbe');
+    await waitFor(() => mail.state.accepted.length === 1, { what: 'interne Benachrichtigung' });
+    await sleep(300);
+    assert.deepEqual([orderCount(), mail.state.accepted.length], [1, 1], 'genau ein Auftrag, genau eine Mail');
+    assert.deepEqual(leaks(requests, 'musterfirma'), [], 'Website-Adresse nie in einer URL');
+    assert.deepEqual(errors.filter(e => !/status of 40[09]/.test(e)), [], 'Konsolenfehler (außer den erwarteten 400/409-Dokumenten)');
+    await context.close();
+  } finally {
+    google.state.authPage = false;
+  }
+});
+
+test('Accessibility-Snapshot (axe-core): keine schweren Verstöße auf Startseite (auch mit Fehlern), Methodik, Rechtsseiten, Eingabe-, Fehler- und Bestätigungsseite', { skip: skip || (!AXE && 'NOT_RUN: PXK_AXE nicht gesetzt') }, async t => {
+  await resetData();
   const report = {};
-  for (const path of ['/index.html', '/pruefkriterien.html', '/impressum.html', '/datenschutz.html', '/api/anfrage', 'confirm']) {
+  for (const path of ['/index.html', 'hero-fehler', '/pruefkriterien.html', '/impressum.html', '/datenschutz.html', '/agb.html', '/api/anfrage', 'server-fehler', 'angenommen']) {
     /* axe wird als Inline-Skript injiziert; die CSP der Seite würde das (korrekt) blockieren */
-    const o = await open(path === 'confirm' ? '/index.html' : path, { bypassCSP: true });
-    if (path === 'confirm') {
+    const o = await open(path.startsWith('/') ? path : path === 'server-fehler' ? '/api/anfrage' : '/index.html', { bypassCSP: true });
+    if (path === 'hero-fehler') await o.page.click('.url-field .btn');
+    if (path === 'server-fehler') {
+      /* Pflichtfeld im Browser abschalten, damit die Fehlerseite des Workers (fehlendes Häkchen) geprüft wird */
+      await o.page.$eval('#agb', e => { e.required = false; });
       await o.page.fill('#url', 'musterfirma.de');
-      await Promise.all([o.page.waitForURL(`${app.base}/api/anfrage`), o.page.press('#url', 'Enter')]);
+      await Promise.all([o.page.waitForSelector('#agb-error'), o.page.click('.url-field .btn')]);
+    }
+    if (path === 'angenommen') {
+      await o.page.fill('#url', 'musterfirma.de');
+      await o.page.check('#agb');
+      await Promise.all([o.page.waitForSelector('#reference'), o.page.press('#url', 'Enter')]);
     }
     await o.page.addScriptTag({ path: AXE });
     const v = await o.page.evaluate(async () => (await window.axe.run(document, { resultTypes: ['violations'] })).violations.map(x => ({ id: x.id, impact: x.impact, n: x.nodes.length })));

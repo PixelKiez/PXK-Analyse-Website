@@ -1,6 +1,6 @@
 /* Pixelkiez Analyse – kleine Verbesserungen für die Startseite.
-   Das Formular wird normal per POST an /api/anfrage (API-Worker) gesendet; der Worker prüft die Adresse verbindlich.
-   Hier nur eine Vorabprüfung, damit offensichtliche Tippfehler ohne Seitenwechsel auffallen. */
+   Das Formular wird normal per POST an /api/anfrage (API-Worker) gesendet; der Worker prüft Adresse und AGB-Zustimmung verbindlich.
+   Hier nur eine Vorabprüfung, damit Tippfehler und ein fehlendes AGB-Häkchen ohne Seitenwechsel auffallen; dann wird nichts gesendet. */
 (() => {
   const $ = s => document.querySelector(s);
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -75,24 +75,35 @@
     setTimeout(step, 2500);
   }
 
-  /* Vorabprüfung: Host mit Punkt, optional mit http(s):// und Pfad */
-  const error = $('#url-error');
+  /* Vorabprüfung: Host mit Punkt, optional mit http(s):// und Pfad; AGB-Häkchen gesetzt */
+  const agb = $('#agb'), submit = form.querySelector('button[type=submit]');
   const host = v => v.trim().toLowerCase().replace(/^https?:\/\//, '').split(/[/?#]/)[0];
   const valid = v => v.trim().length <= 2048 && !/[\s<>"`\\]/.test(v.trim()) && /^[a-z0-9äöüß-]+(\.[a-z0-9äöüß-]+)+$/.test(host(v));
+  /* Fehlertext ein-/ausblenden und am Feld verknüpfen */
+  const mark = (field, ok) => {
+    const id = `${field.id}-error`;
+    $('#' + id).hidden = ok;
+    if (ok) { field.removeAttribute('aria-invalid'); field.removeAttribute('aria-describedby'); }
+    else { field.setAttribute('aria-invalid', 'true'); field.setAttribute('aria-describedby', id); }
+    return ok;
+  };
+  let sending = false;
 
   form.addEventListener('submit', e => {
-    const ok = valid(input.value);
-    error.hidden = ok;
-    if (ok) {
-      input.removeAttribute('aria-invalid');
-      input.removeAttribute('aria-describedby');
+    const urlOk = mark(input, valid(input.value));
+    const agbOk = !agb || mark(agb, agb.checked);
+    /* Doppelklick: nur die erste gültige Absendung geht zu Google */
+    if (urlOk && agbOk && !sending) {
+      sending = true;
+      if (submit) submit.disabled = true;
       return;
     }
     e.preventDefault();
-    input.setAttribute('aria-invalid', 'true');
-    input.setAttribute('aria-describedby', 'url-error');
-    input.focus();
+    if (!urlOk) input.focus(); else if (!agbOk) agb.focus();
   });
+  if (agb) agb.addEventListener('change', () => { if (agb.checked) mark(agb, true); });
+  /* Zurück aus der Google-Anmeldung (Seite aus dem Verlauf): Formular wieder benutzbar */
+  addEventListener('pageshow', () => { sending = false; if (submit) submit.disabled = false; });
 
   /* Abschluss-Button: zurück zum Feld */
   const toTop = $('#to-top');

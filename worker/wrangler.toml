@@ -26,6 +26,9 @@ BASE_URL = "https://360.pixelkiez.de"
 GOOGLE_CLIENT_ID = ""
 # Version der Datenschutzerklärung, die mit jedem Auftrag gespeichert wird. Mit "ENTWURF-…" nimmt die Produktion keine Aufträge an.
 PRIVACY_VERSION = "ENTWURF-2026-10-31"
+# Version der AGB, die im Hero akzeptiert werden muss (gleich dem Feld agb_version in public/index.html und der Angabe in
+# public/agb.html). Mit "ENTWURF-…" nimmt die Produktion keine Aufträge an – erst die rechtlich freigegebene Fassung eintragen.
+TERMS_VERSION = "ENTWURF-2026-10-31"
 # Einzige freigegebene Mail-API (Resend). Der API-Key kommt als Secret MAIL_API_TOKEN.
 MAIL_API_URL = "https://api.resend.com/emails"
 # Absender erst eintragen, wenn die Versanddomain notify.pixelkiez.de bei Resend verifiziert ist (Adresse @notify.pixelkiez.de)

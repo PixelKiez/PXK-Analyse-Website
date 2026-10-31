@@ -7,7 +7,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   ROOT, CUSTOMER, NOTIFY_TO, mockGoogle, mockResend, startPages, startPagesFunction, buildPagesFunctions, uploadFiles,
-  Client, login, confirm, field, waitFor, workerAvailable, wranglerAvailable, MfResponse,
+  Client, login, startForm, referenceOf, waitFor, workerAvailable, wranglerAvailable, MfResponse, TERMS_VERSION,
 } from './lib/harness.mjs';
 import { execFileSync } from 'node:child_process';
 
@@ -351,7 +351,7 @@ test('Lokales Pages: beide Videos mit echten Byte-Ranges (200/206/416, HEAD, If-
   }
 });
 
-test('Lokales Pages mit Worker über das Service Binding: URL-Eingabe → Function → Worker → Google-Mock → Callback → D1 → Bestätigung → Resend-Mock', { skip }, async () => {
+test('Lokales Pages mit Worker über das Service Binding: Website + AGB → Function → Worker → Google-Mock → Callback legt an (D1) → Bestätigung → Resend-Mock', { skip }, async () => {
   const google = await mockGoogle().start();
   const mail = await mockResend().start();
   const site = await startPages({ google, mail });
@@ -359,7 +359,14 @@ test('Lokales Pages mit Worker über das Service Binding: URL-Eingabe → Functi
     const c = new Client(site, { ip: '198.51.100.20' });
     const home = await c.req('GET', '/');
     assert.equal(home.status, 200);
-    const { start, auth, callback } = await login(c, google, { website: 'https://www.musterfirma.de/leistungen' });
+    /* Ohne AGB-Häkchen lehnt der Worker auch hinter der Function ab: keine Weiterleitung, keine Session */
+    const noAgb = await c.req('POST', '/api/anfrage', { form: startForm({ agb: false }) });
+    assert.deepEqual([noAgb.status, noAgb.location, noAgb.headers.getSetCookie().length], [422, null, 0]);
+    assert.match(noAgb.text, /Bitte akzeptieren Sie die AGB/);
+    const crossSite = await c.req('POST', '/api/anfrage', { form: startForm(), headers: { origin: 'https://evil.example' } });
+    assert.equal(crossSite.status, 403, 'Origin-Prüfung des Workers greift auch hinter der Function');
+    assert.deepEqual(site.sql('SELECT COUNT(*) AS n FROM orders'), [{ n: 0 }]);
+    const { start, auth, callback, callbackPath } = await login(c, google, { website: 'https://www.musterfirma.de/leistungen' });
     assert.equal(start.status, 303, start.text.slice(0, 200));
     assert.equal(auth.searchParams.get('redirect_uri'), `${site.base}/api/auth/callback`);
     assert.equal(auth.searchParams.get('scope'), 'openid email');
@@ -368,23 +375,19 @@ test('Lokales Pages mit Worker über das Service Binding: URL-Eingabe → Functi
     assert.equal(callback.status, 303);
     assert.equal(callback.location, `${site.base}/api/anfrage`);
     assert.notEqual(callback.headers.getSetCookie()[0].split(';')[0], first.split(';')[0], 'Session-Wechsel nach dem Login');
-    const crossSite = await c.req('POST', '/api/anfrage', { form: { action: 'confirm', csrf: 'x', idem: 'y', zustimmung: '1' }, headers: { origin: 'https://evil.example' } });
-    assert.equal(crossSite.status, 403, 'Origin-Prüfung des Workers greift auch hinter der Function');
-    const page = await c.req('GET', '/api/anfrage');
-    const form = { action: 'confirm', csrf: field(page.text, 'csrf'), idem: field(page.text, 'idem'), zustimmung: '1' };
-    const [a, b] = await Promise.all([c.req('POST', '/api/anfrage', { form }), c.req('POST', '/api/anfrage', { form })]);
-    assert.deepEqual([a.status, b.status], [303, 303], 'Doppelabsendung → gleiche Bestätigung');
+    assert.equal((await c.req('GET', callbackPath)).status, 400, 'Rücksprung nur einmal gültig');
     const done = await c.req('GET', '/api/anfrage');
-    const ref = (done.text.match(/id="reference">(PXA-[0-9A-Z]{4}-[0-9A-Z]{4})</) || [])[1];
-    assert.ok(ref, 'Referenz angezeigt');
-    const orders = site.sql('SELECT reference, email, website_url FROM orders');
-    assert.deepEqual(orders, [{ reference: ref, email: CUSTOMER, website_url: 'https://www.musterfirma.de/leistungen' }], 'genau ein Auftrag in D1');
+    const ref = referenceOf(done.text);
+    assert.ok(ref, 'Referenz angezeigt, ohne zweiten Klick');
+    const orders = site.sql('SELECT reference, email, website_url, terms_version, terms_accepted_at IS NOT NULL AS accepted FROM orders');
+    assert.deepEqual(orders, [{ reference: ref, email: CUSTOMER, website_url: 'https://www.musterfirma.de/leistungen', terms_version: TERMS_VERSION, accepted: 1 }], 'genau ein Auftrag in D1 (Migrationen 0001 und 0002 lokal angewendet)');
     await waitFor(() => site.sql("SELECT status FROM notifications")[0]?.status === 'sent', { what: 'Benachrichtigung', timeout: 10000 });
     assert.equal(mail.state.accepted.length, 1);
     assert.deepEqual(mail.state.accepted[0].to, [NOTIFY_TO]);
     assert.equal(mail.state.accepted[0].idempotencyKey, `pxwa-${ref}`);
     assert.ok(mail.state.accepted[0].userAgent);
-    const out = await c.req('POST', '/api/anfrage', { form: { action: 'logout', csrf: form.csrf } });
+    const [{ csrf }] = site.sql("SELECT json_extract(data, '$.csrf') AS csrf FROM sessions WHERE json_extract(data, '$.done') IS NOT NULL");
+    const out = await c.req('POST', '/api/anfrage', { form: { action: 'logout', csrf } });
     assert.equal(out.location, `${site.base}/index.html`);
     assert.ok(out.headers.getSetCookie().some(s => /^pxwa=;.*Max-Age=0/.test(s)), 'Abmelde-Cookie kommt über die Binding-Grenze');
     assert.ok(!site.logs().includes(CUSTOMER) && !site.logs().includes('musterfirma') && !site.logs().includes('code='), 'Log ohne E-Mail, Website oder Google-Code');

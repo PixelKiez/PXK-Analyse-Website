@@ -6,49 +6,37 @@ import { displayWebsite } from './url';
 export class View {
   constructor(private base = '') {}
 
-  input(value = '', error: string | null = null, notice: string | null = null): string {
-    const invalid = error !== null ? ' aria-invalid="true" aria-describedby="url-error"' : '';
-    const body = '<div class="section-head"><p class="eyebrow">Kostenlose Website-Analyse</p><h1 class="h2">Welche Website sollen wir analysieren?</h1>'
-      + '<p class="text">Nach der Eingabe melden Sie sich mit Google an und bestätigen die Anfrage. Pixelkiez erstellt die Analyse danach persönlich.</p></div>'
-      + (notice !== null ? `<p class="request-notice" role="status">${h(notice)}</p>` : '')
-      + `<form class="analyze request-form" method="post" action="${h(this.base)}/api/anfrage">`
-      + '<input type="hidden" name="action" value="start">'
-      + '<label class="sr-only" for="url">Adresse Ihrer Website</label>'
-      + `<div class="url-field"><input id="url" name="website" type="text" inputmode="url" autocomplete="url" maxlength="2048" placeholder="ihre-website.de" value="${h(value)}"${invalid}>`
-      + '<button class="btn btn--accent" type="submit">Weiter mit Google</button></div>'
-      + (error !== null ? `<p class="form-error" id="url-error" role="alert">${h(error)}</p>` : '')
-      + '</form>';
-    return this.page('Website eingeben', body);
-  }
-
-  confirm(url: string, email: string, csrf: string, idem: string, error: string | null = null): string {
+  /* Eingabe wie im Hero der Startseite: Website, AGB-Häkchen (nie vorausgewählt), „Analysieren“. Für Fehler ohne JavaScript
+     und nach einer abgebrochenen Anmeldung. Das erste fehlerhafte Feld bekommt den Fokus (autofocus). */
+  input(termsVersion: string, value = '', errors: { url?: string | null; agb?: string | null } = {}, notice: string | null = null): string {
     const base = h(this.base);
-    const body = '<div class="section-head"><p class="eyebrow">Letzter Schritt</p><h1 class="h2">Anfrage bestätigen.</h1>'
-      + '<p class="text">Bitte prüfen Sie die Angaben. Gespeichert wird der Auftrag erst, wenn Sie unten bestätigen.</p></div>'
+    const urlError = errors.url ?? null;
+    const agbError = errors.agb ?? null;
+    const first = urlError !== null ? 'url' : agbError !== null ? 'agb' : null;
+    const invalid = (id: string, error: string | null): string => (error !== null ? ` aria-invalid="true" aria-describedby="${id}-error"${first === id ? ' autofocus' : ''}` : '');
+    const body = '<div class="section-head"><p class="eyebrow">Kostenlose Website-Analyse</p><h1 class="h2">Welche Website sollen wir analysieren?</h1>'
+      + '<p class="text">Nach dem Klick auf „Analysieren“ melden Sie sich mit Google an. Danach speichern wir Ihre Anfrage ohne weiteren Klick, und Pixelkiez erstellt die Analyse persönlich.</p></div>'
+      + (notice !== null ? `<p class="request-notice" role="status">${h(notice)}</p>` : '')
       + '<div class="request-grid">'
-      + '<article class="card detail" aria-label="Ihre Angaben"><div class="detail-top"><span>Kostenlose Website-Analyse</span><span class="tag">0 €</span></div><dl>'
-      + `<div><dt>Website</dt><dd class="mono request-break">${h(displayWebsite(url))}</dd></div>`
-      + `<div><dt>E-Mail</dt><dd class="request-break">${h(email)}<small class="request-meta">von Google bestätigt</small></dd></div>`
-      + '<div><dt>Leistung</dt><dd>Persönliche Analyse in vier Bereichen. Bericht als PDF mit sieben Seiten per E-Mail.</dd></div>'
-      + '<div><dt>Kosten</dt><dd>0 €, kein Abo, keine Folgekosten</dd></div>'
-      + '</dl></article>'
+      + `<form class="analyze request-form" method="post" action="${base}/api/anfrage">`
+      + `<input type="hidden" name="action" value="start"><input type="hidden" name="agb_version" value="${h(termsVersion)}">`
+      + '<label class="sr-only" for="url">Adresse Ihrer Website</label>'
+      + `<div class="url-field"><input id="url" name="website" type="text" inputmode="url" autocomplete="url" maxlength="2048" placeholder="ihre-website.de" value="${h(value)}"${invalid('url', urlError)}>`
+      + '<button class="btn btn--accent" type="submit">Analysieren</button></div>'
+      + (urlError !== null ? `<p class="form-error" id="url-error" role="alert">${h(urlError)}</p>` : '')
+      + `<label class="consent"><input id="agb" type="checkbox" name="agb" value="1" required${invalid('agb', agbError)}>`
+      + `<span>Ich akzeptiere die <a class="request-link" href="${base}/agb.html">AGB</a> von 360°Pixelkiez.</span></label>`
+      + (agbError !== null ? `<p class="form-error" id="agb-error" role="alert">${h(agbError)}</p>` : '')
+      + `<p class="request-small">Kostenlose Website-Analyse – 0 €, kein Abo. <a class="request-link" href="${base}/datenschutz.html">Datenschutzerklärung</a></p>`
+      + '</form>'
       + '<div class="request-side"><h2 class="request-h">Hinweise zur Datenverarbeitung</h2><ul class="request-notes">'
-      + '<li>Wir speichern Ihre Website-Adresse, Ihre von Google bestätigte E-Mail-Adresse, die Kennung Ihres Google-Kontos und den Zeitpunkt der Anfrage.</li>'
-      + '<li>Zweck: Pixelkiez erstellt damit Ihre Analyse und schickt Ihnen den PDF-Bericht an diese E-Mail-Adresse.</li>'
+      + '<li>Erst nach der Google-Anmeldung speichern wir Ihre Website-Adresse, Ihre von Google bestätigte E-Mail-Adresse, die Kennung Ihres Google-Kontos, den Zeitpunkt der Anfrage sowie Version und Zeitpunkt Ihrer Zustimmung zu den AGB.</li>'
+      + '<li>Zweck: Pixelkiez erstellt damit Ihre Analyse und schickt Ihnen den Bericht als PDF mit sieben Seiten an diese E-Mail-Adresse.</li>'
       + '<li>Die Anmeldung läuft über Google. Wir erhalten nur Konto-Kennung und bestätigte E-Mail-Adresse, keinen Zugriff auf Ihr Postfach.</li>'
       + '<li>Pixelkiez wird intern per E-Mail über Ihre Anfrage informiert.</li>'
       + '<li>Ihre Website wird von dieser Seite nicht automatisch abgerufen oder gescannt.</li>'
-      + `</ul><p class="request-small"><a class="request-link" href="${base}/datenschutz.html">Datenschutzerklärung</a></p>`
-      + `<form class="request-confirm" method="post" action="${base}/api/anfrage">`
-      + `<input type="hidden" name="action" value="confirm"><input type="hidden" name="csrf" value="${h(csrf)}"><input type="hidden" name="idem" value="${h(idem)}">`
-      + `<label class="consent"><input type="checkbox" name="zustimmung" value="1" required${error !== null ? ' aria-invalid="true" aria-describedby="confirm-error"' : ''}>`
-      + '<span>Ich möchte die kostenlose Website-Analyse für die oben genannte Website erhalten und habe die Hinweise zur Datenverarbeitung gelesen.</span></label>'
-      + (error !== null ? `<p class="form-error" id="confirm-error" role="alert">${h(error)}</p>` : '')
-      + '<button class="btn btn--accent" type="submit">Kostenlos anfragen</button></form>'
-      + `<form class="request-logout" method="post" action="${base}/api/anfrage"><input type="hidden" name="action" value="logout"><input type="hidden" name="csrf" value="${h(csrf)}">`
-      + '<button class="btn btn--ghost btn--sm" type="submit">Abbrechen und abmelden</button></form>'
-      + '</div></div>';
-    return this.page('Anfrage bestätigen', body);
+      + '</ul></div></div>';
+    return this.page('Website eingeben', body);
   }
 
   accepted(reference: string, url: string, email: string, kind: 'created' | 'duplicate'): string {
