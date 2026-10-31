@@ -30,7 +30,8 @@ export class View {
       + `<p class="request-small">Kostenlose Website-Analyse – 0 €, kein Abo. <a class="request-link" href="${base}/datenschutz.html">Datenschutzerklärung</a></p>`
       + '</form>'
       + '<div class="request-side"><h2 class="request-h">Hinweise zur Datenverarbeitung</h2><ul class="request-notes">'
-      + '<li>Erst nach der Google-Anmeldung speichern wir Ihre Website-Adresse, Ihre von Google bestätigte E-Mail-Adresse, die Kennung Ihres Google-Kontos, den Zeitpunkt der Anfrage sowie Version und Zeitpunkt Ihrer Zustimmung zu den AGB.</li>'
+      + '<li>Vor der Google-Anmeldung speichern wir Ihre Website-Adresse sowie Version und Zeitpunkt Ihrer Zustimmung zu den AGB vorübergehend in einer serverseitigen Sitzung. Wird die Anmeldung nicht abgeschlossen, entsteht daraus kein Auftrag, und Pixelkiez erhält keine Benachrichtigung.</li>'
+      + '<li>Erst nach erfolgreicher Google-Anmeldung und mit gültiger Zustimmung entsteht der eigentliche kostenlose Analyseauftrag. Erst dann ordnen wir ihm Ihre von Google bestätigte E-Mail-Adresse und die Kennung Ihres Google-Kontos zu; dazu kommen der Zeitpunkt der Anfrage sowie Version und Zeitpunkt Ihrer Zustimmung zu den AGB.</li>'
       + '<li>Zweck: Pixelkiez erstellt damit Ihre Analyse und schickt Ihnen den Bericht als PDF mit sieben Seiten an diese E-Mail-Adresse.</li>'
       + '<li>Die Anmeldung läuft über Google. Wir erhalten nur Konto-Kennung und bestätigte E-Mail-Adresse, keinen Zugriff auf Ihr Postfach.</li>'
       + '<li>Pixelkiez wird intern per E-Mail über Ihre Anfrage informiert.</li>'

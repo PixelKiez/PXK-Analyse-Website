@@ -99,7 +99,9 @@
       return;
     }
     e.preventDefault();
-    if (!urlOk) input.focus(); else if (!agbOk) agb.focus();
+    if (!urlOk) input.focus();
+    /* Der Fokus holt nur das Häkchen ins Bild; auf kleinen Bildschirmen (320×568) läge der Fehlertext darunter noch außerhalb */
+    else if (!agbOk) { agb.focus(); $('#agb-error').scrollIntoView({ block: 'nearest' }); }
   });
   if (agb) agb.addEventListener('change', () => { if (agb.checked) mark(agb, true); });
   /* Zurück aus der Google-Anmeldung (Seite aus dem Verlauf): Formular wieder benutzbar */

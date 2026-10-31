@@ -50,6 +50,11 @@ test('Website + AGB + Google: genau ein Free-Auftrag mit AGB-Version und Zustimm
   assert.match(first.text, /href="\/datenschutz\.html">Datenschutzerklärung<\/a>/);
   assert.match(first.text, /type="submit">Analysieren<\/button>/);
   assert.match(first.text, /Kostenlose Website-Analyse – 0 €, kein Abo/);
+  /* Datenhinweis wie der Ablauf: Website und AGB-Zustimmung liegen schon vor der Google-Anmeldung in der Session (siehe flow unten),
+     Auftrag mit E-Mail-Adresse erst nach der Anmeldung, ohne abgeschlossene Anmeldung weder Auftrag noch Benachrichtigung */
+  assert.match(first.text, /<li>Vor der Google-Anmeldung speichern wir Ihre Website-Adresse sowie Version und Zeitpunkt Ihrer Zustimmung zu den AGB vorübergehend in einer serverseitigen Sitzung\. Wird die Anmeldung nicht abgeschlossen, entsteht daraus kein Auftrag, und Pixelkiez erhält keine Benachrichtigung\.<\/li>/);
+  assert.match(first.text, /<li>Erst nach erfolgreicher Google-Anmeldung und mit gültiger Zustimmung entsteht der eigentliche kostenlose Analyseauftrag\. Erst dann ordnen wir ihm Ihre von Google bestätigte E-Mail-Adresse und die Kennung Ihres Google-Kontos zu; dazu kommen der Zeitpunkt der Anfrage sowie Version und Zeitpunkt Ihrer Zustimmung zu den AGB\.<\/li>/);
+  assert.doesNotMatch(first.text, /Erst nach der Google-Anmeldung speichern wir Ihre Website-Adresse/, 'keine Behauptung, die Website-Adresse werde erst nach der Anmeldung gespeichert');
   const t0 = Math.floor(Date.now() / 1000);
   const { start, auth, callbackPath } = await begin(c, google, { website: 'HTTPS://WWW.Musterfirma.DE/leistungen?utm_source=x#top' });
   assert.equal(start.status, 303);

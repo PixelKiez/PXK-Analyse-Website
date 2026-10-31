@@ -50,8 +50,8 @@ after(async () => {
   await browser.close(); await app.stop(); await google.stop(); await mail.stop();
 });
 
-async function open(path, { width = 1440, height = 900, reducedMotion = 'reduce', bypassCSP = false, javaScriptEnabled = true } = {}) {
-  const context = await browser.newContext({ viewport: { width, height }, reducedMotion, bypassCSP, javaScriptEnabled });
+async function open(path, { width = 1440, height = 900, reducedMotion = 'reduce', bypassCSP = false, javaScriptEnabled = true, engine = browser } = {}) {
+  const context = await engine.newContext({ viewport: { width, height }, reducedMotion, bypassCSP, javaScriptEnabled });
   const page = await context.newPage();
   const errors = [], blocked = [], requests = [];
   page.on('request', r => requests.push({ method: r.method(), url: r.url(), body: r.postData() ?? '' }));
@@ -344,6 +344,67 @@ test('Tastatur: ungültige Adresse und fehlendes AGB-Häkchen bleiben im Formula
     assert.deepEqual(errors, [], `${width}: Konsolenfehler`);
     assert.deepEqual(blocked, []);
     await context.close();
+  }
+});
+
+test('Kleine Bildschirme (320×568, 360×640) in Chromium und WebKit: „Analysieren“ ohne AGB-Häkchen zeigt Häkchen und Fehlertext vollständig im Bild, Fokus am Häkchen; nichts gesendet, kein Auftrag, keine Benachrichtigung', { skip }, async t => {
+  /* Gemessen wird nach dem Klick, ohne dass der Test selbst scrollt: Beide Elemente liegen zwischen Navigation und unterem Fensterrand
+     und sind an ihrem Mittelpunkt nicht verdeckt. Mit und ohne „Bewegung reduzieren“ – sonst scrollt die Seite weich, daher warten, bis sie steht. */
+  const settle = page => page.evaluate(() => new Promise(done => {
+    let last = NaN, same = 0;
+    const tick = () => { if (scrollY === last) same++; else { same = 0; last = scrollY; } if (same >= 10) done(scrollY); else requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+  }));
+  const seen = page => page.evaluate(() => {
+    const nav = document.querySelector('#nav').getBoundingClientRect().bottom;
+    return Object.fromEntries(['#agb', '#agb-error'].map(s => {
+      const e = document.querySelector(s), r = e.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return [s, { top: Math.round(r.top), bottom: Math.round(r.bottom), visible: r.height > 0 && r.top >= nav && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth && (hit === e || e.contains(hit)) }];
+    }));
+  });
+  let wk = null;
+  try { wk = await pw.webkit.launch(); } catch { /* unten als NOT_RUN gemeldet */ }
+  try {
+    for (const [name, engine] of [['Chromium', browser], ['WebKit', wk]]) {
+      await t.test(name, { skip: !engine && 'NOT_RUN: Playwright-WebKit nicht installiert (playwright install webkit)' }, async st => {
+        for (const size of ['320x568', '360x640']) {
+          for (const reducedMotion of ['no-preference', 'reduce']) {
+            await resetData();
+            const before = google.log.auth || 0;
+            const [width, height] = size.split('x').map(Number);
+            const what = `${name} ${size} ${reducedMotion}`;
+            const { context, page, errors, blocked, requests } = await open('/index.html', { width, height, reducedMotion, engine });
+            await page.fill('#url', 'musterfirma.de');
+            const y0 = await page.evaluate(() => scrollY);
+            await page.click('.url-field .btn');
+            const y = await settle(page);
+            const m = await seen(page);
+            const info = `scrollY ${y0} → ${y}, Häkchen ${m['#agb'].top}–${m['#agb'].bottom} px, Fehlertext ${m['#agb-error'].top}–${m['#agb-error'].bottom} px, Fensterhöhe ${height} px`;
+            assert.equal(await page.isVisible('#agb-error'), true, `${what}: Fehlertext eingeblendet`);
+            assert.ok(m['#agb'].visible, `${what}: AGB-Häkchen vollständig im Bild (${info})`);
+            assert.ok(m['#agb-error'].visible, `${what}: Fehlertext vollständig im Bild (${info})`);
+            assert.deepEqual(await page.evaluate(() => [document.activeElement.id, document.activeElement.getAttribute('aria-invalid'), document.activeElement.getAttribute('aria-describedby'), document.querySelector('#agb').checked, location.pathname]),
+              ['agb', 'true', 'agb-error', false, '/'], `${what}: Fokus am Häkchen, als ungültig markiert und mit dem Fehlertext verknüpft`);
+            if (SHOTS) await page.screenshot({ path: join(SHOTS, `agb-fehler-${name.toLowerCase()}-${size}-${reducedMotion}.png`) });
+            await sleep(200);
+            assert.deepEqual(requests.filter(r => r.method === 'POST' || r.url.includes('/api/')), [], `${what}: ohne Häkchen wird nichts gesendet`);
+            assert.equal((google.log.auth || 0) - before, 0, `${what}: keine Weiterleitung zu Google`);
+            assert.deepEqual([orderCount(), app.sql('SELECT COUNT(*) AS n FROM notifications')[0].n, mail.state.attempts], [0, 0, 0], `${what}: kein Auftrag, kein Outbox-Eintrag, keine Mail`);
+            /* Weiter bedienbar: Häkchen setzen nimmt Fehlertext und Markierung zurück */
+            await page.check('#agb');
+            assert.deepEqual([await page.isVisible('#agb-error'), await page.getAttribute('#agb', 'aria-invalid')], [false, null], `${what}: Fehler verschwindet mit dem Häkchen`);
+            /* Nur mit Screenshots: WebKit meldet die dafür von Playwright eingefügten Styles als CSP-Verstoß (die Seiten-CSP blockiert sie zu Recht) */
+            assert.deepEqual(SHOTS && name === 'WebKit' ? errors.filter(e => !/^Refused to apply a stylesheet/.test(e)) : errors, [], `${what}: Konsolenfehler`);
+            assert.deepEqual(blocked, [], `${what}: unerwartete Fremd-Requests`);
+            st.diagnostic(`${what}: ${info}`);
+            await context.close();
+          }
+        }
+      });
+    }
+  } finally {
+    if (wk) await wk.close();
   }
 });
 
