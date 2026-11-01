@@ -34,7 +34,9 @@ TERMS_VERSION = "ENTWURF-2026-10-31"
 MAIL_API_URL = "https://api.resend.com/emails"
 # Absender erst eintragen, wenn die Versanddomain notify.pixelkiez.de bei Resend verifiziert ist (Adresse @notify.pixelkiez.de)
 MAIL_FROM = ""
-MAIL_NOTIFY_TO = "kontakt@pixelkiez.de"
+# Einziger interner Empfänger (fest im Code, PRODUCTION_NOTIFY_TO). Erst deployen, wenn das Postfach 360@pixelkiez.de
+# existiert und eine Zustellung nachgewiesen ist (docs/deploy-cloudflare-pages.md, Abschnitt 6).
+MAIL_NOTIFY_TO = "360@pixelkiez.de"
 # Löschfrist für erledigte Aufträge in Tagen – bewusst nicht gesetzt, solange die Aufbewahrungsfrist (D-5) offen ist
 # ORDER_RETENTION_DAYS = "<tage>"
 

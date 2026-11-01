@@ -22,7 +22,7 @@ export const CLIENT_ID = 'pxwa-test-client.apps.googleusercontent.com';
 export const CLIENT_SECRET = 'test-only-secret';
 export const MAIL_TOKEN = 'test-only-mail-token';
 export const MAIL_FROM = 'analyse@notify.pixelkiez.de';
-export const NOTIFY_TO = 'kontakt@pixelkiez.de';
+export const NOTIFY_TO = '360@pixelkiez.de';
 export const CUSTOMER = 'kunde@beispiel-kunde.de';
 export const GOOGLE_AUTH = 'https://accounts.google.com/o/oauth2/v2/auth';
 export const PRODUCTION_BASE = 'https://360.pixelkiez.de';
@@ -148,7 +148,7 @@ const RESEND_ERRORS = {
   quota: [429, 'daily_quota_exceeded', 'You have exceeded your daily email sending quota.'],
   busy: [409, 'concurrent_idempotent_requests', 'There is another request in progress with the same key.'],
   forbidden: [403, 'validation_error', 'The notify.pixelkiez.de domain is not verified.'],
-  reject: [422, 'validation_error', 'Invalid `to` field. kontakt@pixelkiez.de'], auth: [401, 'validation_error', 'API key is invalid'],
+  reject: [422, 'validation_error', 'Invalid `to` field. 360@pixelkiez.de'], auth: [401, 'validation_error', 'API key is invalid'],
 };
 const addresses = v => (typeof v === 'string' ? [v] : Array.isArray(v) ? v : null);
 const isAddress = v => typeof v === 'string' && /^(?:[^<>]+ <)?[^\s@<>]+@[^\s@<>]+\.[a-z]{2,}>?$/i.test(v);

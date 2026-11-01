@@ -32,8 +32,8 @@ const METHOD = [
   ['geo_ai_visibility', 'GEO & AI Visibility', [['AI', 8]]],
   ['ux_accessibility_trust', 'UX, Barrierefreiheit & Vertrauen', [['UX', 8], ['A11Y', 6], ['TRUST', 8]]],
 ];
-/* 360°Pixelkiez ist eine eigenständige Website: keine Links zu pixelkiez.de, nur die Kontaktadresse */
-const EXTERNAL_OK = ['mailto:kontakt@pixelkiez.de'];
+/* 360°Pixelkiez ist eine eigenständige Website: keine Links zu pixelkiez.de, nur die Kontaktadresse 360@pixelkiez.de */
+const EXTERNAL_OK = ['mailto:360@pixelkiez.de'];
 
 /* Alles, was Nutzer, Screenreader oder Suchmaschinen lesen: sichtbarer und verborgener Text, Metadaten, ARIA, JSON-LD */
 const allText = n => n.text !== undefined ? n.text : ['script', 'style', 'symbol'].includes(n.tag) ? ' ' : ` ${n.children.map(allText).join(' ')} `;
@@ -128,7 +128,7 @@ test('Hero (PXWA-BE-02): AGB-Pflichthäkchen nicht vorausgewählt, AGB- und Date
   assert.equal(txt(H.byTag(H.byClass(root, 'hero')[0], 'h1')[0]), 'Sehen Sie, was Ihre Website ausbremst.', 'Original-H1');
 });
 
-test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen neu, Reihenfolge erhalten; außerhalb des Hero nur der Text von Schritt 02', () => {
+test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen neu, Reihenfolge erhalten; außerhalb des Hero nur der Text von Schritt 02 und die Kontaktadresse', () => {
   const now = read('public/index.html');
   const old = git('show', `${BASE_SHA}:public/index.html`);
   const hero = html => { const i = html.indexOf('<section class="hero">'); return html.slice(i, html.indexOf('</section>', i) + '</section>'.length); };
@@ -145,7 +145,8 @@ test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen n
   const kept = a.filter(l => b.includes(l));
   assert.deepEqual(b.filter(l => kept.includes(l)), kept, 'Badge, H1, Lead, URL-Feld und Faktenzeile in unveränderter Reihenfolge');
   const outside = html => html.replace(hero(html), '').replace(/<div class="step cw-lilac"><span>02<\/span>.*?<\/div>/, '<SCHRITT-02>');
-  assert.equal(outside(now), outside(old), 'übrige Startseite unverändert (außer Schritt 02, der den zweiten Bestätigungsklick beschrieb)');
+  /* Kontaktadresse im Footer: 360@pixelkiez.de ersetzt die frühere Adresse (PO-Entscheidung 01.11.2026), sonst nichts */
+  assert.equal(outside(now), outside(old).replaceAll('kontakt@pixelkiez.de', '360@pixelkiez.de'), 'übrige Startseite unverändert (außer Schritt 02, der den zweiten Bestätigungsklick beschrieb, und der Kontaktadresse)');
   assert.match(now, /<span>02<\/span><h3>AGB akzeptieren und anmelden<\/h3>/);
 });
 
@@ -242,13 +243,13 @@ test('Eigenständige Website 360°Pixelkiez: Name in Titel, Logo und Footer; Imp
   assert.match(view, /© 2026 360°Pixelkiez/);
   assert.ok(view.includes('<a href="${b}/impressum.html">Impressum</a><a href="${b}/datenschutz.html">Datenschutz</a>'), 'Anfrageseiten: Impressum und Datenschutz');
   const imprint = H.norm(H.textOf(H.byTag(H.parse(read('public/impressum.html')).root, 'main')[0]));
-  for (const s of ['§ 5 Digitale-Dienste-Gesetz (DDG)', 'Vincent Schnetzer', '360°Pixelkiez', 'Edelhofdamm 74', '13465 Berlin', 'kontakt@pixelkiez.de', '§ 18 Abs. 2 MStV', 'Verbraucherschlichtungsstelle']) {
+  for (const s of ['§ 5 Digitale-Dienste-Gesetz (DDG)', 'Vincent Schnetzer', '360°Pixelkiez', 'Edelhofdamm 74', '13465 Berlin', '360@pixelkiez.de', '§ 18 Abs. 2 MStV', 'Verbraucherschlichtungsstelle']) {
     assert.ok(imprint.includes(s), `Impressum enthält "${s}"`);
   }
   const privacy = H.norm(H.textOf(H.byTag(H.parse(read('public/datenschutz.html')).root, 'main')[0]));
   assert.match(privacy, /in Vorbereitung/, 'Datenschutzerklärung als unvollständig gekennzeichnet, bis sie fertiggestellt ist');
   assert.match(privacy, /ENTWURF – nicht rechtlich freigegeben/);
-  assert.ok(privacy.includes('Vincent Schnetzer') && privacy.includes('kontakt@pixelkiez.de'), 'Verantwortlicher genannt');
+  assert.ok(privacy.includes('Vincent Schnetzer') && privacy.includes('360@pixelkiez.de'), 'Verantwortlicher genannt');
   /* Entwurf nennt die tatsächlich genutzten Dienste und Datenflüsse; offene Punkte stehen in eckigen Klammern */
   for (const s of ['Cloudflare Pages', 'Cloudflare Workers', 'Cloudflare-D1-Datenbank mit EU-Jurisdiktion', 'Google Ireland Limited', '„openid“ und „email“', 'Resend', 'Schriftarten', '__Host-pxwa', 'HMAC', '[Frist noch nicht festgelegt']) {
     assert.ok(privacy.includes(s), `Datenschutz-Entwurf nennt "${s}"`);
@@ -340,13 +341,19 @@ test('Release-Grenze API (privater Worker): keine Route, keine workers.dev-Adres
   assert.match(active, /^MAIL_FROM = ""$/m, 'Absender erst nach Verifizierung der Versanddomain');
   assert.match(active, /^PRIVACY_VERSION = "ENTWURF-/m, 'Datenschutzerklärung nicht freigegeben: Produktion nimmt keine Aufträge an');
   assert.match(active, /^TERMS_VERSION = "ENTWURF-/m, 'AGB nicht freigegeben: Produktion nimmt keine Aufträge an');
-  assert.match(active, /^MAIL_NOTIFY_TO = "kontakt@pixelkiez\.de"$/m);
+  assert.match(active, /^MAIL_NOTIFY_TO = "360@pixelkiez\.de"$/m);
   assert.ok(!/^ORDER_RETENTION_DAYS\s*=/m.test(active), 'Löschfrist nicht aktiv, solange die Aufbewahrungsfrist offen ist');
   const config = read('worker/src/config.ts');
   assert.match(config, /export const AUTHORIZED_MAIL_API_HOSTS: readonly string\[\] = \['api\.resend\.com'\];/);
   assert.match(config, /export const AUTHORIZED_MAIL_FROM_DOMAINS: readonly string\[\] = \['notify\.pixelkiez\.de'\];/);
   assert.match(config, /export const PRODUCTION_BASE_URL = 'https:\/\/360\.pixelkiez\.de';/);
-  assert.match(config, /export const PRODUCTION_NOTIFY_TO = 'kontakt@pixelkiez\.de';/, 'fester interner Empfänger in Produktion');
+  assert.match(config, /export const PRODUCTION_NOTIFY_TO = '360@pixelkiez\.de';/, 'fester interner Empfänger in Produktion');
+  /* Einzige Adresse ist 360@pixelkiez.de: Die frühere Adresse steht weder in ausgelieferten Seiten noch im Worker oder in der
+     Konfiguration (kein versteckter Rückfall, keine Doppelzustellung). */
+  for (const f of [...PAGES, ...WORKER_SRC, 'worker/wrangler.toml', 'worker/.dev.vars.example', 'wrangler.toml', FUNCTION, MEDIA_FUNCTION, 'public/_headers', 'public/assets/app.js']) {
+    assert.ok(!/kontakt@pixelkiez\.de/i.test(read(f)), `${f}: keine frühere Adresse kontakt@pixelkiez.de`);
+  }
+  assert.deepEqual([...new Set([...PAGES, VIEW].flatMap(f => [...read(f).matchAll(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi)].map(m => m[0])))], ['360@pixelkiez.de'], 'einzige Mailadresse auf der Website');
 });
 
 test('D1-Schema: nur die nötigen Tabellen und Spalten (Datenminimierung), keine Tokens; Migration 0002 rein additiv', () => {

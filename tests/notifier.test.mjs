@@ -148,6 +148,7 @@ test('Produktion: falscher Mail-Anbieter oder Pfad, fremder Absender, Datenschut
     ['Mail-API nicht Resend', { MAIL_API_URL: 'https://api.mail-anbieter.example.net/emails' }, /MAIL_API_URL/],
     ['Resend mit falschem Pfad', { MAIL_API_URL: 'https://api.resend.com/v1/send' }, /MAIL_API_URL/],
     ['Absender außerhalb von notify.pixelkiez.de', { MAIL_FROM: 'analyse@pixelkiez.de' }, /MAIL_FROM/],
+    ['Empfängerpostfach als Absender', { MAIL_FROM: '360@pixelkiez.de' }, /MAIL_FROM/],
     ['Datenschutzerklärung nur als Entwurf', { PRIVACY_VERSION: 'ENTWURF-2026-10-31' }, /PRIVACY_VERSION/],
     ['AGB nur als Entwurf', { TERMS_VERSION: 'ENTWURF-2026-10-31' }, /TERMS_VERSION/],
     ['AGB-Entwurf in Kleinschreibung', { TERMS_VERSION: 'entwurf-agb' }, /TERMS_VERSION/],
@@ -175,13 +176,20 @@ test('Produktion: falscher Mail-Anbieter oder Pfad, fremder Absender, Datenschut
   }
 });
 
-test('Produktion: interner Empfänger ausschließlich kontakt@pixelkiez.de – jede andere Adresse sperrt die API (503, kein Cron-Versand, kein Aufruf von Resend)', { skip }, async () => {
+test('Produktion: interner Empfänger ausschließlich 360@pixelkiez.de – jede andere Adresse, auch die frühere kontakt@pixelkiez.de, sperrt die API (503, kein Cron-Versand, kein Aufruf von Resend)', { skip }, async () => {
   const variants = [
-    ['anderes Postfach', 'info@pixelkiez.de'], ['andere Domain', 'kontakt@pixelkiez.com'], ['Versanddomain statt Postfach', 'kontakt@notify.pixelkiez.de'],
-    ['angehängte Fremddomain', 'kontakt@pixelkiez.de.example.net'], ['Subdomain-Präfix', 'kontakt@mail.pixelkiez.de'], ['Plus-Adresse', 'kontakt+test@pixelkiez.de'],
-    ['zwei Empfänger', 'kontakt@pixelkiez.de,angreifer@example.net'], ['Anzeigename', 'Pixelkiez <kontakt@pixelkiez.de>'],
-    ['Unicode-Doppelgänger (Kelvin-Zeichen U+212A)', 'Kontakt@pixelkiez.de'], ['Unicode-Doppelgänger (kyrillisches о)', 'kontakt@pixelkiez.de'.replace('o', 'о')],
-    ['nachgestellter Punkt', 'kontakt@pixelkiez.de.'], ['leer', ''], ['nicht gesetzt', undefined],
+    ['frühere Adresse (kein Rückfall)', 'kontakt@pixelkiez.de'], ['anderes Postfach', 'info@pixelkiez.de'], ['andere Domain', '360@pixelkiez.com'],
+    ['Versanddomain statt Postfach', '360@notify.pixelkiez.de'], ['verworfene Adresse auf der Subdomain', 'analyse@360.pixelkiez.de'],
+    ['verworfene Mail-Subdomain', 'analyse@mail.360.pixelkiez.de'], ['angehängte Fremddomain', '360@pixelkiez.de.example.net'],
+    ['Subdomain-Präfix', '360@mail.pixelkiez.de'], ['Plus-Adresse', '360+test@pixelkiez.de'], ['andere Ziffern', '3600@pixelkiez.de'],
+    ['neue und frühere Adresse (Doppelzustellung)', '360@pixelkiez.de,kontakt@pixelkiez.de'], ['zwei Empfänger mit Semikolon', '360@pixelkiez.de;kontakt@pixelkiez.de'],
+    ['zwei Empfänger', '360@pixelkiez.de,angreifer@example.net'], ['Anzeigename', 'Pixelkiez <360@pixelkiez.de>'], ['mailto-Schema', 'mailto:360@pixelkiez.de'],
+    ['Kopfzeilen-Injektion', '360@pixelkiez.de\r\nBcc: angreifer@example.net'],
+    ['Unicode-Doppelgänger (Kelvin-Zeichen U+212A)', '360@pixel\u212Aiez.de'], ['Unicode-Doppelgänger (kyrillisches е)', '360@pixelkiez.de'.replace('e', '\u0435')],
+    ['Unicode-Doppelgänger (punktloses ı)', '360@p\u0131xelkiez.de'], ['Unicode-Doppelgänger (Vollbreiten-Ziffern)', '\uFF13\uFF16\uFF10@pixelkiez.de'],
+    ['Unicode-Doppelgänger (arabisch-indische Ziffern)', '\u0663\u0666\u0660@pixelkiez.de'], ['Unicode-Doppelgänger (Vollbreiten-@)', '360\uFF20pixelkiez.de'],
+    ['unsichtbares Zeichen (Zero-Width Space)', '360@pixel\u200Bkiez.de'], ['weiches Trennzeichen', '360@pixel\u00ADkiez.de'],
+    ['nachgestellter Punkt', '360@pixelkiez.de.'], ['leer', ''], ['nicht gesetzt', undefined],
   ];
   for (const [name, to] of variants) {
     mail.reset();
@@ -191,7 +199,9 @@ test('Produktion: interner Empfänger ausschließlich kontakt@pixelkiez.de – j
       assert.equal(r.status, 503, name);
       assert.equal(r.location, null, `${name}: keine Weiterleitung`);
       assert.match(r.text, /Gerade nicht verfügbar/, `${name}: sichere Fehlerseite`);
-      assert.ok(!r.text.includes('MAIL_NOTIFY_TO') && !(to && r.text.includes(to)), `${name}: Antwort nennt weder Schlüssel noch Adresse`);
+      /* Der Footer der Fehlerseite verlinkt öffentlich mailto:360@pixelkiez.de; außerhalb davon steht der konfigurierte Wert nirgends */
+      const body = r.text.replaceAll('href="mailto:360@pixelkiez.de"', '');
+      assert.ok(!body.includes('MAIL_NOTIFY_TO') && !(to && body.includes(to)), `${name}: Antwort nennt weder Schlüssel noch Adresse`);
       assert.equal((await w.cron()).outcome, 'exception', `${name}: Cron versendet nichts`);
       await waitFor(() => /Ungültige oder fehlende Werte: MAIL_NOTIFY_TO/.test(w.logs()), { what: `Log ${name}` });
       assert.ok(!(to && w.logs().includes(to)), `${name}: Log nennt nur den Schlüssel, nie den Wert`);
@@ -202,8 +212,8 @@ test('Produktion: interner Empfänger ausschließlich kontakt@pixelkiez.de – j
   }
 });
 
-test('Produktion: Groß-/Kleinschreibung von kontakt@pixelkiez.de wird angenommen; versendet wird immer an die kleingeschriebene Adresse über api.resend.com', { skip }, async () => {
-  for (const to of ['kontakt@pixelkiez.de', 'Kontakt@PixelKiez.de', 'KONTAKT@PIXELKIEZ.DE']) {
+test('Produktion: Groß-/Kleinschreibung von 360@pixelkiez.de wird angenommen; versendet wird immer genau einmal an die kleingeschriebene Adresse über api.resend.com', { skip }, async () => {
+  for (const to of ['360@pixelkiez.de', '360@PixelKiez.de', '360@PIXELKIEZ.DE']) {
     mail.reset();
     const w = await startWorker({ base: PRODUCTION_BASE, env: { ...PROD, MAIL_NOTIFY_TO: to }, outbound: resendOutbound(mail) });
     try {
@@ -212,7 +222,7 @@ test('Produktion: Groß-/Kleinschreibung von kontakt@pixelkiez.de wird angenomme
       await w.run("INSERT INTO notifications (order_id, next_attempt_at, created_at) SELECT id, '2000-01-01 00:00:00', created_at FROM orders");
       assert.match((await w.cron()).log, /PXWA: 1 versendet, 0 fehlgeschlagen/, to);
       assert.equal(mail.state.accepted.length, 1, to);
-      assert.deepEqual(mail.state.accepted[0].to, ['kontakt@pixelkiez.de'], `${to}: kanonischer Empfänger`);
+      assert.deepEqual(mail.state.accepted[0].to, ['360@pixelkiez.de'], `${to}: kanonischer Empfänger, keine zweite Adresse`);
       assert.equal(mail.state.accepted[0].from, PROD.MAIL_FROM);
     } finally {
       await w.stop();

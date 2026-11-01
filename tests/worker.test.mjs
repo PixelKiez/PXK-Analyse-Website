@@ -99,7 +99,7 @@ test('Website + AGB + Google: genau ein Free-Auftrag mit AGB-Version und Zustimm
   await settled();
   assert.equal(mail.state.accepted.length, 1, 'genau eine Mail');
   const m = mail.state.accepted[0];
-  assert.deepEqual(m.to, [NOTIFY_TO], 'nur an Pixelkiez (bis zur Umstellung kontakt@pixelkiez.de), nie an die Kundin/den Kunden');
+  assert.deepEqual(m.to, [NOTIFY_TO], 'nur an Pixelkiez (360@pixelkiez.de), nie an die Kundin/den Kunden');
   assert.equal(m.from, MAIL_FROM);
   assert.equal(m.reply_to, CUSTOMER);
   assert.equal(m.subject, `Neue Analyse-Anfrage ${ref}`);

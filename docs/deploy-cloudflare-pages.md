@@ -27,7 +27,7 @@ Browser ──HTTPS──► 360.pixelkiez.de  (CNAME bei Hostinger → <projekt
                                                             ▼
                                                         Worker „pxwa-api“ ──► D1 „pxwa“ (EU-Jurisdiktion)
                                                             ├─► Google OIDC (Token, JWKS)
-                                                            ├─► Resend API (nur an kontakt@pixelkiez.de)
+                                                            ├─► Resend API (nur an 360@pixelkiez.de)
                                                             └─ Cron alle 5 Minuten (Wiederholungen, Aufräumen)
 ```
 
@@ -38,6 +38,8 @@ Browser ──HTTPS──► 360.pixelkiez.de  (CNAME bei Hostinger → <projekt
 - [ ] CNAME `360` bei Hostinger auf den von Cloudflare genannten `*.pages.dev`-Namen (Abschnitt 4)
 - [ ] Google-OAuth-Client (Webanwendung) mit exakt `https://360.pixelkiez.de/api/auth/callback` (Abschnitt 5)
 - [ ] Resend: Domain `notify.pixelkiez.de` verifiziert, API-Key als Secret, `MAIL_FROM` gesetzt (Abschnitt 6)
+- [ ] Postfach `360@pixelkiez.de` eingerichtet und Zustellung nachgewiesen (Abschnitt 6); vorher keinen Worker mit
+      gesetztem `MAIL_FROM` deployen und keine echte Benachrichtigung auslösen
 - [ ] Datenschutzerklärung fertig und rechtlich geprüft; danach `PRIVACY_VERSION` ohne „ENTWURF“ setzen.
       Solange `PRIVACY_VERSION` mit „ENTWURF“ beginnt, nimmt der Worker in Produktion **keine** Aufträge an (503).
 - [ ] Aufbewahrungsfrist für Auftragsdaten entschieden (D-5, Abschnitt 8)
@@ -102,7 +104,7 @@ jede unbekannte Adresse mit der Startseite beantworten).
 3. Schema: `npx wrangler d1 migrations apply pxwa --remote` (Migrationen nur additiv).
 4. `[vars]` (keine Secrets): `BASE_URL = "https://360.pixelkiez.de"` (fest; andere Werte sperren die API),
    `GOOGLE_CLIENT_ID`, `PRIVACY_VERSION`, `MAIL_API_URL = "https://api.resend.com/emails"`,
-   `MAIL_FROM` (Adresse @notify.pixelkiez.de, erst nach Domain-Verifizierung), `MAIL_NOTIFY_TO = "kontakt@pixelkiez.de"`.
+   `MAIL_FROM` (Adresse @notify.pixelkiez.de, erst nach Domain-Verifizierung), `MAIL_NOTIFY_TO = "360@pixelkiez.de"`.
 5. Secrets nur per `npx wrangler secret put <NAME>`: `GOOGLE_CLIENT_SECRET`, `SECRET` (≥ 32 Zeichen, z. B.
    `openssl rand -hex 32`; pseudonymisiert IP-Adressen im Rate-Limit), `MAIL_API_TOKEN` (Resend-API-Key).
 6. Deploy: `npx wrangler deploy`. Keine Route, keine Custom Domain: `workers_dev = false` und `preview_urls = false`
@@ -151,10 +153,17 @@ zugelassen werden sollen, ist eine Produktentscheidung; der Code ändert die Zie
 - Erst nach „Verified“: `MAIL_FROM` (z. B. eine Adresse `@notify.pixelkiez.de`) in `worker/wrangler.toml` setzen.
 - API-Key mit Recht „Sending access“ nur für diese Domain; als Secret `MAIL_API_TOKEN`, nie im Repository oder Log.
 - Vertrag: `POST https://api.resend.com/emails`, `Authorization: Bearer …`, `User-Agent` (Pflicht, sonst 403),
-  `Idempotency-Key: pxwa-<Referenz>`, JSON `{ from, to: ["kontakt@pixelkiez.de"], reply_to, subject, text }`.
+  `Idempotency-Key: pxwa-<Referenz>`, JSON `{ from, to: ["360@pixelkiez.de"], reply_to, subject, text }`.
   Kein HTML, kein Anhang, keine Mail an Kundinnen und Kunden.
-- Empfänger: In Produktion muss `MAIL_NOTIFY_TO` `kontakt@pixelkiez.de` sein (Groß-/Kleinschreibung egal, nur ASCII);
-  versendet wird immer an genau diese Adresse. Jeder andere Wert sperrt die API (503) und den Cron-Versand.
+- Empfänger: In Produktion muss `MAIL_NOTIFY_TO` `360@pixelkiez.de` sein (Groß-/Kleinschreibung egal, nur ASCII);
+  versendet wird immer an genau diese Adresse. Jeder andere Wert – auch die frühere `kontakt@pixelkiez.de`, zwei
+  Adressen oder Unicode-Doppelgänger – sperrt die API (503) und den Cron-Versand. Es gibt keinen Rückfall auf eine
+  andere Adresse. Absender (`MAIL_FROM`, Versanddomain `notify.pixelkiez.de`) und Empfänger (Postfach unter
+  `pixelkiez.de`) sind getrennt.
+- Vorbedingung für die Aktivierung: Das Postfach `360@pixelkiez.de` existiert beim Mail-Anbieter von `pixelkiez.de`, und
+  eine von Hand gesendete Testmail ist dort nachweislich angekommen (Absender, Zeitpunkt, Message-ID notieren). Erst
+  danach `MAIL_FROM` setzen und den Worker deployen; bis dahin bleibt `MAIL_FROM` leer und der Worker antwortet mit 503.
+  Den Nachweis über die Website-Kette erbringt die Ende-zu-Ende-Prüfung (Abschnitt 9).
 - Zuverlässigkeit: Auftrag und Benachrichtigung entstehen in einem D1-Batch (Outbox). Fällt Resend aus, bleibt der
   Auftrag angenommen; ein Mailfehler löscht nie einen Auftrag. **Vorübergehende** Fehler (Verbindung, Zeitüberschreitung,
   408/429/5xx, 409 `concurrent_idempotent_requests`) werden wiederholt: 5 min, 15 min, 45 min … höchstens 12 h, nach
@@ -182,6 +191,12 @@ Pfade): Sie liest die Datei aus dem eigenen Assets-Binding (feste Pfade, kein R2
 nicht erfüllbarer Bereich), 304 (`If-None-Match`), 405 (andere Methoden als GET/HEAD). Poster bleiben statisch. Die
 Sicherheits-Header setzt die Function selbst (`_headers` gilt nicht für Functions); ein Test vergleicht beide.
 Lokal geprüft (`wrangler pages dev`, Playwright): Chromium und WebKit spielen beide Videos mit 206.
+
+**Abweichung zu Confluence D-12 (offene PO-Entscheidung):** Geplantes Medienziel ist Cloudflare R2. Ausgeliefert werden
+die Videos derzeit aus den Pages-Assets über die Function oben; ein R2-Bucket, ein R2-Binding und eine R2-Domain sind
+**nicht** angelegt. Eine R2-Custom-Domain setzt eine Cloudflare-Zone voraus (DNS bleibt bei Hostinger), `r2.dev` ist
+nicht vorgesehen. Ein Wechsel auf R2 braucht eine eigene Entscheidung und einen eigenen Slice (Bucket, Binding in
+`wrangler.toml`, Function-Anpassung, Range-/Safari-Tests, Rollback).
 
 Kosten und Grenzen (Free-Plan): Jede Video-Anfrage ist ein Function-Aufruf (Workers-Kontingent, 100 000 Anfragen pro
 Tag; Safari stellt je Video etwa zwei Anfragen). Ist das Kontingent erschöpft oder die Function gestört, ersetzt
@@ -219,7 +234,7 @@ curl -s -o /dev/null -w "%{http_code}\n" "https://<projekt>.pages.dev/api/anfrag
 
 Im Browser mit einem Test-Google-Konto und einer eigenen Website: URL eingeben → Google → bestätigen.
 Erwartet: Referenz `PXA-…`, genau eine Zeile in `orders`, `notifications.status = 'sent'`, **genau eine** Mail in
-kontakt@pixelkiez.de (Absender @notify.pixelkiez.de, SPF/DKIM „pass“ im Mail-Header). Zurück + erneut senden und
+360@pixelkiez.de (Absender @notify.pixelkiez.de, SPF/DKIM „pass“ im Mail-Header). Zurück + erneut senden und
 dieselbe URL erneut anfragen: keine zweite Mail. Auf einem iPhone: beide Videos laufen (sonst Standbild, nie eine
 schwarze Fläche). Danach Testdaten löschen:
 `DELETE FROM notifications WHERE order_id IN (SELECT id FROM orders WHERE reference = 'PXA-…'); DELETE FROM orders WHERE reference = 'PXA-…'`.
