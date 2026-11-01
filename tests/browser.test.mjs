@@ -50,11 +50,13 @@ after(async () => {
   await browser.close(); await app.stop(); await google.stop(); await mail.stop();
 });
 
-async function open(path, { width = 1440, height = 900, reducedMotion = 'reduce', bypassCSP = false, javaScriptEnabled = true, engine = browser } = {}) {
+async function open(path, { width = 1440, height = 900, reducedMotion = 'reduce', bypassCSP = false, javaScriptEnabled = true, engine = browser, videos = false } = {}) {
   const context = await engine.newContext({ viewport: { width, height }, reducedMotion, bypassCSP, javaScriptEnabled });
   const page = await context.newPage();
   const errors = [], blocked = [], requests = [];
   page.on('request', r => requests.push({ method: r.method(), url: r.url(), body: r.postData() ?? '' }));
+  /* Video-Antworten ab der Navigation mitschreiben: preload="auto" fragt schon vor 'load' an */
+  const tracked = videos ? trackVideos(page) : null;
   await context.route('**/*', route => {
     const u = new URL(route.request().url());
     if (u.origin === app.base || FONT_HOSTS.includes(u.hostname)) return route.continue();
@@ -67,7 +69,7 @@ async function open(path, { width = 1440, height = 900, reducedMotion = 'reduce'
   /* 'load' statt 'networkidle': Video-Anfragen (preload) können länger offen bleiben */
   await page.goto(app.base + path, { waitUntil: 'load' });
   if (javaScriptEnabled) await page.evaluate(() => document.fonts.ready);
-  return { context, page, errors, blocked, requests };
+  return { context, page, errors, blocked, requests, videos: tracked };
 }
 const resetData = async () => { await app.exec('DELETE FROM notifications; DELETE FROM orders; DELETE FROM rate_limits; DELETE FROM sessions'); mail.reset(); };
 const orderCount = () => app.sql('SELECT COUNT(*) AS n FROM orders')[0].n;
@@ -162,8 +164,7 @@ test('Video unter dem Hero: mittig, abgerundet, ohne Bedienelemente, startet bei
       top: r.top, left: r.left, right: innerWidth - r.right, width: r.width, vw: innerWidth, vh: innerHeight, radius: parseFloat(cs.borderTopLeftRadius), overflow: cs.overflow };
   });
   for (const [width, height] of [[1440, 900], [390, 844]]) {
-    const { context, page, errors, blocked } = await open('/index.html', { width, height, reducedMotion: 'no-preference' });
-    const videos = trackVideos(page);
+    const { context, page, errors, blocked, videos } = await open('/index.html', { width, height, reducedMotion: 'no-preference', videos: true });
     const before = await state(page);
     assert.ok(before.top >= before.vh - 1, `${width}: Video liegt unter dem ersten Bildschirm`);
     assert.equal(before.paused, true, `${width}: läuft vor dem Scrollen noch nicht`);

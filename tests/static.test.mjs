@@ -128,7 +128,7 @@ test('Hero (PXWA-BE-02): AGB-Pflichthäkchen nicht vorausgewählt, AGB- und Date
   assert.equal(txt(H.byTag(H.byClass(root, 'hero')[0], 'h1')[0]), 'Sehen Sie, was Ihre Website ausbremst.', 'Original-H1');
 });
 
-test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen neu, Reihenfolge erhalten; außerhalb des Hero nur der Text von Schritt 02 und die Kontaktadresse', () => {
+test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen neu, Reihenfolge erhalten; außerhalb des Hero nur der Text von Schritt 02, die Kontaktadresse und die entfernten Eyebrow-Zeilen', () => {
   const now = read('public/index.html');
   const old = git('show', `${BASE_SHA}:public/index.html`);
   const hero = html => { const i = html.indexOf('<section class="hero">'); return html.slice(i, html.indexOf('</section>', i) + '</section>'.length); };
@@ -145,8 +145,11 @@ test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen n
   const kept = a.filter(l => b.includes(l));
   assert.deepEqual(b.filter(l => kept.includes(l)), kept, 'Badge, H1, Lead, URL-Feld und Faktenzeile in unveränderter Reihenfolge');
   const outside = html => html.replace(hero(html), '').replace(/<div class="step cw-lilac"><span>02<\/span>.*?<\/div>/, '<SCHRITT-02>');
-  /* Kontaktadresse im Footer: 360@pixelkiez.de ersetzt die frühere Adresse (PO-Entscheidung 01.11.2026), sonst nichts */
-  assert.equal(outside(now), outside(old).replaceAll('kontakt@pixelkiez.de', '360@pixelkiez.de'), 'übrige Startseite unverändert (außer Schritt 02, der den zweiten Bestätigungsklick beschrieb, und der Kontaktadresse)');
+  /* Kontaktadresse im Footer: 360@pixelkiez.de ersetzt die frühere Adresse (PO-Entscheidung 01.11.2026).
+     Eyebrow-Zeilen über den Abschnittsüberschriften entfallen (Entscheidung des Auftraggebers 02.11.2026), sonst nichts */
+  const withoutEyebrows = html => html.replace(/^[ \t]*<p class="eyebrow">[^<]*<\/p>\n/gm, '').replace(/<p class="eyebrow">[^<]*<\/p>/g, '');
+  assert.ok(!now.includes('class="eyebrow"'), 'Startseite ohne Eyebrow-Zeilen');
+  assert.equal(outside(now), withoutEyebrows(outside(old)).replaceAll('kontakt@pixelkiez.de', '360@pixelkiez.de'), 'übrige Startseite unverändert (außer Schritt 02, der den zweiten Bestätigungsklick beschrieb, der Kontaktadresse und den Eyebrow-Zeilen)');
   assert.match(now, /<span>02<\/span><h3>AGB akzeptieren und anmelden<\/h3>/);
 });
 
