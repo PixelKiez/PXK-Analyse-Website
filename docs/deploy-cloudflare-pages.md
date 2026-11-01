@@ -2,8 +2,17 @@
 
 Gilt für die kostenlose Website-Analyse mit Google-Anmeldung (PXK-153). Ein Deployment braucht eine eigene, aktuelle
 menschliche Freigabe für **genau einen Commit-SHA**. Dieses Dokument nennt nur Schlüsselnamen, nie Werte.
-Nichts hier ist bereits eingerichtet: kein Cloudflare-Projekt, keine D1-Datenbank, kein DNS-Eintrag, kein
-Google-Client, keine Resend-Domain. Alle bisherigen Tests sind lokal (Mocks, workerd, `wrangler pages dev`).
+Stand 01.11.2026 (Abschnitt 1 des Launches, je Punkt menschlich freigegeben): Pages-Projekt und D1 sind angelegt,
+eine Vorschau läuft. Noch **nicht** eingerichtet: Worker `pxwa-api`, D1-Schema, Custom Domain, DNS-Eintrag,
+Google-Client, Resend-Domain, Secrets, Produktions-Deployment.
+
+| Ressource | Name | ID / Adresse | Stand |
+|---|---|---|---|
+| Cloudflare-Konto | (2FA aktiv) | `4e86c3d78cdde255eb5d084f24162271` | geprüft 01.11.2026 |
+| D1 | `pxwa` | `3a5e6c3c-89f4-4b13-83ee-b70e151dc9b0` | Jurisdiktion `eu`, Region EEUR, 0 Tabellen |
+| Pages-Projekt | `pxwa` | `b132db8f-1695-4a95-9948-c5d749a46066`, `pxwa.pages.dev` | Direct Upload, Production-Branch `main`, keine Custom Domain |
+| Vorschau | Branch `vorschau` | `c76ddf3a-aed8-4f0d-bda4-fff0504b1e6a`, `https://vorschau.pxwa.pages.dev` | aus `d7f8d86`, `noindex`, `/api/*` 503, öffentlich erreichbar |
+| Worker | `pxwa-api` | – | nicht angelegt |
 
 ```
 Browser ──HTTPS──► 360.pixelkiez.de  (CNAME bei Hostinger → <projekt>.pages.dev)
@@ -34,7 +43,8 @@ Browser ──HTTPS──► 360.pixelkiez.de  (CNAME bei Hostinger → <projekt
 - [ ] Aufbewahrungsfrist für Auftragsdaten entschieden (D-5, Abschnitt 8)
 - [ ] Auftragsverarbeitungsverträge (Cloudflare, Resend) und Übermittlungsgrundlagen geprüft
 - [ ] Videos auf einem echten iPhone/Safari prüfen: Die Video-Function beantwortet Range-Anfragen mit 206; lokal
-      (WebKit, `wrangler pages dev`) laufen beide Videos. Auf echtem Cloudflare noch nicht geprüft (Abschnitt 7).
+      (WebKit, `wrangler pages dev`) laufen beide Videos. Auf echtem Cloudflare (Vorschau, 01.11.2026) per `curl`
+      geprüft: 206 mit `Content-Range`, 416, 405; echtes iPhone noch offen (Abschnitt 7).
 - [ ] Echte Ende-zu-Ende-Prüfung nach der Aktivierung (Abschnitt 9)
 - [ ] `noindex` bleibt gesetzt, bis eine eigene Launch-Freigabe es aufhebt
 
