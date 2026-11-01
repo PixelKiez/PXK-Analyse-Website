@@ -13,11 +13,12 @@ preview_urls = false
 [triggers]
 crons = ["*/5 * * * *"]
 
-# D1 mit EU-Jurisdiktion anlegen (erst nach Freigabe): npx wrangler d1 create pxwa --jurisdiction eu → database_id hier eintragen
+# D1 mit EU-Jurisdiktion, angelegt am 01.11.2026 mit `npx wrangler d1 create pxwa --jurisdiction eu` (Region EEUR).
+# Die ID ist kein Geheimnis; Schema erst mit eigener Freigabe: npx wrangler d1 migrations apply pxwa --remote
 [[d1_databases]]
 binding = "DB"
 database_name = "pxwa"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "3a5e6c3c-89f4-4b13-83ee-b70e151dc9b0"
 migrations_dir = "migrations"
 
 [vars]
