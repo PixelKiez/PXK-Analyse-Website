@@ -21,13 +21,13 @@ export const AUTHORIZED_MAIL_API_HOSTS: readonly string[] = ['api.resend.com'];
 /* Absender nur aus der eigenen Versanddomain (bei Resend zu verifizieren, getrennt von den Postfächern unter pixelkiez.de) */
 export const AUTHORIZED_MAIL_FROM_DOMAINS: readonly string[] = ['notify.pixelkiez.de'];
 
-/* Einziger Empfänger der internen Benachrichtigung in Produktion. MAIL_NOTIFY_TO muss diese Adresse sein (Groß-/Klein-
-   schreibung egal, nur ASCII); versendet wird immer an genau diese Schreibweise. Jede andere Adresse sperrt die API.
-   Beschlossenes künftiges Ziel ist 360@pixelkiez.de (Confluence PXWA §16). Umstellung erst nach eigener Freigabe, wenn das
-   Postfach eingerichtet und die Zustellung nachgewiesen ist – dann in einem Schritt: diese Konstante, MAIL_NOTIFY_TO in
-   worker/wrangler.toml, NOTIFY_TO in tests/lib/harness.mjs und die Empfänger-Tests in tests/notifier.test.mjs. Nie beide
-   Adressen zugleich und kein automatischer Rückfall auf die alte Adresse. */
-export const PRODUCTION_NOTIFY_TO = 'kontakt@pixelkiez.de';
+/* Einziger Empfänger der internen Benachrichtigung in Produktion: 360@pixelkiez.de (PO-Entscheidung, Confluence PXWA §16;
+   ersetzt die frühere Kontaktadresse vollständig). MAIL_NOTIFY_TO muss diese Adresse sein (Groß-/Kleinschreibung egal, nur
+   ASCII); versendet wird immer an genau diese Schreibweise. Jede andere Adresse – auch die frühere – sperrt die API.
+   Nie zwei Adressen zugleich, kein Rückfall auf eine andere Adresse. Die Versanddomain notify.pixelkiez.de (MAIL_FROM)
+   ist davon getrennt. Produktiv aktiv erst nach nachgewiesener Zustellung an das Postfach
+   (docs/deploy-cloudflare-pages.md, Abschnitt 6). */
+export const PRODUCTION_NOTIFY_TO = '360@pixelkiez.de';
 
 export const LIMITS = {
   startPerIp: [20, 600],         // Anfragestarts je IP: 20 in 10 Minuten

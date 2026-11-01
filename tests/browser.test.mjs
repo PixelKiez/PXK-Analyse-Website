@@ -334,7 +334,7 @@ test('Tastatur: ungültige Adresse und fehlendes AGB-Häkchen bleiben im Formula
     assert.ok(await overflow(page) <= 0, `${width}: Überlauf auf der Bestätigung`);
     assert.deepEqual(app.sql('SELECT website_url, terms_version FROM orders'), [{ website_url: 'https://musterfirma.de', terms_version: TERMS_VERSION }]);
     await waitFor(() => mail.state.accepted.length === 1, { what: 'interne Benachrichtigung' });
-    assert.deepEqual(mail.state.accepted[0].to, ['kontakt@pixelkiez.de']);
+    assert.deepEqual(mail.state.accepted[0].to, ['360@pixelkiez.de']);
     assert.deepEqual(leaks(requests, 'musterfirma'), [], 'Website-Adresse nie in einer URL');
     assert.ok(requests.some(r => r.method === 'POST' && /website=musterfirma\.de/.test(r.body) && /agb=1/.test(r.body) && r.body.includes(`agb_version=${TERMS_VERSION}`)), 'per POST mit Häkchen und AGB-Version');
     const cookies = await context.cookies();

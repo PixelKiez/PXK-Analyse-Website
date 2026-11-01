@@ -87,7 +87,7 @@ export class View {
   <footer class="cw-lilac">
     <div class="footer">
       <span>© 2026 360°Pixelkiez</span>
-      <nav aria-label="Rechtliches"><a href="${b}/impressum.html">Impressum</a><a href="${b}/datenschutz.html">Datenschutz</a><a href="mailto:kontakt@pixelkiez.de">Kontakt</a></nav>
+      <nav aria-label="Rechtliches"><a href="${b}/impressum.html">Impressum</a><a href="${b}/datenschutz.html">Datenschutz</a><a href="mailto:360@pixelkiez.de">Kontakt</a></nav>
     </div>
   </footer>
 </main>
