@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self' https://accounts.google.com">
+<meta name="robots" content="noindex,nofollow">
+<title>Entity Trust: Wie Maschinen Unternehmen zuordnen | 360°Pixelkiez</title>
+<meta name="description" content="Entity Trust ist keine Note: wie Google, Bing und KI-Systeme Name, Standort, Leistungen und Personen eines Betriebs zuordnen und was sich prüfen lässt.">
+<link rel="canonical" href="https://360.pixelkiez.de/wissen/entity-trust">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../assets/styles.css">
+<link rel="stylesheet" href="../assets/anfrage.css">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "Article", "headline": "Entity Trust: Ist Ihr Unternehmen für Maschinen eindeutig?", "description": "Entity Trust ist keine Note: wie Google, Bing und KI-Systeme Name, Standort, Leistungen und Personen eines Betriebs zuordnen und was sich prüfen lässt.", "inLanguage": "de-DE", "url": "https://360.pixelkiez.de/wissen/entity-trust", "mainEntityOfPage": "https://360.pixelkiez.de/wissen/entity-trust", "author": {"@type": "Organization", "name": "360°Pixelkiez", "url": "https://360.pixelkiez.de/"}, "publisher": {"@type": "Organization", "name": "360°Pixelkiez", "url": "https://360.pixelkiez.de/"}, "isPartOf": {"@type": "CollectionPage", "url": "https://360.pixelkiez.de/wissen/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Start", "item": "https://360.pixelkiez.de/"}, {"@type": "ListItem", "position": 2, "name": "Wissen", "item": "https://360.pixelkiez.de/wissen/"}, {"@type": "ListItem", "position": 3, "name": "Entity Trust: Ist Ihr Unternehmen für Maschinen eindeutig?", "item": "https://360.pixelkiez.de/wissen/entity-trust"}]}]}</script>
+</head>
+<body>
+<svg class="sr-only" width="0" height="0" aria-hidden="true">
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+</svg>
+
+<header class="nav-wrap" id="nav">
+  <nav class="nav" aria-label="Hauptnavigation">
+    <a class="logo" href="../index.html#top">360°Pixelkiez<span>Analyse</span></a>
+    <div class="nav-links">
+      <a href="../index.html#bericht">Bericht</a>
+      <a href="../index.html#bereiche">Bereiche</a>
+      <a href="../index.html#angebot">Angebot</a>
+      <a href="../index.html#faq">FAQ</a>
+    </div>
+    <a class="btn btn--ghost btn--sm" href="../index.html">Start</a>
+  </nav>
+</header>
+
+<main class="frame" id="top">
+  <section class="section cw-peach" id="artikel">
+    <div class="section-head"><h1 class="h2">Entity Trust: Ist Ihr Unternehmen für Maschinen eindeutig?</h1><p class="text">Hinter dem Schlagwort Entity Trust steht vor allem eine Zuordnungsfrage: Erkennt ein System, welcher Betrieb eine Website herausgibt, wo er tätig ist und was er anbietet? Dieser Beitrag sortiert, was Google, Microsoft, Schema.org, Wikidata und Wikipedia dazu schreiben, und markiert, wo belegte Aussagen enden und Annahmen beginnen.</p></div>
+    <p class="text"><a class="request-link" href="index.html">Alle Wissensbeiträge</a></p>
+  </section>
+
+  <section class="section">
+    <article class="legal-body">
+<h2 class="legal-h" id="zuordnung-statt-note">Eine Zuordnung, keine Bewertung</h2>
+<p>Das Wort „Trust“ klingt nach einem Vertrauenswert. Googles eigene Dokumente beschreiben etwas anderes: Laut Knowledge-Panel-Hilfe sind Knowledge Panels Infokästen zu Personen, Orten, Organisationen oder Dingen aus dem Knowledge Graph, gestützt auf das, was Google aus den im Web verfügbaren Inhalten versteht. Die Organization-Auszeichnung könne Google helfen, Verwaltungsangaben einer Organisation zu erfassen und sie von anderen abzugrenzen. Eine Note kommt in keinem der beiden Dokumente vor.</p>
+<p>Am ehesten berührt Googles Seite über hilfreiche, nutzerorientierte Inhalte die Bewertungsfrage: E-E-A-T sei für sich genommen kein spezifischer Rankingfaktor, vielmehr deute eine Kombination von Faktoren auf Inhalte mit gutem E-E-A-T hin; bei Themen mit großer Tragweite gewichten Googles Systeme solche Inhalte stärker. Die Daten geschulter Bewerter fließen laut derselben Seite nicht direkt in die Rankingalgorithmen ein, was nicht dasselbe ist wie „gar nicht“.</p>
+<p>Für Ihre Website heißt das: Zuerst muss ein System Ihren Betrieb eindeutig erkennen und von Namensvettern unterscheiden können.</p>
+<h2 class="legal-h" id="vier-arten-von-angaben">Herausgeber, Standort, Angebot, Menschen</h2>
+<p>Was über einen Betrieb bekannt sein kann, lässt sich in vier Arten ordnen. Die Einteilung ist redaktionell; Schema.org bietet aber für jede ein passendes Vokabular.</p>
+<ul class="request-notes">
+<li><b>Herausgeber:</b> <code>Organization</code> steht bei Schema.org für Organisationen aller Art, vom Unternehmen bis zum Verein. <code>legalName</code> nimmt die offizielle, etwa im Register eingetragene Firma auf, <code>name</code> den Namen, unter dem man auftritt.</li>
+<li><b>Standort:</b> Für einen physischen Geschäftssitz oder eine Filiale gibt es <code>LocalBusiness</code>. Beim Google-Unternehmensprofil fordert Google eine genaue Adresse oder ein Einzugsgebiet, keine Postfächer an entfernten Orten und ein Profil am realen Standort. Das gilt dem Profil, nicht der Adresse auf Ihrer Website.</li>
+<li><b>Angebot:</b> Dienstleistungen lassen sich als <code>Service</code> auszeichnen. Die Kategorie im Unternehmensprofil soll dagegen sagen, was der Betrieb als Ganzes <em>ist</em>, nicht was er <em>hat</em>, und kein Schlagwortfeld sein.</li>
+<li><b>Menschen:</b> Personen verknüpft Schema.org etwa über <code>affiliation</code>, <code>worksFor</code> oder <code>memberOf</code> mit einer Organisation. <code>knowsAbout</code> deutet ein Wissensgebiet nur an und unterscheidet keine Kompetenzstufen; als Nachweis von Fachkunde taugt es nicht.</li>
+</ul>
+<p>Google rät, die Organisationsangaben auf der Startseite oder einer Seite wie „Über uns“ zusammenzufassen, statt sie auf jeder Unterseite zu wiederholen. Im Mittelpunkt stehen der Name, Anschrift und Telefonnummer sowie Webadresse und Logo. Pflichtfelder gibt es ausdrücklich keine.</p>
+<p>Ein erfundenes Beispiel: Ein Elektrobetrieb in Berlin-Lichtenberg ist als „Kranz Elektroinstallation GmbH“ eingetragen, über der Ladentür steht „Elektro Kranz“, im Unternehmensprofil „Elektro Kranz Berlin“. Drei Schreibweisen bedeuten hier nicht zwingend einen Widerspruch: Die Registerfirma gehört in <code>legalName</code>, der gelebte Name in <code>name</code>, und im Profil steht der reale Name, unter dem Kundinnen und Kunden den Betrieb kennen. Damit ein System das zusammenführen kann, müssen die Angaben im abgerufenen Dokument stehen; mehr dazu im Beitrag darüber, <a class="request-link" href="wie-ki-websites-liest.html">wie KI Websites liest</a>.</p>
+<h2 class="legal-h" id="gleiche-angaben">Wo gleichlautende Angaben zählen</h2>
+<p>Einheitlichkeit ist bei Google und Microsoft unterschiedlich verbindlich geregelt:</p>
+<ul class="request-notes">
+<li><b>Unternehmensprofil:</b> Der Name soll den realen Namen wiedergeben, der auch auf Schild, Website und Geschäftspapieren durchgehend verwendet wird. Das ist eine Vorgabe. Fehlerhafte Angaben können laut Google dazu führen, dass ein Profil bei passenden Suchen in der Umgebung fehlt.</li>
+<li><b>Organization-Auszeichnung:</b> Google empfiehlt, denselben Namen und dieselben Alternativnamen zu nutzen, die die Website als Seitennamen führt. Das ist eine Empfehlung.</li>
+<li><b>Markup und sichtbarer Text:</b> Laut Googles allgemeinen Richtlinien soll man nichts auszeichnen, was Besucher nicht sehen können; JSON-LD und sichtbarer Seiteninhalt müssen dieselbe Sache beschreiben.</li>
+<li><b>Bing:</b> Die Bing Webmaster Guidelines verlangen, Personen, Organisationen, Orte und Produkte eindeutig und gleichbleibend zu bezeichnen; das verbessere Grounding-Sichtbarkeit und Zitatgenauigkeit, wie stark, bleibt offen.</li>
+</ul>
+<p>Einen Mechanismus beschreibt Microsoft im Blogbeitrag „Evolving role of the index“ vom Mai 2026, einem namentlich gezeichneten Positionsbeitrag und keiner Produktdokumentation: Widersprechen sich zwei indexierte Quellen, reiche es für einen Grounding-Index nicht, schlicht eine vorzuziehen; der Konflikt müsse erfasst werden, weil stilles Entscheiden zu selbstsicher falschen Antworten führen könne. Ist die Beleglage dünn, überholt oder widersprüchlich, sei Enthaltung ein zulässiges Ergebnis.</p>
+<p>Die Übertragung auf Ihren Fall ist eine Annahme: Dass ein Widerspruch zwischen Website und Unternehmensprofil die Zuordnung erschwert, ist plausibel, steht aber in keiner Quelle. Keine der zitierten Google-Seiten verbindet Einheitlichkeit mit einer Position in den Suchergebnissen. Gleichlautende Angaben sichern also keinen Platz; sie ersparen einem System bestenfalls eine Entscheidung. Verschiedene Werte in dafür vorgesehenen Feldern sind dagegen kein Widerspruch.</p>
+<h2 class="legal-h" id="auszeichnung-und-verweise">Auszeichnung und Verweise nach außen</h2>
+<p>Strukturierte Daten machen Darstellungen möglich, sagen sie aber nicht zu, so Googles allgemeine Richtlinien; eine manuelle Maßnahme wegen des Markups kostet die Eignung für Rich Results, nicht die Platzierung in der Websuche. Für die generativen KI-Funktionen der Google-Suche sind sie laut Googles Leitfaden nicht erforderlich, auch kein spezielles schema.org-Markup; nützlich bleiben sie für Rich Results. Microsoft setzt einen anderen Akzent: Strukturierte Daten könnten klareres Grounding unterstützen, sicherten jedoch weder Sichtbarkeit noch Grounding-Traffic zu und müssten den sichtbaren Inhalt korrekt wiedergeben; irreführendes Markup könne unbeachtet bleiben und Vertrauen kosten.</p>
+<p>Zwei Felder der Organization-Auszeichnung weisen über die eigene Website hinaus. In <code>sameAs</code> lassen sich mehrere Adressen anderer Websites eintragen, etwa Profile in sozialen Netzwerken oder auf Bewertungsportalen; Schema.org meint damit Referenzseiten, die die Identität eindeutig belegen, etwa bei Wikipedia oder Wikidata. Welche Wirkung das hat, sagen beide Seiten nicht. Die Umsatzsteuer-Identifikationsnummer (<code>vatID</code>) nennt Google ein wichtiges Signal für das Vertrauen von Nutzern, soweit sie im jeweiligen Land und Geschäftsfeld eine Rolle spielt; Schema.org bevorzugt, wo möglich, die weniger mehrdeutigen Kennungen nach ISO 6523.</p>
+<p>Außerhalb der eigenen Website entscheiden andere. Wikidata nimmt nur Einträge auf, die eine von drei Bedingungen erfüllen: einen gültigen Sitelink zu einem Wikimedia-Projekt, eine klar bestimmbare Entität mit seriösen, öffentlich zugänglichen Belegen oder einen strukturellen Bedarf. Die englischsprachige Wikipedia hält fest, dass kein Unternehmen von sich aus relevant ist; substanzielle Berichterstattung in mehreren verlässlichen, unabhängigen Sekundärquellen ist ein hinreichender Weg. Dass ein Eintrag in Wikidata oder Wikipedia in Googles Knowledge Graph führt, belegen die Quellen nicht.</p>
+<h2 class="legal-h" id="festlegen-und-beobachten">Was Sie festlegen und was Sie nur beobachten</h2>
+<p>Zur Ordnung hilft eine Trennung, die so in keiner Quelle steht: Angaben wie Name, Logo, Profiladresse oder <code>sameAs</code>-Verweise bestimmen Sie selbst und können sie jederzeit nachlesen. Was ein benanntes System daraus macht, lässt sich nur feststellen. Website-Namen, Kontaktdaten und Social-Profile ermittelt Google zudem selbst im öffentlichen Web; verifizierte offizielle Vertreter können solche Angaben im Knowledge Panel ersetzen.</p>
+<p>Für die Beobachtung gibt es Werkzeuge, aber keine Zusagen. Der AI-Performance-Bericht der Bing Webmaster Tools zeigt zitierte Inhalte, misst laut Microsoft aber weder Rankings noch Autorität, Leistung oder Wichtigkeit; seine Werte sind eine Stichprobe und können sich noch ändern. Citation Share hilft, Veränderungen des eigenen Anteils nach Überarbeitungen zu verfolgen, belegt aber keine Ursache. Knowledge Panels erzeugt Google automatisch, wenn das offene Web ausreichend Informationen hergibt; wann, wo und wie eines erscheint, entscheiden automatische Systeme, und einen Antragsweg beschreiben die Hilfeseiten nicht. Die Jagd nach unechten Erwähnungen zählt Google im KI-Leitfaden zu den Taktiken, die man ignorieren kann; gemeint sind unechte, nicht Erwähnungen überhaupt.</p>
+<p>Zu ChatGPT, Perplexity, Claude oder der Gemini-App sagen die verwendeten Quellen nichts. Dass die beiden Anbieter für ihre eigenen Systeme nichts zusagen, macht eine Nennung nicht unwahrscheinlich; sie lässt sich nur im Nachhinein beobachten. Wer Ihnen eine Erwähnung in einem bestimmten KI-System verspricht, verspricht mehr als die Anbieter selbst.</p>
+<h2 class="legal-h" id="eigene-website">Woran Sie es an Ihrer Website erkennen</h2>
+<ul class="request-notes">
+<li>Stehen Firmenname, Anschrift, Telefonnummer, Webadresse und Logo gebündelt auf der Startseite oder einer Über-uns-Seite?</li>
+<li>Lauten Name und Adresse auf Website, Unternehmensprofil und Schild gleich, und sind Registerfirma und gelebter Name sauber auseinandergehalten?</li>
+<li>Beschreibt das Markup dasselbe, was Besucher auf der Seite lesen?</li>
+<li>Führen die Adressen in <code>sameAs</code> zu Profilen, die es tatsächlich gibt und die denselben Betrieb zeigen?</li>
+<li>Werden Leistungen, Standort und die Menschen hinter dem Betrieb im ausgelieferten Text genannt?</li>
+</ul>
+<h2 class="legal-h" id="passende-pruefpunkte">Welche Prüfpunkte dazu passen</h2>
+<p>In der Analyse von 360°Pixelkiez sehen wir uns bis zu sechs öffentliche Seiten Ihrer Website persönlich an. Welche Prüfpunkte passen, entscheiden wir je Website. Zu diesem Thema gehören vor allem:</p>
+<ul class="request-notes">
+<li><a class="request-link" href="../pruefkriterien.html#geo_ai_visibility">GEO &amp; AI Visibility</a>: <b>Entitätsklarheit</b> (Unternehmensidentität in Text und Strukturdaten), <b>Leistung, Zielgruppe &amp; Standort explizit</b>, <b>Strukturierte Zusammenfassungen &amp; Schema</b> und <b>Faktenkonsistenz über Seiten hinweg</b>. Falls die Werkzeuge verfügbar sind, kommen <b>Beobachtete KI-Antwort-Stichproben</b> hinzu, bei denen wir nur datiert beobachtete Antworten dokumentieren.</li>
+<li><a class="request-link" href="../pruefkriterien.html#findability_seo">SEO &amp; Auffindbarkeit</a>: <b>Strukturierte Daten</b> mit Blick auf Syntax und sichtbare Inhalte, <b>Brand-Sichtbarkeit</b> als datierte Suche nach dem Markennamen und, falls relevant, <b>Lokale / mehrsprachige Signale</b>.</li>
+<li><a class="request-link" href="../pruefkriterien.html#ux_accessibility_trust">UX, Barrierefreiheit &amp; Vertrauen</a>: <b>Konsistente Unternehmens- &amp; Leistungsdaten</b> und <b>Kontakttransparenz</b>.</li>
+</ul>
+<p>Wie ein Anbieter Ihren Betrieb intern führt und wie ein KI-System künftig antwortet, lässt sich von außen nicht einsehen. Der siebenseitige PDF-Bericht hält deshalb datierte Beobachtungen fest und macht keine Zusage für Rankings oder KI-Erwähnungen.</p>
+<h2 class="legal-h" id="quellen">Quellen</h2>
+<ul class="request-notes">
+<li><a class="request-link" href="https://developers.google.com/search/docs/appearance/structured-data/organization">Google Search Central: Organization (Organization) structured data</a></li>
+<li><a class="request-link" href="https://developers.google.com/search/docs/appearance/structured-data/sd-policies">Google Search Central: General structured data guidelines</a></li>
+<li><a class="request-link" href="https://developers.google.com/search/docs/fundamentals/creating-helpful-content">Google Search Central: Creating helpful, reliable, people-first content</a></li>
+<li><a class="request-link" href="https://developers.google.com/search/docs/fundamentals/ai-optimization-guide">Google Search Central: Optimizing your website for generative AI features on Google Search</a></li>
+<li><a class="request-link" href="https://developers.google.com/search/docs/appearance/establish-business-details">Google Search Central: Add Business Details to Google</a></li>
+<li><a class="request-link" href="https://support.google.com/knowledgepanel/answer/9163198">Google-Hilfe: About knowledge panels</a></li>
+<li><a class="request-link" href="https://support.google.com/knowledgepanel/answer/9787176">Google-Hilfe: How Google’s Knowledge Graph works</a></li>
+<li><a class="request-link" href="https://support.google.com/business/answer/3038177">Google-Unternehmensprofil-Hilfe: Guidelines for representing your business on Google</a></li>
+<li><a class="request-link" href="https://support.google.com/business/answer/7091">Google-Unternehmensprofil-Hilfe: Tips to improve your local ranking on Google</a></li>
+<li><a class="request-link" href="https://blogs.bing.com/search/May-2026/Evolving-role-of-the-index-From-ranking-pages-to-supporting-answers">Microsoft Bing Blogs: Evolving role of the index: From ranking pages to supporting answers</a></li>
+<li><a class="request-link" href="https://www.bing.com/webmasters/help/webmaster-guidelines-30fba23a">Microsoft Bing: Bing Webmaster Guidelines</a></li>
+<li><a class="request-link" href="https://www.bing.com/webmasters/help/ai-performance-9f8e7d6c">Microsoft Bing: AI Performance in Bing Webmaster Tools</a></li>
+<li><a class="request-link" href="https://schema.org/Organization">Schema.org: Organization</a></li>
+<li><a class="request-link" href="https://schema.org/sameAs">Schema.org: sameAs</a></li>
+<li><a class="request-link" href="https://schema.org/LocalBusiness">Schema.org: LocalBusiness</a></li>
+<li><a class="request-link" href="https://schema.org/Service">Schema.org: Service</a></li>
+<li><a class="request-link" href="https://schema.org/Person">Schema.org: Person</a></li>
+<li><a class="request-link" href="https://www.wikidata.org/wiki/Wikidata:Notability">Wikidata: Wikidata:Notability</a></li>
+<li><a class="request-link" href="https://en.wikipedia.org/wiki/Wikipedia:Notability_(organizations_and_companies)">Wikipedia: Notability (organizations and companies)</a></li>
+</ul>
+    </article>
+  </section>
+
+  <section class="section cw-lilac" id="analyse">
+    <div class="section-head"><h2 class="h2">Wie steht Ihre Website da?</h2><p class="text">Pixelkiez prüft bis zu sechs öffentliche Seiten Ihrer Website persönlich und schickt Ihnen einen Bericht mit sieben Seiten als PDF. Kostenlos, ohne Abo.</p></div>
+    <a class="btn btn--accent" href="../index.html#top">Website eingeben <svg class="i"><use href="#i-arrow"/></svg></a>
+  </section>
+
+  <footer class="cw-lilac">
+    <div class="footer-cols">
+      <div class="footer-brand"><a class="logo" href="../index.html#top">360°Pixelkiez<span>Analyse</span></a><p>Kostenlose, persönlich erstellte Website-Analyse als PDF.</p></div>
+      <div><h4>Angebot</h4><ul><li><a href="../index.html#ablauf">Ablauf</a></li><li><a href="../index.html#bericht">Bericht</a></li><li><a href="../index.html#bereiche">Bereiche</a></li><li><a href="../index.html#angebot">Angebot</a></li></ul></div>
+      <div><h4>Methodik</h4><ul><li><a href="../pruefkriterien.html#methodik">Alle Prüfpunkte</a></li><li><a href="../pruefkriterien.html#findability_seo">SEO &amp; Auffindbarkeit</a></li><li><a href="../pruefkriterien.html#geo_ai_visibility">GEO &amp; AI Visibility</a></li><li><a href="index.html">Wissen</a></li></ul></div>
+      <div><h4>Kontakt</h4><ul><li><a href="mailto:360@pixelkiez.de">360@pixelkiez.de</a></li></ul></div>
+    </div>
+    <div class="footer">
+      <span>© 2026 360°Pixelkiez</span>
+      <nav aria-label="Rechtliches"><a href="../impressum.html">Impressum</a><a href="../datenschutz.html">Datenschutz</a></nav>
+    </div>
+  </footer>
+</main>
+
+<script src="../assets/app.js"></script>
+</body>
+</html>

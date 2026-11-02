@@ -11,7 +11,9 @@ import { ROOT, artifactFiles, uploadFiles, MIGRATIONS } from './lib/harness.mjs'
 
 const read = p => readFileSync(join(ROOT, p), 'utf8');
 const git = (...a) => execFileSync('git', a, { cwd: ROOT, encoding: 'utf8' });
-const PAGES = ['public/index.html', 'public/pruefkriterien.html', 'public/impressum.html', 'public/datenschutz.html', 'public/agb.html', 'public/404.html'];
+/* Wissensbereich: Übersicht und sechs eigenständige 360°Pixelkiez-Beiträge (Entscheidung des Auftraggebers 02.11.2026) */
+const WISSEN = ['index', 'seo-geo-ai-visibility', 'wie-ki-websites-liest', 'wie-websites-ausgeliefert-werden', 'answerability', 'entity-trust', 'agent-readiness'].map(s => `public/wissen/${s}.html`);
+const PAGES = ['public/index.html', 'public/pruefkriterien.html', 'public/impressum.html', 'public/datenschutz.html', 'public/agb.html', 'public/404.html', ...WISSEN];
 /* Stand vor PXWA-BE-02 (Hero ohne AGB-Häkchen): Referenz für den Hero-Schutz */
 const BASE_SHA = '13ac821f94c754a94c330b5686f5bf12f4a0282d';
 const FUNCTION = 'functions/api/[[path]].ts';
@@ -34,6 +36,14 @@ const METHOD = [
 ];
 /* 360°Pixelkiez ist eine eigenständige Website: keine Links zu pixelkiez.de, nur die Kontaktadresse 360@pixelkiez.de */
 const EXTERNAL_OK = ['mailto:360@pixelkiez.de'];
+/* Herausgeber der Quellen, die die Wissensseiten belegen (nur dort erlaubt, nur https, nie pixelkiez.de) */
+const SOURCE_HOSTS = [
+  'about.ads.microsoft.com', 'angular.dev', 'blogs.bing.com', 'developer.wordpress.org', 'developers.google.com', 'developers.openai.com',
+  'docs.astro.build', 'docs.claude.com', 'docs.perplexity.ai', 'en.wikipedia.org', 'help.openai.com', 'html.spec.whatwg.org',
+  'nextjs.org', 'nuxt.com', 'platform.claude.com', 'playwright.dev', 'react.dev', 'schema.org',
+  'static.googleusercontent.com', 'support.anthropic.com', 'support.claude.com', 'support.google.com', 'svelte.dev', 'vercel.com',
+  'www.bing.com', 'www.rfc-editor.org', 'www.typescriptlang.org', 'www.w3.org', 'www.wikidata.org',
+];
 
 /* Alles, was Nutzer, Screenreader oder Suchmaschinen lesen: sichtbarer und verborgener Text, Metadaten, ARIA, JSON-LD */
 const allText = n => n.text !== undefined ? n.text : ['script', 'style', 'symbol'].includes(n.tag) ? ' ' : ` ${n.children.map(allText).join(' ')} `;
@@ -149,7 +159,8 @@ test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen n
      Eyebrow-Zeilen über den Abschnittsüberschriften entfallen (Entscheidung des Auftraggebers 02.11.2026), sonst nichts */
   const withoutEyebrows = html => html.replace(/^[ \t]*<p class="eyebrow">[^<]*<\/p>\n/gm, '').replace(/<p class="eyebrow">[^<]*<\/p>/g, '');
   assert.ok(!now.includes('class="eyebrow"'), 'Startseite ohne Eyebrow-Zeilen');
-  assert.equal(outside(now), withoutEyebrows(outside(old)).replaceAll('kontakt@pixelkiez.de', '360@pixelkiez.de'), 'übrige Startseite unverändert (außer Schritt 02, der den zweiten Bestätigungsklick beschrieb, der Kontaktadresse und den Eyebrow-Zeilen)');
+  const withWissen = html => html.replace('<li><a href="pruefkriterien.html#geo_ai_visibility">GEO &amp; AI Visibility</a></li></ul>', '<li><a href="pruefkriterien.html#geo_ai_visibility">GEO &amp; AI Visibility</a></li><li><a href="wissen/index.html">Wissen</a></li></ul>');
+  assert.equal(outside(now), withWissen(withoutEyebrows(outside(old))).replaceAll('kontakt@pixelkiez.de', '360@pixelkiez.de'), 'übrige Startseite unverändert (außer Schritt 02, der den zweiten Bestätigungsklick beschrieb, der Kontaktadresse, den Eyebrow-Zeilen und dem Wissen-Link im Footer)');
   assert.match(now, /<span>02<\/span><h3>AGB akzeptieren und anmelden<\/h3>/);
 });
 
@@ -211,16 +222,23 @@ test('Methodik: vier Bereiche in Reihenfolge, eindeutige IDs, 48 Original-Prüfp
   for (const [, id, name, desc] of refRows) assert.deepEqual(rows[id], [H.decode(name), H.decode(desc)], id);
 });
 
-test('Links: interne Anker gültig, keine Links zu pixelkiez.de, nur mailto als externes Ziel', () => {
+test('Links: interne Anker gültig, keine Links zu pixelkiez.de, nur mailto als externes Ziel (Wissensseiten zusätzlich ihre Quellen)', () => {
   const pages = Object.fromEntries(PAGES.map(p => [p.slice(7), read(p)]));
   for (const [page, html] of Object.entries(pages)) {
     for (const a of H.byTag(H.parse(html).root, 'a')) {
       const href = a.attrs.get('href');
       assert.ok(href && href !== '#', `${page}: Link ohne Ziel "${H.norm(H.textOf(a))}"`);
-      if (/^(https?:|mailto:)/.test(href)) { assert.ok(EXTERNAL_OK.includes(href), `${page}: externer Link ${href}`); continue; }
+      if (/^(https?:|mailto:)/.test(href)) {
+        /* Wissensseiten belegen ihre Aussagen: https-Quellen nur von den freigegebenen Herausgebern, nie pixelkiez.de */
+        const source = page.startsWith('wissen/') && href.startsWith('https://') && SOURCE_HOSTS.includes(new URL(href).hostname);
+        assert.ok(EXTERNAL_OK.includes(href) || source, `${page}: externer Link ${href}`);
+        continue;
+      }
       /* Nur 404.html verlinkt absolut (/…), weil Pages sie für Adressen in beliebiger Tiefe ausliefert */
       assert.ok(page === '404.html' ? href.startsWith('/') : !href.startsWith('/'), `${page}: ${href}`);
-      const [file, frag] = href.replace(/^\//, '').split('#');
+      /* Relativ zur Seite auflösen (Wissensseiten liegen in wissen/); ein Verzeichnis meint dessen index.html */
+      const url = new URL(href, `https://360.pixelkiez.de/${page}`);
+      const [file, frag] = [decodeURIComponent(url.pathname.slice(1)).replace(/(^|\/)$/, '$1index.html'), url.hash.slice(1)];
       const target = file || page;
       assert.ok(pages[target], `${page}: unbekannte Datei ${target}`);
       if (frag) assert.ok(H.byId(H.parse(pages[target]).root, frag), `${page}: Anker ${href} fehlt`);
@@ -240,7 +258,8 @@ test('Eigenständige Website 360°Pixelkiez: Name in Titel, Logo und Footer; Imp
     assert.match(H.textOf(H.byTag(root, 'title')[0]), /360°Pixelkiez/, `${page}: Titel`);
     assert.ok(H.byClass(root, 'logo').every(l => H.norm(H.textOf(l)).startsWith('360°Pixelkiez')), `${page}: Logo`);
     const legal = H.find(root, e => e.tag === 'nav' && e.attrs.get('aria-label') === 'Rechtliches')[0];
-    assert.deepEqual(H.byTag(legal, 'a').map(a => a.attrs.get('href').replace(/^\//, '')), ['impressum.html', 'datenschutz.html'], `${page}: Rechtliches`);
+    /* relativ zur Seite aufgelöst: auch die Wissensseiten in wissen/ verweisen auf dieselben Rechtsseiten */
+    assert.deepEqual(H.byTag(legal, 'a').map(a => new URL(a.attrs.get('href'), `https://360.pixelkiez.de/${page.slice(7)}`).pathname.slice(1)), ['impressum.html', 'datenschutz.html'], `${page}: Rechtliches`);
     assert.match(H.norm(H.textOf(H.byClass(root, 'footer')[0])), /© 2026 360°Pixelkiez/, `${page}: Copyright`);
   }
   assert.match(view, /© 2026 360°Pixelkiez/);
@@ -273,7 +292,7 @@ test('Design: styles.css unverändert gegenüber vision.html; alle verwendeten K
 });
 
 test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, Functions nur unter /api/* und für zwei Videos, Sicherheits-Header, keine Railway- oder PHP-Reste', () => {
-  assert.deepEqual(artifactFiles(), ['404.html', '_headers', '_routes.json', 'agb.html', 'assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'datenschutz.html', 'impressum.html', 'index.html', ...MEDIA, 'pruefkriterien.html']);
+  assert.deepEqual(artifactFiles(), ['404.html', '_headers', '_routes.json', 'agb.html', 'assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'datenschutz.html', 'impressum.html', 'index.html', ...MEDIA, 'pruefkriterien.html', ...WISSEN.map(p => p.slice(7)).sort()]);
   assert.deepEqual(repoFiles().filter(f => /\.(php|phtml)$|(^|\/)\.htaccess$|^(server|bin)\/|railway|Dockerfile|Caddyfile|\.dockerignore/i.test(f)), [], 'keine PHP-, Railway- oder Docker-Bestandteile');
   const pages = read('wrangler.toml');
   const active = pages.split('\n').filter(l => !l.trim().startsWith('#')).join('\n');
@@ -313,7 +332,8 @@ test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, F
 
 test('Release-Scan des Pages-Uploads (public/ wie `wrangler pages deploy`): nur Website-Dateien, keine Quellen, kein PHP/Railway, keine Secrets, höchstens 25 MiB je Datei', () => {
   const files = uploadFiles();
-  assert.deepEqual(files.filter(f => !f.startsWith('media/')), ['404.html', 'agb.html', 'assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'datenschutz.html', 'impressum.html', 'index.html', 'pruefkriterien.html']);
+  assert.deepEqual(files.filter(f => !f.startsWith('media/')), ['404.html', 'agb.html', 'assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'datenschutz.html', 'impressum.html', 'index.html', 'pruefkriterien.html',
+    ...WISSEN.map(p => p.slice(7)).sort()]);
   assert.ok(files.filter(f => f.startsWith('media/')).every(f => /^media\/[\w-]+\.(mp4|jpg)$/.test(f)), 'in media/ nur Videos und Poster');
   assert.ok(files.length < 20000);
   for (const f of files) {
