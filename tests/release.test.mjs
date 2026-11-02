@@ -24,8 +24,9 @@ const MEDIA = {
   'media/report-pdf-de-1x1.mp4': '028005b2cc077a4c610457029130dd080c70f27d0b59e47e8884cf868eeb6a97',
   'media/report-pdf-poster.jpg': '0654272d71a86d1de3473bba8c800aabd3ff546e12659b2374f9f313a0d5f477',
 };
-const SITE = ['404.html', '_headers', '_routes.json', 'agb.html', 'assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'datenschutz.html', 'impressum.html', 'index.html', 'pruefkriterien.html',
-  ...['agent-readiness', 'answerability', 'entity-trust', 'index', 'seo-geo-ai-visibility', 'wie-ki-websites-liest', 'wie-websites-ausgeliefert-werden'].map(s => `wissen/${s}.html`)];
+const SITE = ['404.html', '_headers', '_routes.json', 'agb.html', 'assets/anfrage.css', 'assets/app.js', 'assets/inhalt.css', 'assets/inhalt.js', 'assets/styles.css', 'datenschutz.html', 'impressum.html', 'index.html', 'pruefkriterien.html',
+  ...['agent-readiness', 'answerability', 'entity-trust', 'index', 'seo-geo-ai-visibility', 'wie-ki-websites-liest', 'wie-websites-ausgeliefert-werden'].map(s => `wissen/${s}.html`),
+  ...['auffindbarkeit-seo', 'barrierefreiheit', 'index', 'ki-crawler-agenten', 'ki-verstaendlichkeit', 'methodik', 'nutzerfuehrung-conversion', 'performance-technik', 'vertrauen-datenschutz', 'warum-website-analyse'].map(s => `analyse/${s}.html`)];
 
 let dir, sha;
 before(() => {

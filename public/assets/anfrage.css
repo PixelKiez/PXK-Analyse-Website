@@ -84,3 +84,13 @@ section[id] { scroll-margin-top: 88px; }
 /* Sanftes Einblenden beim Scrollen; die Klassen setzt app.js (nicht bei „Bewegung reduzieren“) */
 .reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s var(--ease), transform .7s var(--ease); transition-delay: var(--reveal-delay, 0ms); }
 .reveal.is-visible { opacity: 1; transform: none; }
+
+/* Hauptnavigation mit Wissen und Analyse: auf mittleren Breiten nur die wichtigsten Punkte, damit nichts überläuft */
+@media (max-width: 1120px) { .nav-links a:nth-child(2), .nav-links a:nth-child(3) { display: none; } }
+@media (max-width: 920px) { .nav-links a:nth-child(-n+4) { display: none; } }
+.nav-links a[aria-current="page"] { background: var(--paper); color: var(--ink); }
+
+/* Startseite: am Seitenende derselbe verwaschene Übergang wie auf den Inhaltsseiten – Papier, Pfirsich, Lila bis in den Footer */
+.closing { background: linear-gradient(180deg, var(--paper) 0%, #FFE6DD 36%, #F8E3E6 66%, #EFE2F6 100%); border-top-color: transparent; }
+.closing + footer { background: linear-gradient(180deg, #EFE2F6 0%, #EBE2FC 45%); }
+.closing + footer .footer-cols, .closing + footer .footer { border-top-color: rgb(91 63 166 / .14); }
