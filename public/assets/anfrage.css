@@ -86,6 +86,11 @@
 .partner-logos li:last-child img { height: 26px; }
 /* Pixelkiez-Logo in der untersten Footer-Leiste zwischen Copyright und Rechtlichem */
 .footer-partner { width: auto; height: 20px; }
+/* Seitenende (alle Seiten laden diese Datei): Schluss ist unten am Footer. Ohne das federt iOS Safari über das Ende hinaus und zeigt
+   darunter eine leere helle Fläche (Mensch, 03.11.2026). Folge: auch kein Ziehen zum Neuladen. Die letzte Footer-Zeile endet über
+   der Home-Leiste (viewport-fit=cover). */
+html, body { overscroll-behavior-y: none; }
+.footer { padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px)); }
 
 /* Startseite: Schritte („So funktioniert's“) als lila Karten, Bereiche („Was wir prüfen“) als Pfirsich-Karten.
    Farben und Linien kommen aus .cw-lilac bzw. .cw-peach (styles.css). */

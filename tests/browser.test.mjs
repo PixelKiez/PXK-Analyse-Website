@@ -750,6 +750,10 @@ test('Soft-Launch im Browser (Chromium und WebKit, 320/390/768/1440, alle 22 Sei
             assert.deepEqual(requests.filter(r => r.method !== 'GET' || new URL(r.url).pathname.startsWith('/api')), [], `${name} ${path} ${width}: Anfrage an /api/ oder kein GET`);
             assert.equal(await page.locator('form, input, textarea, select, button[type=submit]').count(), 0, `${name} ${path} ${width}: kein Formular`);
             assert.ok(await overflow(page) <= 0, `${name} ${path} ${width}: Überlauf`);
+            /* Seitenende: nichts unter dem Footer, kein Überfedern über das Ende hinaus (iOS Safari zeigte darunter eine leere Fläche) */
+            const ende = await page.evaluate(() => ({ rest: document.documentElement.scrollHeight - (document.querySelector('.footer').getBoundingClientRect().bottom + scrollY),
+              over: getComputedStyle(document.documentElement).overscrollBehaviorY }));
+            assert.ok(Math.abs(ende.rest) <= 1 && ende.over === 'none', `${name} ${path} ${width}: Seite endet am Footer (${JSON.stringify(ende)})`);
             /* Die 404-Seite kommt korrekt mit Status 404; Browser melden das für das Dokument selbst als Konsolenfehler */
             assert.deepEqual(errors.filter(e => !(path === '/gibt/es/nicht' && /status of 404/.test(e))), [], `${name} ${path} ${width}: Konsolenfehler`);
             if (path === '/index.html') {

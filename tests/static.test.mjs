@@ -387,16 +387,26 @@ test('Partner: unter dem Hero Pixelkiez und DYAI Studio nebeneinander, ohne Besc
   assert.ok(!read(VIEW).includes('>pixelkiez.de</a>'), 'Anfrageseiten: kein Text „pixelkiez.de“');
 });
 
-test('Favicon: weißer Hintergrund, großer Ring orange, kleiner Ring lila; ICO 16/32/48 px, Apple-Icon 180 px', () => {
-  /* Entscheidung des Auftraggebers 03.11.2026 */
+test('Favicon „P°“: weißer Hintergrund, P orange (Archivo 600 als Pfad, wie die Wortmarke), ° als kleiner lila Ring; ICO 16/32/48 px, Apple-Icon 180 px', () => {
+  /* Entscheidung des Auftraggebers 03.11.2026 (Farben, Ring) und 03.11.2026 abends: „P°“ statt des großen Rings */
   const svg = H.parse(read('public/assets/favicon.svg')).root;
   assert.equal(H.byTag(svg, 'rect')[0].attrs.get('fill'), '#FFFFFF');
-  assert.deepEqual(H.byTag(svg, 'circle').map(c => [c.attrs.get('r'), c.attrs.get('stroke')]), [['15', '#FE5B2A'], ['5.5', '#7B5CD6']]);
+  assert.deepEqual(H.byTag(svg, 'path').map(p => p.attrs.get('fill')), ['#FE5B2A'], 'P als Pfad (keine Schrift im Favicon)');
+  assert.equal(H.byTag(svg, 'text').length, 0);
+  assert.deepEqual(H.byTag(svg, 'circle').map(c => [c.attrs.get('r'), c.attrs.get('stroke')]), [['5.5', '#7B5CD6']]);
   const ico = readFileSync(join(ROOT, 'public/favicon.ico'));
   assert.equal(ico.readUInt16LE(4), 3, 'drei Größen im ICO');
   assert.deepEqual([0, 1, 2].map(i => ico[6 + i * 16]), [16, 32, 48]);
   const apple = readFileSync(join(ROOT, 'public/assets/apple-touch-icon.png'));
   assert.deepEqual([apple.readUInt32BE(16), apple.readUInt32BE(20), apple[25]], [180, 180, 2], 'Apple-Icon 180×180, RGB ohne Transparenz');
+});
+
+test('Seitenende: jede Seite lädt anfrage.css; dort kein Überfedern über das Ende (overscroll-behavior-y: none) und Footer über der Home-Leiste', () => {
+  /* Mensch 03.11.2026: mobil ließ sich unter den Footer weiterscrollen (leere helle Fläche); Schluss ist unten am Footer */
+  const css = read('public/assets/anfrage.css');
+  assert.match(css, /^html, body \{ overscroll-behavior-y: none; \}$/m);
+  assert.match(css, /^\.footer \{ padding-bottom: calc\(32px \+ env\(safe-area-inset-bottom, 0px\)\); \}$/m);
+  for (const page of PAGES) assert.match(read(page), /<link rel="stylesheet" href="[^"]*assets\/anfrage\.css">/, `${page}: lädt anfrage.css`);
 });
 
 test('Links: interne Anker gültig, zu pixelkiez.de nur der Partner-Link, sonst nur mailto als externes Ziel (Wissensseiten zusätzlich ihre Quellen)', () => {
