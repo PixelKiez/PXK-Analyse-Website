@@ -20,6 +20,9 @@ const INHALT = [...WISSEN, ...ANALYSE];
 const OG = ['start', 'wissen', 'analyse', ...WISSEN.slice(1).map(s => 'wissen-' + s.split('/').pop().slice(0, -5)), ...ANALYSE.slice(1).map(s => 'analyse-' + s.split('/').pop().slice(0, -5))];
 const BILDER = ['assets/apple-touch-icon.png', 'assets/favicon.svg', 'favicon.ico', ...OG.map(n => `assets/og/${n}.jpg`)];
 const ASSETS = ['assets/anfrage.css', 'assets/app.js', 'assets/donut.css', 'assets/donut.js', 'assets/inhalt.css', 'assets/styles.css'];
+/* Selbst ausgelieferte Schriften (Soft-Launch-Datenschutz-Fix 03.11.2026): Stylesheet, WOFF2-Dateien und OFL-Lizenzen */
+const FONT_FILES = ['assets/fonts.css', ...['OFL-Archivo.txt', 'OFL-IBM-Plex-Mono.txt', 'archivo-latin-ext.woff2', 'archivo-latin.woff2', 'ibm-plex-mono-400-latin-ext.woff2',
+  'ibm-plex-mono-400-latin.woff2', 'ibm-plex-mono-500-latin-ext.woff2', 'ibm-plex-mono-500-latin.woff2'].map(f => 'assets/fonts/' + f)];
 const PAGES = ['public/index.html', 'public/impressum.html', 'public/datenschutz.html', 'public/agb.html', 'public/404.html', ...INHALT];
 /* Stand vor PXWA-BE-02 (Hero ohne AGB-Häkchen): Referenz für den Hero-Schutz */
 const BASE_SHA = '13ac821f94c754a94c330b5686f5bf12f4a0282d';
@@ -510,7 +513,7 @@ test('Design: styles.css unverändert gegenüber vision.html; alle verwendeten K
 });
 
 test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, Functions nur unter /api/* und für zwei Videos, Sicherheits-Header, keine Railway- oder PHP-Reste', () => {
-  assert.deepEqual(artifactFiles(), ['404.html', '_headers', '_routes.json', 'agb.html', ...ASSETS, ...BILDER, 'datenschutz.html', 'impressum.html', 'index.html', ...MEDIA, ...INHALT.map(p => p.slice(7))].sort());
+  assert.deepEqual(artifactFiles(), ['404.html', '_headers', '_routes.json', 'agb.html', ...ASSETS, ...FONT_FILES, ...BILDER, 'datenschutz.html', 'impressum.html', 'index.html', ...MEDIA, ...INHALT.map(p => p.slice(7))].sort());
   assert.deepEqual(repoFiles().filter(f => /\.(php|phtml)$|(^|\/)\.htaccess$|^(server|bin)\/|railway|Dockerfile|Caddyfile|\.dockerignore/i.test(f)), [], 'keine PHP-, Railway- oder Docker-Bestandteile');
   const pages = read('wrangler.toml');
   const active = pages.split('\n').filter(l => !l.trim().startsWith('#')).join('\n');
@@ -550,14 +553,14 @@ test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, F
 
 test('Release-Scan des Pages-Uploads (public/ wie `wrangler pages deploy`): nur Website-Dateien, keine Quellen, kein PHP/Railway, keine Secrets, höchstens 25 MiB je Datei', () => {
   const files = uploadFiles();
-  assert.deepEqual(files.filter(f => !f.startsWith('media/')), ['404.html', 'agb.html', ...ASSETS, ...BILDER, 'datenschutz.html', 'impressum.html', 'index.html',
+  assert.deepEqual(files.filter(f => !f.startsWith('media/')), ['404.html', 'agb.html', ...ASSETS, ...FONT_FILES, ...BILDER, 'datenschutz.html', 'impressum.html', 'index.html',
     ...INHALT.map(p => p.slice(7))].sort());
   assert.ok(files.filter(f => f.startsWith('media/')).every(f => /^media\/[\w-]+\.(mp4|jpg)$/.test(f)), 'in media/ nur Videos und Poster');
   assert.ok(files.length < 20000);
   for (const f of files) {
     const buf = readFileSync(join(ROOT, 'public', f));
     assert.ok(buf.length <= 25 * 1024 * 1024, `${f}: über 25 MiB`);
-    if (/\.(mp4|jpg|png|ico)$/.test(f)) continue;
+    if (/\.(mp4|jpg|png|ico|woff2)$/.test(f)) continue;
     const text = buf.toString('utf8');
     assert.ok(!/railway|<\?php|\.php\b|caddy/i.test(text), `${f}: Railway- oder PHP-Rest`);
     assert.ok(!/-----BEGIN [A-Z ]*PRIVATE KEY|GOCSPX-|\bre_[A-Za-z0-9]{16,}|\bsk_[A-Za-z0-9]{16,}/.test(text), `${f}: Secret`);

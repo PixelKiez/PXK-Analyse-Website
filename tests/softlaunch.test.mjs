@@ -91,3 +91,43 @@ test('Keine Secrets, Test- oder Konfigurationswerte und keine Personendaten auß
   }
   assert.ok(!existsSync(join(PUBLIC, '.dev.vars')));
 });
+
+/* Datenschutz-Fix (03.11.2026): Schriften selbst ausgeliefert, keine Anfrage an Google Fonts oder andere fremde Server */
+const FONTS = ['OFL-Archivo.txt', 'OFL-IBM-Plex-Mono.txt', 'archivo-latin-ext.woff2', 'archivo-latin.woff2', 'ibm-plex-mono-400-latin-ext.woff2',
+  'ibm-plex-mono-400-latin.woff2', 'ibm-plex-mono-500-latin-ext.woff2', 'ibm-plex-mono-500-latin.woff2'];
+
+test('Schriften selbst ausgeliefert: keine externen Ressourcen, CSP nur eigene Herkunft, Lizenzen beigelegt', () => {
+  assert.deepEqual(FILES.filter(f => f.startsWith('assets/fonts/')).map(f => f.slice('assets/fonts/'.length)).sort(), FONTS);
+  for (const p of PAGES) {
+    const html = read(p);
+    assert.ok(!/fonts\.googleapis\.com|fonts\.gstatic\.com/.test(html), `${p}: Google Fonts`);
+    /* Kein Tag lädt etwas von einer fremden Herkunft (Links zu Quellen und Canonical/og:url sind keine Ressourcen) */
+    for (const m of html.matchAll(/<(link|script|img|source|video|audio|iframe|embed|object)\b[^>]*>/g)) {
+      const tag = m[0];
+      if (m[1] === 'link' && /rel="(canonical|alternate)"/.test(tag)) continue;
+      assert.ok(!/(src|href|data)="(https?:)?\/\//.test(tag), `${p}: externe Ressource ${tag}`);
+    }
+    assert.ok(!/rel="(preconnect|dns-prefetch|preload|prefetch)"[^>]*href="(https?:)?\/\//.test(html), `${p}: Vorab-Verbindung zu fremdem Server`);
+    const csp = html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)[1];
+    assert.match(csp, /(^|; )style-src 'self';/, `${p}: style-src`);
+    assert.match(csp, /(^|; )font-src 'self';/, `${p}: font-src`);
+    assert.ok(!/https?:/.test(csp), `${p}: CSP erlaubt fremde Herkunft`);
+    /* fonts.css vor styles.css, mit demselben Pfadpräfix */
+    const pre = html.match(/<link rel="stylesheet" href="([^"]*)assets\/styles\.css">/)[1];
+    const i = html.indexOf(`<link rel="stylesheet" href="${pre}assets/fonts.css">`);
+    assert.ok(i > 0 && i < html.indexOf(`href="${pre}assets/styles.css"`), `${p}: fonts.css vor styles.css`);
+  }
+  for (const css of FILES.filter(f => f.endsWith('.css'))) assert.ok(!/@import|url\(\s*["']?(https?:)?\/\//.test(read(css)), `${css}: lädt fremde Ressourcen`);
+  const fonts = read('assets/fonts.css');
+  const urls = [...fonts.matchAll(/url\("([^"]+)"\)/g)].map(m => m[1]);
+  assert.equal(urls.length, 10, 'Archivo 400/500/600 und IBM Plex Mono 400/500, je latin und latin-ext');
+  for (const u of urls) {
+    assert.match(u, /^fonts\/[a-z0-9-]+\.woff2$/);
+    assert.equal(readFileSync(join(PUBLIC, 'assets', u)).subarray(0, 4).toString('latin1'), 'wOF2', `${u}: WOFF2`);
+  }
+  assert.equal((fonts.match(/font-display: swap;/g) || []).length, 10);
+  for (const [f, copyright] of [['OFL-Archivo.txt', 'Copyright 2020 The Archivo Project Authors'], ['OFL-IBM-Plex-Mono.txt', 'Copyright © 2017 IBM Corp.']]) {
+    const lic = read('assets/fonts/' + f);
+    assert.ok(lic.includes(copyright) && lic.includes('SIL OPEN FONT LICENSE Version 1.1'), `${f}: Copyright und OFL 1.1`);
+  }
+});
