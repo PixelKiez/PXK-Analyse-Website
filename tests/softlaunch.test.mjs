@@ -20,13 +20,14 @@ const text = html => body(html).replace(/<script[\s\S]*?<\/script>/g, ' ').repla
 const NOTICE = 'Kostenlose Analyse-Anfragen in Kürze verfügbar';
 
 /* Videos (Entscheidung des Auftraggebers 03.11.2026 per Rückfrage, PXK-159): Die drei R2-Objekte sind über ihre Adresse abrufbar.
-   Eingebunden sind nur das Berichtsvideo (Lavendel) und das Befund-Video (Peach). Das Berichtsvideo zeigt nach Frame-Prüfung noch
+   Eingebunden sind das Berichtsvideo (Lavendel) und das Befund-Video (Peach). Das Berichtsvideo zeigt nach Frame-Prüfung noch
    „Die 4 wichtigsten Metriken“, „Pro Metrik eine Seite“ und eine Schaltfläche „Jetzt analysieren“ – vom Auftraggeber so freigegeben.
-   Das Hero-Video (vier Metriken, Schein-Analyse, „Jetzt analysieren“, kontakt@pixelkiez.de im Abspann) ist NICHT eingebunden. */
+   Das Hero-Video (vier Metriken, Schein-Analyse, „Jetzt analysieren“, kontakt@pixelkiez.de im Abspann) steht seit dem P0-Hotfix wieder
+   unter dem Hero, aber sichtbar als „Historische Demo“ gekennzeichnet (Plakette im Video, Bildunterschrift, Alternativtext). */
 const R2_PFADE = ['/media/360-pixelkiez-video-1080p.mp4', '/media/report-pdf-de-1x1-lavendel.mp4', '/media/section-bericht-peach-5x4.mp4'];
-const EINGEBUNDEN = [['bericht', 'media/report-pdf-de-1x1-lavendel.mp4', 'media/report-pdf-lavendel-poster.jpg'], ['nutzen', 'media/section-bericht-peach-5x4.mp4', 'media/section-bericht-peach-poster.jpg']];
+const EINGEBUNDEN = [['demo', 'media/360-pixelkiez-video-1080p.mp4', 'media/360-pixelkiez-video-historisch-poster.jpg'], ['bericht', 'media/report-pdf-de-1x1-lavendel.mp4', 'media/report-pdf-lavendel-poster.jpg'], ['nutzen', 'media/section-bericht-peach-5x4.mp4', 'media/section-bericht-peach-poster.jpg']];
 
-test('Artefakt: alle 22 Seiten vorhanden, in media/ nur die zwei Poster, Functions nur unter /api/* und für die drei R2-Videos', () => {
+test('Artefakt: alle 22 Seiten vorhanden, in media/ nur die drei Poster, Functions nur unter /api/* und für die drei R2-Videos', () => {
   assert.equal(PAGES.length, 22);
   for (const p of ['index.html', 'impressum.html', 'datenschutz.html', 'agb.html', '404.html', 'wissen/index.html', 'analyse/index.html', 'analyse/methodik.html']) assert.ok(PAGES.includes(p), p);
   assert.deepEqual(FILES.filter(f => f.startsWith('media/') || /\.(mp4|webm|mov|m4v)$/i.test(f)), EINGEBUNDEN.map(([, , poster]) => poster).sort(), 'keine Videos im Upload (R2), nur die Poster');
@@ -69,14 +70,14 @@ test('Hinweis sichtbar; keine Schaltfläche oder Überschrift legt eine funktion
   for (const p of PAGES.filter(p => p.startsWith('wissen/') || p.startsWith('analyse/'))) assert.ok(text(read(p)).includes(`${NOTICE}.`), `${p}: Hinweis statt „Website eingeben“`);
 });
 
-test('Videos nur wie entschieden: Berichtsvideo und Befund-Video auf der Startseite, kein Hero-Video, keine Video-Metadaten; keine veralteten Aussagen im Seitentext', () => {
+test('Videos nur wie entschieden: historische Demo unter dem Hero, Berichtsvideo und Befund-Video auf der Startseite, keine Video-Metadaten; keine veralteten Aussagen im Seitentext', () => {
   for (const p of PAGES) {
     const html = read(p);
     if (p === 'index.html') {
       const videos = [...html.matchAll(/<section class="[^"]*" id="([^"]+)">(?:(?!<\/section>)[\s\S])*?<video\b[^>]*poster="([^"]+)"[^>]*>\s*<source src="([^"]+)" type="video\/mp4">/g)].map(m => [m[1], m[3], m[2]]);
-      assert.deepEqual(videos, EINGEBUNDEN, 'genau die zwei entschiedenen Videos in ihren Abschnitten');
-      assert.equal((html.match(/<video\b/g) || []).length, 2);
-      assert.ok(!html.includes('360-pixelkiez-video') && !html.includes('class="showcase"'), 'Hero-Video nicht eingebunden');
+      assert.deepEqual(videos, EINGEBUNDEN, 'genau die drei entschiedenen Videos in ihren Abschnitten');
+      assert.equal((html.match(/<video\b/g) || []).length, 3);
+      assert.match(html, /<section class="showcase" id="demo">[\s\S]*?aria-label="Historische Demo[\s\S]*?<span class="showcase-badge" aria-hidden="true">Historische Demo<\/span>[\s\S]*?<figcaption class="showcase-note"><b>Historische Demo<\/b> eines früheren Entwurfs/, 'Hero-Video als historische Demo gekennzeichnet');
     } else {
       assert.ok(!/<video\b|<source\b|poster=/.test(html), `${p}: Video`);
       assert.ok(!/(src|href|content)="[^"]*\bmedia\//.test(html.replace(/https:\/\/static\.googleusercontent\.com\/media\//g, '')), `${p}: Verweis auf media/`);
@@ -166,10 +167,10 @@ test('Startseite gegenüber main: nur Soft-Launch, Schriften-Fix, Partner, Logo-
     /* Datenschutz-Fix (94f0b18): Schriften selbst ausgeliefert */
     ["style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;", "style-src 'self'; font-src 'self';"],
     ['<link rel="preconnect" href="https://fonts.googleapis.com">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">\n', '<link rel="stylesheet" href="assets/fonts.css">\n'],
-    /* Videos (PXK-159): kein Hero-Video und keine Video-Metadaten; an dessen Stelle die Partner-Logos (Entscheidung des Auftraggebers 03.11.2026);
+    /* Videos (PXK-159): keine Video-Metadaten; das Hero-Video als historische Demo mit neuem Poster, darunter die Partner-Logos (P0-Hotfix);
        Berichtsvideo in der Lavendel-Fassung; Befund-Video statt der Beispielkarte */
     [/\n<script type="application\/ld\+json">\{"@context":"https:\/\/schema\.org","@graph":\[\{"@type":"VideoObject".*?<\/script>/, ''],
-    [/  <section class="showcase" aria-label="Beispielansicht">\n[\s\S]*?\n  <\/section>\n/, '  <section class="partner-band" aria-label="Partner">\n    <ul class="partner-logos">\n      <li><a href="https://pixelkiez.de/" target="_blank" rel="noopener"><img src="assets/partner/pixelkiez.png" alt="Pixelkiez" width="104" height="24"></a></li>\n      <li><a href="https://studio.dyai.cloud/" target="_blank" rel="noopener"><img src="assets/partner/dyai-studio.svg" alt="DYAI Studio" width="133" height="26"></a></li>\n    </ul>\n  </section>\n'],
+    [/  <section class="showcase" aria-label="Beispielansicht">\n[\s\S]*?\n  <\/section>\n/, '  <section class="showcase" id="demo">\n    <figure class="showcase-media">\n      <div class="showcase-frame">\n        <video class="showcase-video" muted loop playsinline preload="none" width="1920" height="1080" poster="media/360-pixelkiez-video-historisch-poster.jpg" aria-label="Historische Demo-Animation eines früheren Entwurfs von 360°Pixelkiez mit simulierter Analyse. Alle gezeigten Werte sind Beispieldaten.">\n          <source src="media/360-pixelkiez-video-1080p.mp4" type="video/mp4">\n        </video>\n        <span class="showcase-badge" aria-hidden="true">Historische Demo</span>\n      </div>\n      <figcaption class="showcase-note"><b>Historische Demo</b> eines früheren Entwurfs: Die Animation zeigt eine ältere Auswahl an Metriken und simuliert eine Analyse, die so nicht stattfindet. Heute prüft Pixelkiez Websites persönlich in sechs Bereichen; Anfragen sind über diese Website noch nicht möglich. Alle gezeigten Werte sind Beispieldaten.</figcaption>\n    </figure>\n  </section>\n\n  <section class="partner-band" aria-label="Partner">\n    <ul class="partner-logos">\n      <li><a href="https://pixelkiez.de/" target="_blank" rel="noopener"><img src="assets/partner/pixelkiez.png" alt="Pixelkiez" width="104" height="24"></a></li>\n      <li><a href="https://studio.dyai.cloud/" target="_blank" rel="noopener"><img src="assets/partner/dyai-studio.svg" alt="DYAI Studio" width="133" height="26"></a></li>\n    </ul>\n  </section>\n'],
     ['poster="media/report-pdf-poster.jpg"', 'poster="media/report-pdf-lavendel-poster.jpg"'],
     ['<source src="media/report-pdf-de-1x1.mp4" type="video/mp4">', '<source src="media/report-pdf-de-1x1-lavendel.mp4" type="video/mp4">'],
     [/      <article class="card detail" aria-label="Fiktives Beispiel eines Befunds im Bericht">\n[\s\S]*?\n      <\/article>\n/, '      <figure class="report-media report-media--wide">\n        <div class="showcase-frame">\n          <video class="showcase-video showcase-video--5x4" muted loop playsinline preload="none" width="1350" height="1080" poster="media/section-bericht-peach-poster.jpg" aria-label="Animiertes fiktives Beispiel eines Befunds aus dem Bericht: Die Startseite nennt nur Schlagworte, dazu Befund, warum er wichtig ist, und die Empfehlung. Danach die nächsten Schritte, das Weitergeben des PDFs an Team, Agentur oder IT und der Hinweis: 0 €, kein Abo.">\n            <source src="media/section-bericht-peach-5x4.mp4" type="video/mp4">\n          </video>\n        </div>\n        <figcaption class="showcase-note">Fiktives Beispiel, kein Befund einer echten Website.</figcaption>\n      </figure>\n'],

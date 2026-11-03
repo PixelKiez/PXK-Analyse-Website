@@ -31,10 +31,10 @@ const BASE_SHA = '13ac821f94c754a94c330b5686f5bf12f4a0282d';
 const FUNCTION = 'functions/api/[[path]].ts';
 const MEDIA_FUNCTION = 'functions/media/[file].ts';
 /* Versioniert sind nur die Poster der eingebundenen Videos; die Videos liegen im R2-Bucket 360pixelkiez (functions/media/[file].ts).
-   Eingebunden: Berichtsvideo bei „Ein PDF. Sieben Seiten.“ und Befund-Video bei „Jeder Befund verständlich erklärt.“; das Hero-Video
-   ist über seine Adresse abrufbar, aber nicht eingebunden (Entscheidung des Auftraggebers 03.11.2026, PXK-159) */
-const MEDIA = ['media/report-pdf-lavendel-poster.jpg', 'media/section-bericht-peach-poster.jpg'];
-const VIDEOS_EINGEBUNDEN = [['bericht', 'media/report-pdf-de-1x1-lavendel.mp4', 'media/report-pdf-lavendel-poster.jpg'], ['nutzen', 'media/section-bericht-peach-5x4.mp4', 'media/section-bericht-peach-poster.jpg']];
+   Eingebunden: das Hero-Video direkt unter dem Hero als deutlich gekennzeichnete historische Demo (P0-Hotfix PXK-159), das Berichtsvideo
+   bei „Ein PDF. Sieben Seiten.“ und das Befund-Video bei „Jeder Befund verständlich erklärt.“ (Entscheidung des Auftraggebers 03.11.2026) */
+const MEDIA = ['media/360-pixelkiez-video-historisch-poster.jpg', 'media/report-pdf-lavendel-poster.jpg', 'media/section-bericht-peach-poster.jpg'];
+const VIDEOS_EINGEBUNDEN = [['demo', 'media/360-pixelkiez-video-1080p.mp4', 'media/360-pixelkiez-video-historisch-poster.jpg'], ['bericht', 'media/report-pdf-de-1x1-lavendel.mp4', 'media/report-pdf-lavendel-poster.jpg'], ['nutzen', 'media/section-bericht-peach-5x4.mp4', 'media/section-bericht-peach-poster.jpg']];
 const VIEW = 'worker/src/view.ts';
 const WORKER_SRC = readdirSync(join(ROOT, 'worker/src')).filter(f => f.endsWith('.ts')).map(f => 'worker/src/' + f);
 /* Alle Dateien, die committet würden (versioniert oder neu, nicht ignoriert) */
@@ -138,13 +138,18 @@ test('Startseite: kostenloses Angebot, sechs Bereiche, sieben PDF-Seiten, GEO & 
   const txt = el => H.norm(H.textOf(el));
   const text = H.norm(H.visibleText(root));
   /* Videos aus R2: Berichtsvideo neben dem Text bei „Ein PDF. Sieben Seiten.“, Befund-Video bei „Jeder Befund verständlich erklärt.“
-     (an der Stelle der früheren Beispielkarte); kein Video unter dem Hero; stumm, Schleife, ohne Bedienelemente, erst beim Hineinscrollen */
+     (an der Stelle der früheren Beispielkarte); unter dem Hero die historische Demo; stumm, Schleife, erst beim Hineinscrollen; ohne
+     Browser-Leiste (WebKit lädt deren Symbole aus blob:-Adressen, die die CSP sperrt) – Abspielen/Anhalten über die Schaltfläche aus app.js */
   const videos = H.byTag(root, 'video');
   assert.deepEqual(videos.map(v => [H.find(root, e => e.tag === 'section' && H.find(e, x => x === v).length)[0].attrs.get('id'), H.byTag(v, 'source')[0].attrs.get('src'), v.attrs.get('poster')]), VIDEOS_EINGEBUNDEN);
   for (const v of videos) assert.ok(['muted', 'loop', 'playsinline', 'poster', 'aria-label'].every(a => v.attrs.has(a)) && !v.attrs.has('controls') && !v.attrs.has('autoplay') && v.attrs.get('preload') === 'none');
   for (const v of videos) assert.equal(H.byTag(v, 'source')[0].attrs.get('type'), 'video/mp4');
   assert.ok(VIDEOS_EINGEBUNDEN.every(([, src]) => R2_VIDEOS.includes(src.slice('media/'.length))), 'jedes eingebundene Video liegt in R2');
-  assert.equal(H.byClass(root, 'showcase').length, 0, 'kein Video unter dem Hero');
+  /* Hero-Video: zeigt einen früheren Entwurf (Metriken, simulierte Analyse) – deshalb sichtbar als historische Demo gekennzeichnet */
+  const demo = H.byClass(root, 'showcase');
+  assert.equal(demo.length, 1, 'genau ein Video unter dem Hero');
+  assert.deepEqual([H.norm(H.textOf(H.byClass(demo[0], 'showcase-badge')[0])), H.norm(H.textOf(H.byTag(demo[0], 'figcaption')[0])).startsWith('Historische Demo eines früheren Entwurfs')], ['Historische Demo', true], 'Hero-Video als historische Demo gekennzeichnet');
+  assert.match(H.byTag(demo[0], 'video')[0].attrs.get('aria-label'), /^Historische Demo/);
   assert.equal(H.byClass(root, 'detail').length, 0, 'Beispielkarte ersetzt durch das Befund-Video');
   for (const s of ['GEO', 'AI Visibility', 'Generative Engine Optimization', '0 €', 'mit Google an', 'sieben Seiten']) assert.ok(text.includes(s), `fehlt: ${s}`);
   /* Es sind sechs Bereiche; nirgends mehr „vier Bereiche“ und keine Seitenangabe je Bereich (der Bericht bleibt bei sieben Seiten) */
@@ -359,9 +364,9 @@ test('Partner: unter dem Hero Pixelkiez und DYAI Studio nebeneinander, ohne Besc
   const { root } = H.parse(read('public/index.html'));
   const teile = H.byTag(root, 'main')[0].children.filter(e => e.tag);
   const i = teile.findIndex(e => H.hasClass(e, 'hero'));
-  /* Das Hero-Video ist nicht eingebunden (PXK-159): die Logos stehen direkt unter dem Hero, an der Stelle unter dem früheren Video */
-  assert.deepEqual([teile[i + 1], teile[i + 2]].map(e => e.attrs.get('id') || e.attrs.get('class')), ['partner-band', 'ablauf'], 'Reihenfolge: Hero, Partner-Logos, Ablauf');
-  const band = teile[i + 1];
+  /* P0-Hotfix PXK-159: das Hero-Video (historische Demo) direkt unter dem Hero, die Logos darunter */
+  assert.deepEqual([teile[i + 1], teile[i + 2], teile[i + 3]].map(e => e.attrs.get('id') || e.attrs.get('class')), ['demo', 'partner-band', 'ablauf'], 'Reihenfolge: Hero, Video, Partner-Logos, Ablauf');
+  const band = teile[i + 2];
   assert.equal(H.norm(H.textOf(band)), '', 'kein sichtbares Wort, nur die Logos');
   assert.deepEqual(H.byTag(band, 'a').map(a => { const img = H.byTag(a, 'img')[0]; return [a.attrs.get('href'), a.attrs.get('target'), a.attrs.get('rel'), img.attrs.get('src'), img.attrs.get('alt')]; }), [
     ['https://pixelkiez.de/', '_blank', 'noopener', 'assets/partner/pixelkiez.png', 'Pixelkiez'],

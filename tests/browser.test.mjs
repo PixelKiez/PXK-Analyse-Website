@@ -178,7 +178,7 @@ test('Hero beim Öffnen: Überschrift, Text, Website-Eingabe und AGB-Häkchen im
 });
 
 test('Befund-Video bei „Jeder Befund verständlich erklärt“: links neben den Punkten (mobil darunter), 5:4, abgerundet, lädt und startet erst beim Hineinscrollen, Schleife (Range-Antworten 206)', { skip: videoSkip }, async () => {
-  /* An der Stelle der früheren Beispielkarte (Entscheidung des Auftraggebers 03.11.2026, PXK-159); das Hero-Video ist nicht eingebunden */
+  /* An der Stelle der früheren Beispielkarte (Entscheidung des Auftraggebers 03.11.2026, PXK-159); unter dem Hero die historische Demo (P0-Hotfix) */
   for (const [width, height] of [[1440, 900], [390, 844]]) {
     const { context, page, errors, blocked, videos } = await open('/index.html', { width, height, reducedMotion: 'no-preference', videos: true });
     const state = () => page.evaluate(() => {
@@ -186,15 +186,15 @@ test('Befund-Video bei „Jeder Befund verständlich erklärt“: links neben de
       const fr = f.getBoundingClientRect(), tr = t.getBoundingClientRect(), cs = getComputedStyle(f);
       return { paused: v.paused, time: v.currentTime, loop: v.loop, muted: v.muted, controls: v.controls, inline: v.playsInline, buffered: v.buffered.length,
         left: fr.right <= tr.left, below: fr.top >= tr.bottom, radius: parseFloat(cs.borderTopLeftRadius), overflow: cs.overflow, ratio: fr.width / fr.height, width: fr.width,
-        heroVideo: document.querySelectorAll('.showcase').length };
+        heroVideo: document.querySelectorAll('.showcase').length, toggle: !!f.querySelector('button.video-toggle[aria-label]') };
     });
     const before = await state();
-    assert.deepEqual([before.paused, before.buffered, before.heroVideo], [true, 0, 0], `${width}: läuft und lädt erst beim Hineinscrollen; kein Hero-Video`);
+    assert.deepEqual([before.paused, before.buffered, before.heroVideo, before.toggle], [true, 0, 1, true], `${width}: läuft und lädt erst beim Hineinscrollen; Hero-Video (Demo) da; eigene Schaltfläche`);
     await page.evaluate(() => document.querySelector('#nutzen .showcase-frame').scrollIntoView({ block: 'center' }));
     await page.waitForFunction(() => { const v = document.querySelector('#nutzen .showcase-video'); return !v.paused && v.currentTime > 0.3; }, null, { timeout: 8000 });
     const m = await state();
     assert.ok(width >= 1000 ? m.left : m.below, `${width}: ${width >= 1000 ? 'links neben' : 'unter'} den Punkten`);
-    assert.deepEqual([m.loop, m.muted, m.controls, m.inline], [true, true, false, true], `${width}: Schleife, stumm, ohne Bedienelemente`);
+    assert.deepEqual([m.loop, m.muted, m.controls, m.inline], [true, true, false, true], `${width}: Schleife, stumm, eigene Schaltfläche statt Browser-Leiste`);
     assert.ok(m.radius >= 12 && m.overflow === 'hidden', `${width}: abgerundete Ecken`);
     assert.ok(Math.abs(m.ratio - 1.25) < 0.01 && m.width <= 640, `${width}: 5:4, höchstens 640 px (${m.width} px, ${m.ratio.toFixed(3)})`);
     await page.evaluate(() => { const v = document.querySelector('#nutzen .showcase-video'); v.currentTime = v.duration - 0.3; });
@@ -241,7 +241,7 @@ test('Video bei „Ihr Bericht“: rechts neben dem Text (mobil darunter), abger
   }
 });
 
-test('Safari-Engine (WebKit): beide Videos laufen – Range-Anfragen bekommen 206 von der Video-Function (R2); scheitert das Laden, steht das Standbild in gleicher Größe da', { skip: videoSkip }, async t => {
+test('Safari-Engine (WebKit): alle drei Videos laufen – Range-Anfragen bekommen 206 von der Video-Function (R2); scheitert das Laden, bleibt das Standbild mit Hinweis und „Erneut versuchen“', { skip: videoSkip }, async t => {
   let wk;
   try { wk = await pw.webkit.launch(); } catch { t.skip('NOT_RUN: Playwright-WebKit nicht installiert (playwright install webkit)'); return; }
   const frames = page => page.evaluate(() => [...document.querySelectorAll('.showcase-video')].map(e => {
@@ -256,7 +256,7 @@ test('Safari-Engine (WebKit): beide Videos laufen – Range-Anfragen bekommen 20
       page.on('pageerror', e => errors.push(String(e)));
       const videos = trackVideos(page);
       await page.goto(app.base + '/', { waitUntil: 'load' });
-      for (const sel of ['#bericht .showcase-frame', '#nutzen .showcase-frame']) {
+      for (const sel of ['#demo .showcase-frame', '#bericht .showcase-frame', '#nutzen .showcase-frame']) {
         await page.evaluate(s => document.querySelector(s).scrollIntoView({ block: 'center' }), sel);
         /* Echte Wiedergabe: das Element bleibt ein Video (kein Standbild-Ersatz) und die Zeit läuft */
         await page.waitForFunction(s => {
@@ -265,36 +265,46 @@ test('Safari-Engine (WebKit): beide Videos laufen – Range-Anfragen bekommen 20
         }, sel, { timeout: 15000 });
       }
       const shown = await frames(page);
-      assert.deepEqual(shown.map(e => e.tag), ['VIDEO', 'VIDEO'], `${width}: beide Videos spielen, kein Standbild`);
+      assert.deepEqual(shown.map(e => e.tag), ['VIDEO', 'VIDEO', 'VIDEO'], `${width}: alle drei Videos spielen, kein Standbild`);
       for (const e of shown) {
         assert.ok(e.fills, `${width}: füllt den abgerundeten Rahmen`);
-        assert.match(e.label, /^Animierte/, `${width}: Alternativtext bleibt`);
+        assert.match(e.label, /^(Animierte|Historische Demo)/, `${width}: Alternativtext bleibt`);
       }
       const list = await videos();
-      assertRanges(list, ['/media/report-pdf-de-1x1-lavendel.mp4', '/media/section-bericht-peach-5x4.mp4'], `WebKit ${width}`);
+      assertRanges(list, ['/media/360-pixelkiez-video-1080p.mp4', '/media/report-pdf-de-1x1-lavendel.mp4', '/media/section-bericht-peach-5x4.mp4'], `WebKit ${width}`);
       assert.deepEqual(errors, [], `${width}: Skriptfehler`);
       if (SHOTS) await page.screenshot({ path: join(SHOTS, `webkit-${width}.png`) });
-      t.diagnostic(`WebKit ${width}: beide Videos spielen; MP4-Antworten: ${list.map(x => `${x.path.slice(7)} ${x.range ?? 'ohne Range'} → ${x.status}`).join(', ')}`);
+      t.diagnostic(`WebKit ${width}: alle drei Videos spielen; MP4-Antworten: ${list.map(x => `${x.path.slice(7)} ${x.range ?? 'ohne Range'} → ${x.status}`).join(', ')}`);
       await ctx.close();
     }
-    /* Poster-Fallback bleibt: Ist ein Video nicht ladbar (Netz, Kontingent, Fehler), ersetzt das Standbild es in gleicher Größe */
-    const ctx = await wk.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'no-preference' });
+    /* Ladefehler (Netz, Kontingent, R2): Das Standbild (Poster) bleibt im Video stehen, dazu ein Hinweis und „Erneut versuchen“ –
+       nie eine schwarze Fläche und nie ein stilles Standbild ohne Bedienung. Ist das Netz zurück, startet ein Tipp das Video. */
+    const ctx = await wk.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'no-preference', isMobile: true, hasTouch: true });
     await ctx.route('**/*.mp4', r => r.abort());
     const page = await ctx.newPage();
     await page.goto(app.base + '/', { waitUntil: 'load' });
-    for (const sel of ['#bericht .showcase-frame', '#nutzen .showcase-frame']) {
-      await page.evaluate(s => document.querySelector(s).scrollIntoView({ block: 'center' }), sel);
-      await page.waitForFunction(s => { const e = document.querySelector(s).querySelector('.showcase-video'); return e.tagName === 'IMG' && e.complete && e.naturalWidth > 0; }, sel, { timeout: 10000 });
+    for (const sel of ['#demo', '#bericht', '#nutzen']) {
+      await page.evaluate(s => document.querySelector(`${s} .showcase-frame`).scrollIntoView({ block: 'center', behavior: 'instant' }), sel);
+      await page.waitForFunction(s => document.querySelector(`${s} .showcase-frame`).classList.contains('braucht-start') && !document.querySelector(`${s} .video-hinweis`).hidden, sel, { timeout: 10000 });
     }
-    const still = await frames(page);
-    assert.deepEqual(still.map(e => [e.tag, e.fills, /^Animierte/.test(e.label)]), [['IMG', true, true], ['IMG', true, true]], 'Standbild statt schwarzer Fläche');
+    const still = await page.evaluate(() => [...document.querySelectorAll('.showcase-frame')].map(f => {
+      const v = f.querySelector('.showcase-video'), r = v.getBoundingClientRect(), fr = f.getBoundingClientRect();
+      return [v.tagName, !!v.poster, Math.abs(r.width - fr.width) <= 1, f.querySelector('.video-hinweis').innerText.trim(), f.querySelector('.video-toggle').innerText.trim()];
+    }));
+    assert.deepEqual(still, Array(3).fill(['VIDEO', true, true, 'Das Video konnte gerade nicht geladen werden.', 'Erneut versuchen']), 'Standbild mit Hinweis und Bedienung');
+    await ctx.unroute('**/*.mp4');
+    await page.evaluate(() => document.querySelector('#nutzen .showcase-frame').scrollIntoView({ block: 'center', behavior: 'instant' }));
+    const b = await page.locator('#nutzen .video-toggle').boundingBox();
+    await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
+    await page.waitForFunction(() => { const v = document.querySelector('#nutzen .showcase-video'); return !v.paused && v.currentTime > 0.3; }, null, { timeout: 15000 });
+    assert.equal(await page.locator('#nutzen .video-hinweis').isHidden(), true, 'Hinweis verschwindet nach erfolgreichem Neustart');
     await ctx.close();
   } finally {
     await wk.close();
   }
 });
 
-test('Videos: Läuft app.js, während die Quellenauswahl noch läuft (networkState NO_SOURCE), bleibt das Video und spielt; nur ein echter Ladefehler zeigt das Standbild (Chromium und WebKit)', { skip: videoSkip }, async t => {
+test('Videos: Läuft app.js, während die Quellenauswahl noch läuft (networkState NO_SOURCE), bleibt das Video und spielt; nur ein echter Ladefehler zeigt den Hinweis (Chromium und WebKit)', { skip: videoSkip }, async t => {
   /* Nachstellung des Rennens aus WebKit unter Last: networkState meldet NO_SOURCE, bis die Seite load() aufruft */
   const race = () => {
     const d = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'networkState');
@@ -316,6 +326,119 @@ test('Videos: Läuft app.js, während die Quellenauswahl noch läuft (networkSta
         await page.evaluate(() => document.querySelector('#nutzen .showcase-frame').scrollIntoView({ block: 'center' }));
         await page.waitForFunction(() => { const e = document.querySelector('#nutzen .showcase-video'); return e.tagName === 'VIDEO' && !e.paused && e.currentTime > 0.3; }, null, { timeout: 15000 });
         await ctx.close();
+      });
+    }
+  } finally {
+    if (wk) await wk.close();
+  }
+});
+
+/* P0-Hotfix PXK-159: Mobilgeräte spielten die Videos nicht ab. Ursache: lehnt der Browser den automatischen Start ab (iOS-Stromsparmodus,
+   Datensparen, Autoplay-Sperre), wurde die Ablehnung von play() verschluckt, und ohne Bedienelemente gab es keine Startmöglichkeit; bei
+   „Bewegung reduzieren“ ebenso. Emulation hier: play() ohne echte Nutzergeste (vertrauenswürdiges pointer/touch/click/keydown in der
+   letzten Sekunde) wird mit NotAllowedError abgelehnt. Das ist eine Nachbildung, kein Test auf einem echten Gerät. */
+const autoplaySperre = () => {
+  const play = HTMLMediaElement.prototype.play;
+  let geste = -Infinity;
+  window.__abgelehnt = 0;
+  for (const typ of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) addEventListener(typ, e => { if (e.isTrusted) geste = performance.now(); }, true);
+  HTMLMediaElement.prototype.play = function () {
+    if (performance.now() - geste > 1000) { window.__abgelehnt++; return Promise.reject(new DOMException('Autoplay blockiert (Emulation)', 'NotAllowedError')); }
+    return play.call(this);
+  };
+};
+const tippe = async (page, mobil, box) => { const x = box.x + box.width / 2, y = box.y + box.height / 2; if (mobil) await page.touchscreen.tap(x, y); else await page.mouse.click(x, y); };
+
+test('Videos ohne Autoplay (Stromsparmodus/Autoplay-Sperre, emuliert) und bei „Bewegung reduzieren“: sichtbares „Abspielen“, Start per echtem Tippen/Klick, Anhalten und wieder Abspielen – alle drei Videos (Chromium und WebKit, 320/390/768/1440)', { skip: videoSkip }, async t => {
+  let wk = null;
+  try { wk = await pw.webkit.launch(); } catch { /* unten als NOT_RUN gemeldet */ }
+  try {
+    for (const [name, engine] of [['Chromium', browser], ['WebKit', wk]]) {
+      await t.test(name, { skip: !engine && 'NOT_RUN: Playwright-WebKit nicht installiert (playwright install webkit)' }, async () => {
+        for (const width of [320, 390, 768, 1440]) {
+          for (const fall of ['Autoplay gesperrt', 'Bewegung reduzieren']) {
+            const mobil = width < 768, was = `${name} ${width} ${fall}`;
+            const ctx = await engine.newContext({ viewport: { width, height: mobil ? 800 : 900 }, isMobile: mobil, hasTouch: mobil, reducedMotion: fall === 'Bewegung reduzieren' ? 'reduce' : 'no-preference' });
+            if (fall === 'Autoplay gesperrt') await ctx.addInitScript(autoplaySperre);
+            await ctx.route('**/*', r => r.request().url().startsWith(app.base + '/') ? r.continue() : r.abort());
+            const page = await ctx.newPage();
+            const errors = [];
+            page.on('pageerror', e => errors.push(String(e)));
+            page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+            await page.goto(app.base + '/', { waitUntil: 'load' });
+            for (const sec of ['#demo', '#bericht', '#nutzen']) {
+              await page.evaluate(s => document.querySelector(`${s} .showcase-frame`).scrollIntoView({ block: 'center', behavior: 'instant' }), sec);
+              await page.waitForFunction(s => document.querySelector(`${s} .showcase-frame`).classList.contains('braucht-start'), sec, { timeout: 8000 });
+              const zustand = () => page.evaluate(s => {
+                const v = document.querySelector(`${s} .showcase-video`), b = document.querySelector(`${s} .video-toggle`), f = document.querySelector(`${s} .showcase-frame`);
+                const br = b.getBoundingClientRect(), fr = f.getBoundingClientRect(), x = br.left + br.width / 2, y = br.top + br.height / 2;
+                return { paused: v.paused, controls: v.controls, label: b.getAttribute('aria-label'), text: b.innerText.trim(), w: br.width, h: br.height,
+                  mittig: Math.abs(x - (fr.left + fr.width / 2)) < 2 && Math.abs(y - (fr.top + fr.height / 2)) < 2, getroffen: document.elementFromPoint(x, y)?.closest('.video-toggle') === b };
+              }, sec);
+              /* Ohne Autoplay: Poster mit großem „Abspielen“ in der Mitte, keine Browser-Leiste; die Schaltfläche liegt oben (elementFromPoint) */
+              const a = await zustand();
+              assert.deepEqual([a.paused, a.controls, a.label, a.text, a.mittig, a.getroffen], [true, false, 'Video abspielen', 'Abspielen', true, true], `${was} ${sec}: sichtbare Startmöglichkeit`);
+              assert.ok(a.w >= 44 && a.h >= 44, `${was} ${sec}: Tippfläche mindestens 44 × 44 px (${a.w} × ${a.h})`);
+              const knopf = page.locator(`${sec} .video-toggle`);
+              await tippe(page, mobil, await knopf.boundingBox());
+              await page.waitForFunction(s => { const v = document.querySelector(`${s} .showcase-video`); return !v.paused && v.currentTime > 0.3; }, sec, { timeout: 15000 });
+              const b = await zustand();
+              assert.deepEqual([b.label, b.getroffen, b.w >= 44 && b.h >= 44], ['Video anhalten', true, true], `${was} ${sec}: läuft, Anhalten erreichbar (${b.w} × ${b.h} px)`);
+              /* Anhalten per Tippen: bleibt stehen (auch im Bild), wieder Abspielen per Tippen */
+              await tippe(page, mobil, await knopf.boundingBox());
+              await page.waitForFunction(s => document.querySelector(`${s} .showcase-video`).paused && document.querySelector(`${s} .showcase-frame`).classList.contains('braucht-start'), sec, { timeout: 5000 });
+              const t0 = await page.evaluate(s => document.querySelector(`${s} .showcase-video`).currentTime, sec);
+              await page.waitForTimeout(600);
+              assert.equal(await page.evaluate(s => document.querySelector(`${s} .showcase-video`).currentTime, sec), t0, `${was} ${sec}: angehalten bleibt angehalten`);
+              await tippe(page, mobil, await knopf.boundingBox());
+              await page.waitForFunction(([s, t0]) => { const v = document.querySelector(`${s} .showcase-video`); return !v.paused && v.currentTime > t0 + 0.2; }, [sec, t0], { timeout: 15000 });
+              /* Die Emulation erlaubt play() eine Sekunde nach einem Tipp; danach muss das nächste Video wieder ohne Geste starten wollen */
+              await page.waitForTimeout(1200);
+            }
+            if (fall === 'Autoplay gesperrt') assert.ok(await page.evaluate(() => window.__abgelehnt) >= 3, `${was}: Autoplay je Video abgelehnt (Emulation griff)`);
+            assert.deepEqual(errors, [], `${was}: Konsolenfehler`);
+            await ctx.close();
+          }
+        }
+      });
+    }
+  } finally {
+    if (wk) await wk.close();
+  }
+});
+
+test('Partner-Logos: echter Klick bzw. Tipp trifft den Link (elementFromPoint, kein überlagernder Abschnitt) und öffnet pixelkiez.de bzw. studio.dyai.cloud im neuen Tab; Footer-Logo ebenso (Chromium und WebKit, 320/390/768/1440)', { skip }, async t => {
+  /* P0-Hotfix PXK-159: Der negative Abstand zog die Logos in den positionierten Hero; dessen Fläche lag über den Logos und fing Klicks ab */
+  let wk = null;
+  try { wk = await pw.webkit.launch(); } catch { /* unten als NOT_RUN gemeldet */ }
+  try {
+    for (const [name, engine] of [['Chromium', browser], ['WebKit', wk]]) {
+      await t.test(name, { skip: !engine && 'NOT_RUN: Playwright-WebKit nicht installiert (playwright install webkit)' }, async () => {
+        for (const width of [320, 390, 768, 1440]) {
+          const mobil = width < 768;
+          const ctx = await engine.newContext({ viewport: { width, height: mobil ? 800 : 900 }, isMobile: mobil, hasTouch: mobil, reducedMotion: 'reduce' });
+          /* Externe Partnerseiten nicht wirklich laden: geprüft wird, dass der neue Tab genau diese Adresse öffnet */
+          await ctx.route('**/*', r => r.request().url().startsWith(app.base + '/') ? r.continue() : r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>Partner</title>' }));
+          const page = await ctx.newPage();
+          await page.goto(app.base + '/', { waitUntil: 'load' });
+          for (const [sel, ziel, tippflaeche] of [['.partner-logos a[href="https://pixelkiez.de/"]', 'https://pixelkiez.de/', true], ['.partner-logos a[href="https://studio.dyai.cloud/"]', 'https://studio.dyai.cloud/', true], ['.footer a[href="https://pixelkiez.de/"]', 'https://pixelkiez.de/', false]]) {
+            const was = `${name} ${width} ${ziel}${tippflaeche ? '' : ' (Footer)'}`;
+            const link = page.locator(sel);
+            await link.scrollIntoViewIfNeeded();
+            await page.waitForTimeout(150);
+            const box = await link.locator('img').boundingBox();
+            const x = box.x + box.width / 2, y = box.y + box.height / 2;
+            assert.equal(await page.evaluate(([x, y, s]) => document.querySelector(s).contains(document.elementFromPoint(x, y)), [x, y, sel]), true, `${was}: elementFromPoint trifft den Link`);
+            if (tippflaeche) { const l = await link.boundingBox(); assert.ok(l.height >= 44, `${was}: Tippfläche mindestens 44 px hoch (${l.height})`); }
+            const neu = ctx.waitForEvent('page', { timeout: 10000 });
+            if (mobil) await page.touchscreen.tap(x, y); else await page.mouse.click(x, y);
+            const tab = await neu;
+            await tab.waitForLoadState('domcontentloaded');
+            assert.deepEqual([tab.url(), page.url()], [ziel, app.base + '/'], `${was}: neuer Tab mit der Partnerseite, Website bleibt offen`);
+            await tab.close();
+          }
+          await ctx.close();
+        }
       });
     }
   } finally {

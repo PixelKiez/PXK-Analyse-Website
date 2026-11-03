@@ -50,23 +50,38 @@
    und Button und Menü-Button in der Pille bleiben (Umbruch gemessen bis 473 px in Chromium und WebKit) */
 @media (max-width: 489px) { .nav .logo span { display: none; } }
 
-/* Video unter dem Hero: zentriertes Widget mit abgerundeten Ecken, nicht über die ganze Breite */
+/* Video unter dem Hero (historische Demo, deutlich gekennzeichnet): zentriertes Widget mit abgerundeten Ecken, 16:9, nicht über die ganze Breite */
 .showcase { padding: 0 var(--gutter) clamp(56px, 8vw, 104px); }
 .showcase-media { width: min(100%, 960px); margin: 0 auto; }
-.showcase-frame { overflow: hidden; isolation: isolate; border-radius: clamp(14px, 2vw, 24px); background: #0E1416; box-shadow: 0 24px 60px rgb(12 12 12 / .16); }
+.showcase-frame { position: relative; overflow: hidden; isolation: isolate; border-radius: clamp(14px, 2vw, 24px); background: #0E1416; box-shadow: 0 24px 60px rgb(12 12 12 / .16); }
 .showcase-video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; }
 .showcase-note { margin-top: 14px; text-align: center; font: 400 12px var(--font-mono); color: var(--ink-45); }
+.showcase-note b { font-weight: 500; color: var(--ink); }
+.showcase-badge { position: absolute; top: clamp(10px, 1.6vw, 16px); left: clamp(10px, 1.6vw, 16px); z-index: 1; padding: 6px 10px; border-radius: var(--r-pill); background: rgb(255 255 255 / .94); color: var(--ink); font: 500 12px/1 var(--font-mono); letter-spacing: .04em; text-transform: uppercase; pointer-events: none; }
+/* Eigene Wiedergabe-Schaltfläche (app.js): klein unten rechts, solange das Video läuft;
+   groß und mittig mit „Abspielen“, wenn ein Start per Tippen nötig ist (kein Autoplay, angehalten, „Bewegung reduzieren“, Ladefehler) */
+.video-toggle { position: absolute; right: 12px; bottom: 12px; z-index: 2; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 44px; min-height: 44px; padding: 0 12px; border: 0; border-radius: var(--r-pill); background: rgb(12 12 12 / .72); color: #fff; font: 500 15px var(--font-sans); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.video-toggle svg { width: 16px; height: 16px; fill: currentColor; }
+.video-toggle:hover { background: rgb(12 12 12 / .86); }
+.video-toggle:focus-visible { outline: 2px solid #fff; outline-offset: 2px; box-shadow: 0 0 0 4px var(--accent); }
+.braucht-start .video-toggle { right: 50%; bottom: 50%; transform: translate(50%, 50%); min-height: 56px; padding: 0 22px 0 18px; font-size: 16px; background: var(--ink); box-shadow: 0 10px 30px rgb(12 12 12 / .3); }
+.braucht-start .video-toggle svg { width: 18px; height: 18px; }
+.video-hinweis { position: absolute; top: 12px; left: 12px; right: 12px; z-index: 2; margin: 0; padding: 10px 14px; border-radius: 10px; background: rgb(255 255 255 / .96); color: var(--ink); font-size: 14px; line-height: 1.4; }
 /* Zweites Video rechts neben dem Text im Abschnitt „Ihr Bericht“ (Spalte aus .split); quadratisch, höchstens 560 px */
 .report-media { width: 100%; max-width: 560px; min-width: 0; margin: 0; justify-self: center; }
 .showcase-video--square { aspect-ratio: 1 / 1; }
 /* Drittes Video links neben dem Text im Abschnitt „Jeder Befund verständlich erklärt“ (Spalte aus .split--reverse); 5:4, höchstens 640 px */
 .report-media--wide { max-width: 640px; }
 .showcase-video--5x4 { aspect-ratio: 5 / 4; }
-/* Partner unter dem Hero (ohne Hero-Video, PXK-159): Logos von Pixelkiez und DYAI Studio nebeneinander, schwarz, verlinkt (neuer Tab) */
-.partner-band { display: flex; justify-content: center; margin-top: calc(clamp(56px, 8vw, 104px) * -0.4); padding: 0 var(--gutter) clamp(56px, 8vw, 104px); }
+/* Partner unter dem Video: Logos von Pixelkiez und DYAI Studio nebeneinander, schwarz, verlinkt (neuer Tab).
+   Der negative Abstand zieht die Logos in den unteren Rand des Abschnitts darüber; position/z-index legen sie darüber, sonst fängt
+   ein positionierter Abschnitt (der Hero ist position: relative) Klicks und Tipps auf den Logos ab (PXK-159-Hotfix). */
+.partner-band { position: relative; z-index: 1; display: flex; justify-content: center; margin-top: calc(clamp(56px, 8vw, 104px) * -0.4); padding: 0 var(--gutter) clamp(56px, 8vw, 104px); }
 .partner-logos { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 20px clamp(36px, 6vw, 64px); margin: 0; padding: 0; list-style: none; }
 .partner-logos a, .footer-partner { display: block; border-radius: 6px; }
-.partner-logos a:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; }
+/* Tippfläche mindestens 44 px hoch, ohne die Logos zu verschieben */
+.partner-logos a { padding: 10px; margin: -10px; }
+.partner-logos a:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
 .partner-logos img { display: block; width: auto; height: 24px; }
 .partner-logos li:last-child img { height: 26px; }
 /* Pixelkiez-Logo in der untersten Footer-Leiste zwischen Copyright und Rechtlichem */
