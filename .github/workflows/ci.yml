@@ -1,0 +1,38 @@
+# 360°Pixelkiez (PXWA): Typprüfung, statische, Worker-, Benachrichtigungs- und Pages-Tests sowie der Release-Test
+# auf jedem Pull Request und jedem Push auf main. Kein Deployment, keine Secrets, nur Lesezugriff aufs Repo.
+# Die Browser-Tests (Playwright, axe) laufen weiterhin lokal: npm run test:browser.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Typprüfung und Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # Hero-Schutz und Negativprobe vergleichen mit älteren Commits
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Geprüften Stand als lokalen Branch festhalten (der Release-Test klont das Repo)
+        run: git checkout -B ci-pruefstand
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:release
