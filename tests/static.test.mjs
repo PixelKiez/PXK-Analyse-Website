@@ -7,7 +7,7 @@ import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { join, relative } from 'node:path';
 import * as H from './lib/html.mjs';
-import { ROOT, artifactFiles, uploadFiles, MIGRATIONS } from './lib/harness.mjs';
+import { ROOT, artifactFiles, uploadFiles, MIGRATIONS, SOFT_LAUNCH, SOFT_LAUNCH_SKIP, R2_VIDEOS } from './lib/harness.mjs';
 
 const read = p => readFileSync(join(ROOT, p), 'utf8');
 const git = (...a) => execFileSync('git', a, { cwd: ROOT, encoding: 'utf8' });
@@ -18,14 +18,23 @@ const ANALYSE = ['index', 'auffindbarkeit-seo', 'performance-technik', 'nutzerfu
 const INHALT = [...WISSEN, ...ANALYSE];
 /* Titelbilder (og:image, 1200×630) je Seite, Icons; Stylesheet und Skript des Kreisdiagramms (Startseite und Analyse-Übersicht) */
 const OG = ['start', 'wissen', 'analyse', ...WISSEN.slice(1).map(s => 'wissen-' + s.split('/').pop().slice(0, -5)), ...ANALYSE.slice(1).map(s => 'analyse-' + s.split('/').pop().slice(0, -5))];
-const BILDER = ['assets/apple-touch-icon.png', 'assets/favicon.svg', 'favicon.ico', ...OG.map(n => `assets/og/${n}.jpg`)];
+/* Partner-Logos unter dem Hero (Entscheidung des Auftraggebers 03.11.2026), lokal ausgeliefert (CSP img-src 'self') */
+const PARTNER_LOGOS = ['assets/partner/dyai-studio.svg', 'assets/partner/pixelkiez.png'];
+const BILDER = ['assets/apple-touch-icon.png', 'assets/favicon.svg', 'favicon.ico', ...OG.map(n => `assets/og/${n}.jpg`), ...PARTNER_LOGOS];
 const ASSETS = ['assets/anfrage.css', 'assets/app.js', 'assets/donut.css', 'assets/donut.js', 'assets/inhalt.css', 'assets/styles.css'];
+/* Selbst ausgelieferte Schriften (Soft-Launch-Datenschutz-Fix 03.11.2026): Stylesheet, WOFF2-Dateien und OFL-Lizenzen */
+const FONT_FILES = ['assets/fonts.css', ...['OFL-Archivo.txt', 'OFL-IBM-Plex-Mono.txt', 'archivo-latin-ext.woff2', 'archivo-latin.woff2', 'ibm-plex-mono-400-latin-ext.woff2',
+  'ibm-plex-mono-400-latin.woff2', 'ibm-plex-mono-500-latin-ext.woff2', 'ibm-plex-mono-500-latin.woff2'].map(f => 'assets/fonts/' + f)];
 const PAGES = ['public/index.html', 'public/impressum.html', 'public/datenschutz.html', 'public/agb.html', 'public/404.html', ...INHALT];
 /* Stand vor PXWA-BE-02 (Hero ohne AGB-Häkchen): Referenz für den Hero-Schutz */
 const BASE_SHA = '13ac821f94c754a94c330b5686f5bf12f4a0282d';
 const FUNCTION = 'functions/api/[[path]].ts';
 const MEDIA_FUNCTION = 'functions/media/[file].ts';
-const MEDIA = ['media/360-pixelkiez-video-1080p.mp4', 'media/360-pixelkiez-video-poster.jpg', 'media/report-pdf-de-1x1.mp4', 'media/report-pdf-poster.jpg'];
+/* Versioniert sind nur die Poster der eingebundenen Videos; die Videos liegen im R2-Bucket 360pixelkiez (functions/media/[file].ts).
+   Eingebunden: Berichtsvideo bei „Ein PDF. Sieben Seiten.“ und Befund-Video bei „Jeder Befund verständlich erklärt.“; das Hero-Video
+   ist über seine Adresse abrufbar, aber nicht eingebunden (Entscheidung des Auftraggebers 03.11.2026, PXK-159) */
+const MEDIA = ['media/report-pdf-lavendel-poster.jpg', 'media/section-bericht-peach-poster.jpg'];
+const VIDEOS_EINGEBUNDEN = [['bericht', 'media/report-pdf-de-1x1-lavendel.mp4', 'media/report-pdf-lavendel-poster.jpg'], ['nutzen', 'media/section-bericht-peach-5x4.mp4', 'media/section-bericht-peach-poster.jpg']];
 const VIEW = 'worker/src/view.ts';
 const WORKER_SRC = readdirSync(join(ROOT, 'worker/src')).filter(f => f.endsWith('.ts')).map(f => 'worker/src/' + f);
 /* Alle Dateien, die committet würden (versioniert oder neu, nicht ignoriert) */
@@ -33,8 +42,11 @@ const repoFiles = () => git('ls-files', '--cached', '--others', '--exclude-stand
 /* Text der serverseitig gerenderten Seiten: String- und Template-Literale aus view.ts ohne Platzhalter und Tags */
 const viewText = () => [...read(VIEW).matchAll(/'((?:[^'\\]|\\.)*)'|`((?:[^`\\]|\\.)*)`/g)].map(m => (m[1] ?? m[2]).replace(/\$\{[^}]*\}/g, ' ').replace(/<[^>]+>/g, ' ')).join(' ');
 
-/* 360°Pixelkiez ist eine eigenständige Website: keine Links zu pixelkiez.de, nur die Kontaktadresse 360@pixelkiez.de */
-const EXTERNAL_OK = ['mailto:360@pixelkiez.de'];
+/* 360°Pixelkiez ist eine eigenständige Website. Externe Ziele: die Kontaktadresse 360@pixelkiez.de und die beiden Partner
+   (Entscheidung des Auftraggebers 03.11.2026: Logos unter dem Hero, pixelkiez.de im Footer); sonst kein Link zu pixelkiez.de */
+const PARTNER = ['https://pixelkiez.de/', 'https://studio.dyai.cloud/'];
+const EXTERNAL_OK = ['mailto:360@pixelkiez.de', ...PARTNER];
+const PARTNER_LINK = '<a href="https://pixelkiez.de/" target="_blank" rel="noopener">';
 /* Herausgeber der Quellen, die Wissens- und Analyseseiten belegen (nur dort erlaubt, nur https, nie pixelkiez.de) */
 const SOURCE_HOSTS = [
   'about.ads.microsoft.com', 'almanac.httparchive.org', 'angular.dev', 'arxiv.org', 'baymard.com',
@@ -113,7 +125,8 @@ test('Dokumente: valides Gerüst, genau eine H1, Landmarks, CSP, keine Inline-St
     assert.equal(H.byTag(root, 'h1').length, 1, `${page}: eine H1`);
     for (const lm of ['header', 'nav', 'main', 'footer']) assert.ok(H.byTag(root, lm).length, `${page}: <${lm}>`);
     const csp = H.byTag(head, 'meta').find(m => m.attrs.get('http-equiv') === 'Content-Security-Policy')?.attrs.get('content') || '';
-    assert.match(csp, /script-src 'self'/); assert.match(csp, /form-action 'self' https:\/\/accounts\.google\.com/); assert.match(csp, /object-src 'none'/);
+    /* Soft-Launch: kein Formular, also auch kein Formularziel (form-action 'none'); sonst nur die eigene API und Google */
+    assert.match(csp, /script-src 'self'/); assert.match(csp, SOFT_LAUNCH ? /form-action 'none'/ : /form-action 'self' https:\/\/accounts\.google\.com/); assert.match(csp, /object-src 'none'/);
     assert.deepEqual(H.find(root, e => e.attrs.has('style')).map(e => e.tag), [], `${page}: keine style-Attribute (CSP)`);
     assert.deepEqual(H.byTag(root, 'script').filter(s => !s.attrs.has('src') && s.attrs.get('type') !== 'application/ld+json').length, 0, `${page}: keine Inline-Skripte`);
     assert.ok(H.find(root, e => [...e.attrs.keys()].some(a => a.startsWith('on'))).length === 0, `${page}: keine Inline-Event-Handler`);
@@ -124,11 +137,15 @@ test('Startseite: kostenloses Angebot, sechs Bereiche, sieben PDF-Seiten, GEO & 
   const { root } = H.parse(read('public/index.html'));
   const txt = el => H.norm(H.textOf(el));
   const text = H.norm(H.visibleText(root));
-  /* Videos: unter dem Hero und rechts neben dem Text bei „Ihr Bericht“; stumm, Schleife, ohne Bedienelemente */
+  /* Videos aus R2: Berichtsvideo neben dem Text bei „Ein PDF. Sieben Seiten.“, Befund-Video bei „Jeder Befund verständlich erklärt.“
+     (an der Stelle der früheren Beispielkarte); kein Video unter dem Hero; stumm, Schleife, ohne Bedienelemente, erst beim Hineinscrollen */
   const videos = H.byTag(root, 'video');
-  assert.deepEqual(videos.map(v => H.byTag(v, 'source')[0].attrs.get('src')), ['media/360-pixelkiez-video-1080p.mp4', 'media/report-pdf-de-1x1.mp4']);
-  for (const v of videos) assert.ok(['muted', 'loop', 'playsinline', 'poster', 'aria-label'].every(a => v.attrs.has(a)) && !v.attrs.has('controls') && !v.attrs.has('autoplay'));
-  assert.ok(H.byTag(H.byId(root, 'bericht'), 'video').length === 1, 'Berichtsvideo im Abschnitt „Ihr Bericht“');
+  assert.deepEqual(videos.map(v => [H.find(root, e => e.tag === 'section' && H.find(e, x => x === v).length)[0].attrs.get('id'), H.byTag(v, 'source')[0].attrs.get('src'), v.attrs.get('poster')]), VIDEOS_EINGEBUNDEN);
+  for (const v of videos) assert.ok(['muted', 'loop', 'playsinline', 'poster', 'aria-label'].every(a => v.attrs.has(a)) && !v.attrs.has('controls') && !v.attrs.has('autoplay') && v.attrs.get('preload') === 'none');
+  for (const v of videos) assert.equal(H.byTag(v, 'source')[0].attrs.get('type'), 'video/mp4');
+  assert.ok(VIDEOS_EINGEBUNDEN.every(([, src]) => R2_VIDEOS.includes(src.slice('media/'.length))), 'jedes eingebundene Video liegt in R2');
+  assert.equal(H.byClass(root, 'showcase').length, 0, 'kein Video unter dem Hero');
+  assert.equal(H.byClass(root, 'detail').length, 0, 'Beispielkarte ersetzt durch das Befund-Video');
   for (const s of ['GEO', 'AI Visibility', 'Generative Engine Optimization', '0 €', 'mit Google an', 'sieben Seiten']) assert.ok(text.includes(s), `fehlt: ${s}`);
   /* Es sind sechs Bereiche; nirgends mehr „vier Bereiche“ und keine Seitenangabe je Bereich (der Bericht bleibt bei sieben Seiten) */
   assert.ok(text.includes('in sechs Bereichen') && !/[Vv]ier Bereich|Seite \d des Berichts|je eine Seite pro Bereich/.test(read('public/index.html')), 'sechs Bereiche');
@@ -150,12 +167,14 @@ test('Startseite: kostenloses Angebot, sechs Bereiche, sieben PDF-Seiten, GEO & 
   assert.equal(H.byClass(root, 'plan').length, 3);
   assert.equal(H.byClass(root, 'plan--featured').length, 1);
   assert.match(txt(H.byClass(root, 'plan--featured')[0]), /0 €/);
+  /* Soft-Launch: kein Formular (Hinweis und Anfragewege prüft tests/softlaunch.test.mjs) */
+  if (SOFT_LAUNCH) { assert.equal(H.byTag(root, 'form').length, 0, 'Soft-Launch: kein Formular'); return; }
   const form = H.byId(root, 'analyze');
   assert.equal(form.attrs.get('action'), '/api/anfrage', 'Formular geht an den API-Worker (Cloudflare-Route /api/*)'); assert.equal(form.attrs.get('method'), 'post');
   assert.deepEqual(H.find(form, e => e.attrs.has('name')).map(e => e.attrs.get('name')), ['action', 'agb_version', 'website', 'agb'], 'nur Website, AGB-Häkchen und angezeigte AGB-Version – per POST, nie in einer GET-URL');
 });
 
-test('Hero (PXWA-BE-02): AGB-Pflichthäkchen nicht vorausgewählt, AGB- und Datenschutz-Link, Button „Analysieren“, Hinweis „0 €, kein Abo“', () => {
+test('Hero (PXWA-BE-02): AGB-Pflichthäkchen nicht vorausgewählt, AGB- und Datenschutz-Link, Button „Analysieren“, Hinweis „0 €, kein Abo“', { skip: SOFT_LAUNCH_SKIP }, () => {
   const { root } = H.parse(read('public/index.html'));
   const txt = el => H.norm(H.textOf(el));
   const form = H.byId(root, 'analyze');
@@ -173,7 +192,8 @@ test('Hero (PXWA-BE-02): AGB-Pflichthäkchen nicht vorausgewählt, AGB- und Date
   assert.equal(txt(H.byTag(H.byClass(root, 'hero')[0], 'h1')[0]), 'Sehen Sie, was Ihre Website ausbremst.', 'Original-H1');
 });
 
-test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen neu, Reihenfolge erhalten; außerhalb des Hero nur die einzeln freigegebenen Änderungen', () => {
+/* Im Soft-Launch übernimmt diese Rolle der Test „Startseite gegenüber main“ in tests/softlaunch.test.mjs */
+test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen neu, Reihenfolge erhalten; außerhalb des Hero nur die einzeln freigegebenen Änderungen', { skip: SOFT_LAUNCH_SKIP }, () => {
   const now = read('public/index.html');
   const old = git('show', `${BASE_SHA}:public/index.html`);
   const hero = html => { const i = html.indexOf('<section class="hero">'); return html.slice(i, html.indexOf('</section>', i) + '</section>'.length); };
@@ -212,7 +232,11 @@ test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen n
   assert.match(now, KOPF, 'Kopfdaten für Bilder');
   /* Neu im Kopf: Beiträge zu Wissen (Mega-Menü) und mobiles Menü, beide geprüft im Test „Hauptnavigation“ */
   const MENUES = [/\n      <details class="mega">\n[\s\S]*?\n      <\/details>/, /\n    <details class="nav-menu">\n[\s\S]*?\n    <\/details>/];
-  const ohneNeues = html => MENUES.reduce((s, re) => s.replace(re, ''), html).replace(KOPF, '\n').replace('<link rel="stylesheet" href="assets/donut.css">\n', '')
+  /* Partner-Logos unter dem Video und Pixelkiez-Logo in der Footer-Leiste (Entscheidung des Auftraggebers 03.11.2026), geprüft im Test „Partner“ */
+  const PARTNER_NEU = [/  <section class="partner-band"[\s\S]*?<\/section>\n\n/, `      ${PARTNER_LINK}<img class="footer-partner" src="assets/partner/pixelkiez.png" alt="Pixelkiez" width="87" height="20"></a>\n`];
+  /* Logo-Zusatz oben „Website-Analyse“ statt „Analyse“ (Entscheidung des Auftraggebers 03.11.2026), geprüft im Test „Hauptnavigation“ */
+  const ohneNeues = html => [...MENUES, ...PARTNER_NEU].reduce((s, re) => s.replace(re, ''), html).replace(KOPF, '\n')
+    .replace('    <a class="logo" href="#top">360°Pixelkiez<span>Website-Analyse</span></a>', '    <a class="logo" href="#top">360°Pixelkiez<span>Analyse</span></a>').replace('<link rel="stylesheet" href="assets/donut.css">\n', '')
     .replace(/\n<script type="application\/ld\+json">\{"@context":"https:\/\/schema\.org","@graph":\[\{"@type":"VideoObject".*?<\/script>/, '')
     .replace('\n<script src="assets/donut.js"></script>', '').replace(SCORE_ABSCHNITT, '');
   const ohneAlt = html => html.replace(/  <section class="section" id="tools">\n[\s\S]*?\n  <\/section>\n\n/, '').replace(SCORE_ABSCHNITT, '')
@@ -239,8 +263,10 @@ test('AGB-Seite: eindeutig als Entwurf gekennzeichnet, keine erfundenen Vertrags
   assert.ok(!/§|Haftung|Gewährleistung|Gerichtsstand|Widerruf|Vertragsschluss|Kündigung|Leistungsumfang|Vergütung/i.test(main), 'keine Vertragsklauseln');
   assert.deepEqual(H.byClass(root, 'legal-h').map(e => H.norm(H.textOf(e))), ['Version', 'Fragen']);
   const version = H.norm(H.textOf(H.byId(root, 'agb-version')));
-  const hero = H.find(H.byId(H.parse(read('public/index.html')).root, 'analyze'), e => e.attrs.get('name') === 'agb_version')[0].attrs.get('value');
   const toml = /^TERMS_VERSION = "([^"]+)"$/m.exec(read('worker/wrangler.toml'))[1];
+  /* Soft-Launch: Hero ohne Formular und damit ohne AGB-Feld; dann nur AGB-Seite und Worker-Konfiguration */
+  const hero = SOFT_LAUNCH ? toml : H.find(H.byId(H.parse(read('public/index.html')).root, 'analyze'), e => e.attrs.get('name') === 'agb_version')[0].attrs.get('value');
+  if (SOFT_LAUNCH) assert.ok(!read('public/index.html').includes('agb_version'), 'Soft-Launch: kein AGB-Feld im Hero');
   assert.deepEqual([hero, toml], [version, version], 'eine AGB-Version in Hero, AGB-Seite und Worker-Konfiguration');
   assert.match(version, /^ENTWURF-/, 'ohne freigegebene Fassung bleibt die Produktion gesperrt (config.ts lehnt ENTWURF ab)');
   assert.ok(read('worker/src/config.ts').includes("(production && /^entwurf/i.test(termsVersion))) missing.push('TERMS_VERSION');"), 'Produktion lehnt AGB-Entwürfe ab');
@@ -306,6 +332,7 @@ test('Hauptnavigation: „Analyse“ nur als Button, Wissen mit Pfeil zu den sec
     const p = rel === '404.html' ? '/' : rel.includes('/') ? '../' : '';
     const start = rel === 'index.html' ? '' : `${p}index.html`;
     const nav = H.byTag(H.byTag(H.parse(read(page)).root, 'header')[0], 'nav')[0];
+    assert.equal(H.norm(H.textOf(H.byTag(H.byClass(nav, 'logo')[0], 'span')[0])), 'Website-Analyse', `${page}: Logo-Zusatz oben`);
     const links = H.byClass(nav, 'nav-links')[0];
     const abschnitte = [['bericht', 'Bericht'], ['bereiche', 'Bereiche'], ['angebot', 'Angebot'], ['faq', 'FAQ']].map(([id, t]) => [`${start}#${id}`, t]);
     const wissen = [`${p}wissen/index.html`, 'Wissen'];
@@ -327,7 +354,47 @@ test('Hauptnavigation: „Analyse“ nur als Button, Wissen mit Pfeil zu den sec
   assert.match(read(VIEW), /<details class="mega">[\s\S]*<details class="nav-menu">/);
 });
 
-test('Links: interne Anker gültig, keine Links zu pixelkiez.de, nur mailto als externes Ziel (Wissensseiten zusätzlich ihre Quellen)', () => {
+test('Partner: unter dem Hero Pixelkiez und DYAI Studio nebeneinander, ohne Beschriftung (lokale Logos, Alternativtext, neuer Tab); Pixelkiez-Logo unten im Footer jeder Seite', () => {
+  /* Entscheidung des Auftraggebers 03.11.2026; hebt die frühere Regel „kein Link zu pixelkiez.de“ für genau diese Partner-Links auf */
+  const { root } = H.parse(read('public/index.html'));
+  const teile = H.byTag(root, 'main')[0].children.filter(e => e.tag);
+  const i = teile.findIndex(e => H.hasClass(e, 'hero'));
+  /* Das Hero-Video ist nicht eingebunden (PXK-159): die Logos stehen direkt unter dem Hero, an der Stelle unter dem früheren Video */
+  assert.deepEqual([teile[i + 1], teile[i + 2]].map(e => e.attrs.get('id') || e.attrs.get('class')), ['partner-band', 'ablauf'], 'Reihenfolge: Hero, Partner-Logos, Ablauf');
+  const band = teile[i + 1];
+  assert.equal(H.norm(H.textOf(band)), '', 'kein sichtbares Wort, nur die Logos');
+  assert.deepEqual(H.byTag(band, 'a').map(a => { const img = H.byTag(a, 'img')[0]; return [a.attrs.get('href'), a.attrs.get('target'), a.attrs.get('rel'), img.attrs.get('src'), img.attrs.get('alt')]; }), [
+    ['https://pixelkiez.de/', '_blank', 'noopener', 'assets/partner/pixelkiez.png', 'Pixelkiez'],
+    ['https://studio.dyai.cloud/', '_blank', 'noopener', 'assets/partner/dyai-studio.svg', 'DYAI Studio'],
+  ]);
+  for (const f of PARTNER_LOGOS) assert.ok(statSync(join(ROOT, 'public', f)).size > 500, f);
+  for (const page of PAGES) {
+    const { root: seite } = H.parse(read(page));
+    const kontakt = H.find(seite, e => e.tag === 'h4' && H.norm(H.textOf(e)) === 'Kontakt')[0];
+    assert.deepEqual(H.byTag(kontakt.parent, 'a').map(a => a.attrs.get('href')), ['mailto:360@pixelkiez.de'], `${page}: Footer Kontakt nur mit E-Mail`);
+    const leiste = H.byClass(seite, 'footer')[0];
+    const p = page === 'public/404.html' ? '/' : page.slice(7).includes('/') ? '../' : '';
+    assert.deepEqual(H.byTag(leiste, 'a').filter(a => a.attrs.get('href').startsWith('https:')).map(a => { const img = H.byTag(a, 'img')[0]; return [a.attrs.get('href'), a.attrs.get('target'), a.attrs.get('rel'), img?.attrs.get('src'), img?.attrs.get('alt'), H.norm(H.textOf(a))]; }),
+      [['https://pixelkiez.de/', '_blank', 'noopener', `${p}assets/partner/pixelkiez.png`, 'Pixelkiez', '']], `${page}: Pixelkiez-Logo unten im Footer, ohne Text`);
+    assert.ok(!/pixelkiez\.de(?!\/")/.test(H.textOf(H.find(seite, e => e.tag === 'footer')[0]).replace('360@pixelkiez.de', '')), `${page}: kein Text „pixelkiez.de“ im Footer`);
+  }
+  assert.ok(read(VIEW).includes(`      ${PARTNER_LINK}<img class="footer-partner" src="\${b}/assets/partner/pixelkiez.png" alt="Pixelkiez" width="87" height="20"></a>\n`), 'Anfrageseiten: Pixelkiez-Logo im Footer');
+  assert.ok(!read(VIEW).includes('>pixelkiez.de</a>'), 'Anfrageseiten: kein Text „pixelkiez.de“');
+});
+
+test('Favicon: weißer Hintergrund, großer Ring orange, kleiner Ring lila; ICO 16/32/48 px, Apple-Icon 180 px', () => {
+  /* Entscheidung des Auftraggebers 03.11.2026 */
+  const svg = H.parse(read('public/assets/favicon.svg')).root;
+  assert.equal(H.byTag(svg, 'rect')[0].attrs.get('fill'), '#FFFFFF');
+  assert.deepEqual(H.byTag(svg, 'circle').map(c => [c.attrs.get('r'), c.attrs.get('stroke')]), [['15', '#FE5B2A'], ['5.5', '#7B5CD6']]);
+  const ico = readFileSync(join(ROOT, 'public/favicon.ico'));
+  assert.equal(ico.readUInt16LE(4), 3, 'drei Größen im ICO');
+  assert.deepEqual([0, 1, 2].map(i => ico[6 + i * 16]), [16, 32, 48]);
+  const apple = readFileSync(join(ROOT, 'public/assets/apple-touch-icon.png'));
+  assert.deepEqual([apple.readUInt32BE(16), apple.readUInt32BE(20), apple[25]], [180, 180, 2], 'Apple-Icon 180×180, RGB ohne Transparenz');
+});
+
+test('Links: interne Anker gültig, zu pixelkiez.de nur der Partner-Link, sonst nur mailto als externes Ziel (Wissensseiten zusätzlich ihre Quellen)', () => {
   const pages = Object.fromEntries(PAGES.map(p => [p.slice(7), read(p)]));
   for (const [page, html] of Object.entries(pages)) {
     for (const a of H.byTag(H.parse(html).root, 'a')) {
@@ -349,9 +416,9 @@ test('Links: interne Anker gültig, keine Links zu pixelkiez.de, nur mailto als 
       if (frag) assert.ok(H.byId(H.parse(pages[target]).root, frag), `${page}: Anker ${href} fehlt`);
     }
   }
-  /* Auch serverseitig gerenderte Seiten und Konfigurationsvorlagen verweisen nicht auf die Webdesign-Website */
+  /* Auch serverseitig gerenderte Seiten und Konfigurationsvorlagen: zu pixelkiez.de nur der Partner-Link (Startseite, neuer Tab) */
   for (const f of [...PAGES, VIEW, 'worker/wrangler.toml', 'worker/.dev.vars.example', 'wrangler.toml', 'public/_headers', FUNCTION]) {
-    assert.ok(!/https?:\/\/(www\.)?pixelkiez\.de/i.test(read(f)), `${f}: kein Link zu pixelkiez.de`);
+    assert.ok(!/https?:\/\/(www\.)?pixelkiez\.de/i.test(read(f).replaceAll(PARTNER_LINK, '')), `${f}: Link zu pixelkiez.de außer dem Partner-Link`);
     assert.ok(!/Webdesign/i.test(read(f)), `${f}: kein Bezug auf Webdesign`);
   }
 });
@@ -430,7 +497,7 @@ test('Unterseiten (Wissen, Analyse): Häufige Fragen und Weiterlesen im Stil der
   }
 });
 
-test('Bild-Metadaten: Titelbild je Seite (Open Graph, Twitter, JSON-LD), Icons, Alternativtexte der Illustrationen, Video-Metadaten', () => {
+test('Bild-Metadaten: Titelbild je Seite (Open Graph, Twitter, JSON-LD), Icons, Alternativtexte der Illustrationen, Poster, Video-Metadaten', () => {
   const BASE = 'https://360.pixelkiez.de';
   for (const page of PAGES) {
     const html = read(page);
@@ -472,21 +539,24 @@ test('Bild-Metadaten: Titelbild je Seite (Open Graph, Twitter, JSON-LD), Icons, 
     }
   }
   for (const f of ['favicon.ico', 'assets/favicon.svg', 'assets/apple-touch-icon.png']) assert.ok(statSync(join(ROOT, 'public', f)).size > 200, f);
-  /* Alle JPEGs (Titelbilder, Poster) mit XMP-Block (Titel, Beschreibung, Urheber, Copyright); Videos mit Titel, Urheber, Copyright */
+  /* Alle JPEGs (Titelbilder, Poster) mit XMP-Block (Titel, Beschreibung, Urheber, Copyright). Die Videos liegen in R2 (nicht im Repository);
+     ihre Dateien prüft tests/pages.test.mjs (Größe, SHA-256, Faststart) */
   for (const f of [...OG.map(n => `assets/og/${n}.jpg`), ...MEDIA.filter(m => m.endsWith('.jpg'))]) {
     const buf = readFileSync(join(ROOT, 'public', f));
     for (const s of ['http://ns.adobe.com/xap/1.0/', '<dc:creator><rdf:Seq><rdf:li>360°Pixelkiez</rdf:li>', '© 2026 360°Pixelkiez', '<dc:title>', '<dc:description>']) assert.ok(buf.includes(Buffer.from(s)), `${f}: ${s}`);
-  }
-  for (const f of MEDIA.filter(m => m.endsWith('.mp4'))) {
-    const buf = readFileSync(join(ROOT, 'public', f));
-    for (const s of ['360°Pixelkiez', '© 2026 360°Pixelkiez', 'Beispieldaten']) assert.ok(buf.includes(Buffer.from(s)), `${f}: ${s}`);
-    assert.ok(buf.indexOf('moov') < buf.indexOf('mdat'), `${f}: Faststart`);
   }
   /* Videos der Startseite: Beschriftung, Poster, Maße und passende Video-Metadaten */
   const { root } = H.parse(read('public/index.html'));
   const ld = H.byTag(root, 'script').filter(x => x.attrs.get('type') === 'application/ld+json').map(x => JSON.parse(x.raw));
   const vids = ld.flatMap(x => x['@graph'] || []).filter(n => n['@type'] === 'VideoObject');
   const videos = H.byTag(root, 'video');
+  for (const v of videos) {
+    assert.ok(v.attrs.get('aria-label') && v.attrs.get('width') && v.attrs.get('height'), 'Video beschriftet und mit Maßen');
+    assert.ok(MEDIA.includes(v.attrs.get('poster')), `Poster ${v.attrs.get('poster')} versioniert`);
+    assert.equal(jpegSize(readFileSync(join(ROOT, 'public', v.attrs.get('poster')))).join('x'), `${v.attrs.get('width')}x${v.attrs.get('height')}`, 'Poster so groß wie das Video');
+  }
+  /* Soft-Launch: keine Video-Metadaten (JSON-LD), solange die Seite nicht indexiert wird und Videoinhalte offen sind (PXK-159) */
+  if (SOFT_LAUNCH) { assert.equal(vids.length, 0, 'Soft-Launch: kein VideoObject'); return; }
   assert.equal(vids.length, videos.length);
   videos.forEach((v, i) => {
     assert.ok(v.attrs.get('aria-label') && v.attrs.get('width') && v.attrs.get('height'), 'Video beschriftet und mit Maßen');
@@ -509,8 +579,8 @@ test('Design: styles.css unverändert gegenüber vision.html; alle verwendeten K
   assert.deepEqual(unknown, []);
 });
 
-test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, Functions nur unter /api/* und für zwei Videos, Sicherheits-Header, keine Railway- oder PHP-Reste', () => {
-  assert.deepEqual(artifactFiles(), ['404.html', '_headers', '_routes.json', 'agb.html', ...ASSETS, ...BILDER, 'datenschutz.html', 'impressum.html', 'index.html', ...MEDIA, ...INHALT.map(p => p.slice(7))].sort());
+test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, Functions nur unter /api/* und für drei Videos aus R2, Sicherheits-Header, keine Railway- oder PHP-Reste', () => {
+  assert.deepEqual(artifactFiles(), ['404.html', '_headers', '_routes.json', 'agb.html', ...ASSETS, ...FONT_FILES, ...BILDER, 'datenschutz.html', 'impressum.html', 'index.html', ...MEDIA, ...INHALT.map(p => p.slice(7))].sort());
   assert.deepEqual(repoFiles().filter(f => /\.(php|phtml)$|(^|\/)\.htaccess$|^(server|bin)\/|railway|Dockerfile|Caddyfile|\.dockerignore/i.test(f)), [], 'keine PHP-, Railway- oder Docker-Bestandteile');
   const pages = read('wrangler.toml');
   const active = pages.split('\n').filter(l => !l.trim().startsWith('#')).join('\n');
@@ -518,8 +588,11 @@ test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, F
   assert.match(active, /^pages_build_output_dir = "\.\/public"$/m);
   assert.ok(!/^\s*main\s*=/m.test(active), 'kein Worker-Einstiegspunkt in der Pages-Konfiguration');
   assert.match(active, /^\[\[services\]\]\nbinding = "API"\nservice = "pxwa-api"$/m, 'Produktion: internes Service Binding zum privaten Worker');
-  assert.match(active, /^\[env\.preview\]\nservices = \[\]$/m, 'Vorschau-Deployments ohne Binding');
-  assert.ok(!/\[vars\]|d1_databases|kv_namespaces|r2_buckets|SECRET|TOKEN/i.test(active), 'Website ohne Variablen, Secrets oder Speicher');
+  /* Einziger Speicher: R2-Bucket 360pixelkiez als MEDIA (nur Produktion), für die drei Videos; Vorschau ohne Bindings */
+  assert.match(active, /^\[\[r2_buckets\]\]\nbinding = "MEDIA"\nbucket_name = "360pixelkiez"$/m, 'Produktion: R2-Binding MEDIA wie in den Pages-Projekteinstellungen');
+  assert.equal((active.match(/r2_buckets/g) || []).length, 2, 'genau ein R2-Binding (plus die leere Liste der Vorschau)');
+  assert.match(active, /^\[env\.preview\]\nservices = \[\]\nr2_buckets = \[\]$/m, 'Vorschau-Deployments ohne Binding');
+  assert.ok(!/\[vars\]|d1_databases|kv_namespaces|SECRET|TOKEN|remote\s*=|preview_bucket_name|jurisdiction/i.test(active), 'Website ohne Variablen, Secrets oder weiteren Speicher');
   assert.equal(read('worker/wrangler.toml').match(/^compatibility_date = .*$/m)[0], active.match(/^compatibility_date = .*$/m)[0], 'gleiches Kompatibilitätsdatum');
   const headers = read('public/_headers');
   for (const h of ['Strict-Transport-Security: max-age=31536000', 'X-Content-Type-Options: nosniff', 'X-Frame-Options: DENY', "Content-Security-Policy: frame-ancestors 'none'",
@@ -533,31 +606,36 @@ test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, F
   assert.match(fn, /if \(!env\.API\) return unavailable\(\);/);
   const code = fn.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
   assert.ok(!/console\.|\bfetch\(|env\.ASSETS|next\(/.test(code.replace('env.API.fetch(', '')), 'keine Logs, keine weiteren Aufrufe, kein Rückfall auf statische Dateien');
-  for (const f of ['.dev.vars', 'worker/.dev.vars', '.wrangler/state/v3/d1/x.sqlite', 'node_modules/x', '360-pixelkiez-video-1080p.mp4', 'public/media/anderes-video.mp4', 'public/media/entwurf.jpg']) {
+  for (const f of ['.dev.vars', 'worker/.dev.vars', '.wrangler/state/v3/d1/x.sqlite', 'node_modules/x', '360-pixelkiez-video-1080p.mp4', 'public/media/anderes-video.mp4', 'public/media/entwurf.jpg',
+    ...R2_VIDEOS.map(k => `public/media/${k}`), 'public/media/360-pixelkiez-video-poster.jpg', 'public/media/report-pdf-de-1x1.mp4']) {
     assert.equal(spawnSync('git', ['check-ignore', '-q', f], { cwd: ROOT }).status, 0, `${f} ist ignoriert`);
   }
-  /* Genau die vier freigegebenen Medien sind versioniert (frischer Checkout: tests/release.test.mjs) */
+  /* Genau die zwei Poster sind versioniert, die Videos nie (sie liegen in R2; frischer Checkout: tests/release.test.mjs) */
   for (const f of MEDIA) assert.equal(spawnSync('git', ['check-ignore', '-q', 'public/' + f], { cwd: ROOT }).status, 1, `public/${f} ist nicht ignoriert`);
-  /* Video-Function: nur zwei feste Pfade, nur das eigene Assets-Binding, keine Logs, keine Header der Anfrage an ASSETS */
+  /* Video-Function: nur drei feste Pfade → feste R2-Schlüssel, nur das Binding MEDIA, nur lesen (head/get), keine Logs, kein Abruf */
   const media = read(MEDIA_FUNCTION);
   const mediaCode = media.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
-  assert.match(mediaCode, /const VIDEOS: readonly string\[\] = \['\/media\/360-pixelkiez-video-1080p\.mp4', '\/media\/report-pdf-de-1x1\.mp4'\];/);
-  assert.deepEqual([...mediaCode.matchAll(/\bfetch\(([^)]*\))?/g)].map(m => m[0]), ['fetch(new URL(video, url.origin)'], 'einziger Abruf: feste Videodatei aus ASSETS');
-  assert.match(mediaCode, /env\.ASSETS\.fetch\(new URL\(video, url\.origin\)\.href\)/);
-  assert.ok(!/console\.|caches\.|Set-Cookie|R2|env\.(?!ASSETS)\w+/i.test(mediaCode), 'keine Logs, kein Cache, keine Cookies, keine weiteren Bindings');
-  assert.deepEqual(JSON.parse(read('public/_routes.json')).include, ['/api/*', '/media/360-pixelkiez-video-1080p.mp4', '/media/report-pdf-de-1x1.mp4'], 'Poster bleiben statisch');
+  assert.deepEqual([...mediaCode.matchAll(/\['(\/media\/[^']*)', '([^']*)'\]/g)].map(m => [m[1], m[2]]), R2_VIDEOS.map(k => [`/media/${k}`, k]), 'Allowlist: Pfad → R2-Schlüssel');
+  assert.match(mediaCode, /const key = VIDEOS\.get\(url\.pathname\);\n\s*if \(key === undefined\) return next\(\);/, 'Schlüssel nur aus der Allowlist, sonst statisch');
+  assert.deepEqual([...mediaCode.matchAll(/\bbucket\.(\w+)\(/g)].map(m => m[1]), ['head', 'get'], 'R2 nur lesen: head und get, kein list/put/delete');
+  assert.deepEqual([...mediaCode.matchAll(/\bbucket\.(?:head|get)\((\w+)[,)]/g)].map(m => m[1]), ['key', 'key'], 'gelesen wird nur der feste Schlüssel');
+  assert.ok(!/\bfetch\(|console\.|caches\.|Set-Cookie|env\.(?!MEDIA\b)\w+|createMultipartUpload/i.test(mediaCode), 'kein Abruf, keine Logs, kein Cache, keine Cookies, keine weiteren Bindings');
+  assert.deepEqual(mediaCode.match(/.*\benv\.MEDIA\b.*/g).map(l => l.trim()), ['const bucket = env.MEDIA;'], 'R2 nur über bucket (head/get, siehe oben), nie direkt');
+  assert.match(mediaCode, /headers\.set\('Content-Type', 'video\/mp4'\);/, 'fester Content-Type, nicht aus den R2-Metadaten');
+  assert.ok(!/httpMetadata|writeHttpMetadata|customMetadata/.test(mediaCode), 'keine Metadaten aus dem Bucket in der Antwort');
+  assert.deepEqual(JSON.parse(read('public/_routes.json')).include, ['/api/*', ...R2_VIDEOS.map(k => `/media/${k}`)], 'Poster bleiben statisch');
 });
 
 test('Release-Scan des Pages-Uploads (public/ wie `wrangler pages deploy`): nur Website-Dateien, keine Quellen, kein PHP/Railway, keine Secrets, höchstens 25 MiB je Datei', () => {
   const files = uploadFiles();
-  assert.deepEqual(files.filter(f => !f.startsWith('media/')), ['404.html', 'agb.html', ...ASSETS, ...BILDER, 'datenschutz.html', 'impressum.html', 'index.html',
+  assert.deepEqual(files.filter(f => !f.startsWith('media/')), ['404.html', 'agb.html', ...ASSETS, ...FONT_FILES, ...BILDER, 'datenschutz.html', 'impressum.html', 'index.html',
     ...INHALT.map(p => p.slice(7))].sort());
   assert.ok(files.filter(f => f.startsWith('media/')).every(f => /^media\/[\w-]+\.(mp4|jpg)$/.test(f)), 'in media/ nur Videos und Poster');
   assert.ok(files.length < 20000);
   for (const f of files) {
     const buf = readFileSync(join(ROOT, 'public', f));
     assert.ok(buf.length <= 25 * 1024 * 1024, `${f}: über 25 MiB`);
-    if (/\.(mp4|jpg|png|ico)$/.test(f)) continue;
+    if (/\.(mp4|jpg|png|ico|woff2)$/.test(f)) continue;
     const text = buf.toString('utf8');
     assert.ok(!/railway|<\?php|\.php\b|caddy/i.test(text), `${f}: Railway- oder PHP-Rest`);
     assert.ok(!/-----BEGIN [A-Z ]*PRIVATE KEY|GOCSPX-|\bre_[A-Za-z0-9]{16,}|\bsk_[A-Za-z0-9]{16,}/.test(text), `${f}: Secret`);

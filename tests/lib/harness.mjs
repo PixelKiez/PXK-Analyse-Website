@@ -5,7 +5,8 @@
      Fehlerantworten { statusCode, name, message }); kann Fehler, Verbindungsabbruch und ausbleibende Antworten simulieren
    - Pages Function: mit `wrangler pages functions build` kompiliert und in workerd ausgeführt (Vertrag an der Binding-Grenze)
    - Lokales Cloudflare Pages: `wrangler pages dev` mit public/, _routes.json, _headers und functions/ aus dem Repository,
-     optional mit dem API-Worker in derselben Sitzung, verbunden über das Service Binding API wie in Produktion
+     optional mit dem API-Worker in derselben Sitzung, verbunden über das Service Binding API wie in Produktion, und mit
+     lokalem R2 (Binding MEDIA, befüllt mit `wrangler r2 object put --local`; nie der echte Bucket)
    Die Google-Autorisierungsseite selbst wird nicht nachgebaut: Tests lesen state/nonce/code_challenge aus der
    Weiterleitungs-URL und rufen den Callback so auf, wie Google es nach erfolgreicher Anmeldung täte. */
 import http from 'node:http';
@@ -30,6 +31,13 @@ export const PRODUCTION_BASE = 'https://360.pixelkiez.de';
    Soft-Launch (Hero ohne Formular): dieselbe Version aus der Worker-Konfiguration */
 export const TERMS_VERSION = (/<input type="hidden" name="agb_version" value="([^"]+)">/.exec(readFileSync(join(ROOT, 'public/index.html'), 'utf8'))
   ?? /^TERMS_VERSION = "([^"]+)"$/m.exec(readFileSync(join(ROOT, 'worker/wrangler.toml'), 'utf8')))[1];
+/* Soft-Launch (Branch release/pxwa-soft-launch*): Hero mit Hinweis statt Anfrageformular, bis die Google-Anmeldung freigegeben ist.
+   Tests des Formulars werden dann als übersprungen gemeldet (nicht als bestanden); tests/softlaunch.test.mjs prüft den Hinweis */
+export const SOFT_LAUNCH = /<p class="bald">/.test(readFileSync(join(ROOT, 'public/index.html'), 'utf8'));
+export const SOFT_LAUNCH_SKIP = SOFT_LAUNCH && 'SOFT_LAUNCH: Hero ohne Anfrageformular bis zur Freigabe der Google-Anmeldung (tests/softlaunch.test.mjs)';
+/* Die drei Videos im R2-Bucket 360pixelkiez (Binding MEDIA): Schlüssel wie in functions/media/[file].ts */
+export const R2_BUCKET = '360pixelkiez';
+export const R2_VIDEOS = ['360-pixelkiez-video-1080p.mp4', 'report-pdf-de-1x1-lavendel.mp4', 'section-bericht-peach-5x4.mp4'];
 
 const load = async name => { try { return await import(name); } catch { return null; } };
 const miniflare = await load('miniflare');
@@ -336,24 +344,35 @@ export function buildPagesFunctions() {
 export const MfResponse = miniflare?.Response;
 
 /* Kompilierte Pages Function in workerd. api: Skript eines Workers hinter dem Service Binding API; null = kein Binding (Vorschau).
-   assets: Ersatz für das Pages-Binding ASSETS (Node-Funktion Request → MfResponse); Standard: immer „statische Datei“ */
-export async function startPagesFunction({ api = null, assets } = {}) {
+   assets: Ersatz für das Pages-Binding ASSETS (Node-Funktion Request → MfResponse); Standard: immer „statische Datei“.
+   media: R2-Binding MEDIA (Miniflare-R2 im Speicher) mit Objekten { Schlüssel: Uint8Array | { data, contentType } };
+   null = kein Binding (Vorschau); 'broken' = MEDIA ist kein R2-Bucket (jeder Zugriff wirft). bucket() gibt das R2 zurück */
+export async function startPagesFunction({ api = null, assets, media = null } = {}) {
   const fn = buildPagesFunctions();
+  const broken = media === 'broken';
   const workers = [{
     name: 'pages', modules: true, scriptPath: fn.script, modulesRoot: fn.dir, compatibilityDate: COMPATIBILITY_DATE,
-    serviceBindings: { ...(api ? { API: 'pxwa-api' } : {}), ASSETS: assets ?? (() => new MfResponse('statische Datei', { status: 200 })) },
+    serviceBindings: { ...(api ? { API: 'pxwa-api' } : {}), ...(broken ? { MEDIA: () => new MfResponse('kein R2', { status: 500 }) } : {}),
+      ASSETS: assets ?? (() => new MfResponse('statische Datei', { status: 200 })) },
+    ...(media && !broken ? { r2Buckets: { MEDIA: R2_BUCKET } } : {}),
   }];
   if (api) workers.push({ name: 'pxwa-api', modules: true, script: api, compatibilityDate: COMPATIBILITY_DATE });
   const mf = new miniflare.Miniflare({ workers });
   await mf.ready;
-  return { fetch: (url, init) => mf.dispatchFetch(url, init), stop: () => mf.dispose() };
+  const bucket = media && !broken ? await mf.getR2Bucket('MEDIA', 'pages') : null;
+  for (const [key, o] of Object.entries(media && !broken ? media : {})) {
+    const { data, contentType = 'video/mp4' } = o instanceof Uint8Array ? { data: o } : o;
+    await bucket.put(key, data, { httpMetadata: { contentType } });
+  }
+  return { fetch: (url, init) => mf.dispatchFetch(url, init), stop: () => mf.dispose(), bucket: () => bucket };
 }
 
 /* Lokales Cloudflare Pages (`wrangler pages dev` mit wrangler.toml aus dem Root). worker: true startet den API-Worker aus
    worker/wrangler.toml in derselben Sitzung (-c … -c …), erreichbar nur über das Service Binding API. Seine [vars] werden
    durch Testwerte ersetzt (lokaler Modus, Mock-Google, Mock-Resend); D1 ist lokal, mit `wrangler d1 migrations apply --local`.
-   worker: false: nur die Website, das Binding ist dann nicht verbunden. */
-export async function startPages({ google, mail, worker = true, env = {} } = {}) {
+   worker: false: nur die Website, das Binding ist dann nicht verbunden.
+   media: Objekte für das lokale R2 (Binding MEDIA aus wrangler.toml) als { Schlüssel: Pfad einer Datei }; ohne Angabe bleibt es leer */
+export async function startPages({ google, mail, worker = true, env = {}, media = {} } = {}) {
   const port = await freePort();
   const base = `http://127.0.0.1:${port}`;
   const dir = mkdtempSync(join(tmpdir(), 'pxwa-pages-'));
@@ -376,6 +395,11 @@ export async function startPages({ google, mail, worker = true, env = {} } = {})
     if (m.status !== 0) throw new Error('wrangler d1 migrations apply: ' + m.stdout + m.stderr);
     args.push('-c', 'wrangler.toml', '-c', join(dir, 'worker.toml'));
     google.setRedirectUri(`${base}/api/auth/callback`);
+  }
+  for (const [key, file] of Object.entries(media)) {
+    /* Nur lokal (--local, --persist-to): dieselbe Ablage, die `wrangler pages dev` unten liest */
+    const r = spawnSync(WRANGLER, ['r2', 'object', 'put', `${R2_BUCKET}/${key}`, '--local', '--persist-to', state, '--file', file, '--content-type', 'video/mp4'], { cwd: ROOT, env: wranglerEnv(), encoding: 'utf8' });
+    if (r.status !== 0) throw new Error('wrangler r2 object put --local: ' + r.stdout + r.stderr);
   }
   args.push('--ip', '127.0.0.1', '--port', String(port), '--inspector-port', String(await freePort()), '--persist-to', state, '--show-interactive-dev-session=false');
   /* Eigene Prozessgruppe (zum vollständigen Beenden) und eigene Dev-Registry (parallele Sitzungen verbinden sich nicht) */

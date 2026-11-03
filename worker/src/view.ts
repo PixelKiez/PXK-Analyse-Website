@@ -77,7 +77,7 @@ export class View {
 <body>
 <header class="nav-wrap" id="nav">
   <nav class="nav" aria-label="Hauptnavigation">
-    <a class="logo" href="${b}/index.html#top">360°Pixelkiez<span>Analyse</span></a>
+    <a class="logo" href="${b}/index.html#top">360°Pixelkiez<span>Website-Analyse</span></a>
     <div class="nav-links">
       <a href="${b}/index.html#bericht">Bericht</a>
       <a href="${b}/index.html#bereiche">Bereiche</a>
@@ -115,6 +115,7 @@ export class View {
   <footer class="cw-lilac">
     <div class="footer">
       <span>© 2026 360°Pixelkiez</span>
+      <a href="https://pixelkiez.de/" target="_blank" rel="noopener"><img class="footer-partner" src="${b}/assets/partner/pixelkiez.png" alt="Pixelkiez" width="87" height="20"></a>
       <nav aria-label="Rechtliches"><a href="${b}/impressum.html">Impressum</a><a href="${b}/datenschutz.html">Datenschutz</a><a href="mailto:360@pixelkiez.de">Kontakt</a></nav>
     </div>
   </footer>

@@ -5,23 +5,32 @@
      PXK_PLAYWRIGHT=/pfad/zu/node_modules/playwright [PXK_AXE=/pfad/zu/axe.min.js] [PXK_SCREENSHOT_DIR=…] node --test tests/browser.test.mjs
    Die Google-Anmeldeseite ersetzt ein lokaler Mock-Endpunkt (/auth), der sofort mit einem Einmal-Code zurückleitet,
    so wie Google es nach erfolgreicher Anmeldung täte. (Playwright-Routen greifen bei Redirect-Zielen nicht.)
-   Die Videos kommen aus public/media/ (versioniert) über die Video-Function functions/media/[file].ts (Byte-Ranges, 206).
+   Die Videos kommen aus lokalem R2 (Binding MEDIA) über die Video-Function functions/media/[file].ts (Byte-Ranges, 206);
+   für die Wiedergabe braucht es die echten Dateien: PXK_MEDIA_DIR=/pfad/mit/den/drei/R2-Objekten.
+   Soft-Launch (Hero ohne Formular): Website ohne verbundenen Worker wie in Produktion (/api/* 503); Formular-Szenarien werden
+   als übersprungen gemeldet, der Test „Soft-Launch im Browser“ prüft Hinweis, Partner und dass nichts gesendet wird.
    Ohne Playwright, Wrangler oder Worker-Abhängigkeiten: NOT_RUN statt bestanden. */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { mockGoogle, mockResend, startPages, waitFor, sleep, workerAvailable, wranglerAvailable, ROOT, TERMS_VERSION } from './lib/harness.mjs';
+import { mockGoogle, mockResend, startPages, waitFor, sleep, workerAvailable, wranglerAvailable, ROOT, TERMS_VERSION, SOFT_LAUNCH, SOFT_LAUNCH_SKIP, R2_VIDEOS } from './lib/harness.mjs';
 
 const SHOTS = process.env.PXK_SCREENSHOT_DIR || '';
 const AXE = process.env.PXK_AXE || '';
-const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
+const MEDIA_DIR = process.env.PXK_MEDIA_DIR || '';
+/* Soft-Launch mit selbst ausgelieferten Schriften: jede Anfrage an Google Fonts zählt als Fremd-Request (blocked) */
+const FONT_HOSTS = SOFT_LAUNCH ? [] : ['fonts.googleapis.com', 'fonts.gstatic.com'];
+/* Alle 22 Seiten der Website (ohne die Seiten des API-Workers) */
+const SEITEN = ['/index.html', '/impressum.html', '/datenschutz.html', '/agb.html', '/wissen/index.html', '/wissen/seo-geo-ai-visibility.html', '/wissen/wie-ki-websites-liest.html', '/wissen/wie-websites-ausgeliefert-werden.html', '/wissen/answerability.html', '/wissen/entity-trust.html', '/wissen/agent-readiness.html', '/analyse/index.html', '/analyse/auffindbarkeit-seo.html', '/analyse/performance-technik.html', '/analyse/nutzerfuehrung-conversion.html', '/analyse/vertrauen-datenschutz.html', '/analyse/barrierefreiheit.html', '/analyse/ki-verstaendlichkeit.html', '/analyse/methodik.html', '/analyse/warum-website-analyse.html', '/analyse/ki-crawler-agenten.html', '/gibt/es/nicht'];
 const pw = await (async () => {
   const dir = process.env.PXK_PLAYWRIGHT;
   try { return dir ? await import(pathToFileURL(join(dir, 'index.mjs')).href) : await import('playwright'); } catch { return null; }
 })();
 const skip = !pw ? 'NOT_RUN: Playwright nicht verfügbar (PXK_PLAYWRIGHT setzen)' : !workerAvailable ? 'NOT_RUN: miniflare/esbuild fehlen (npm ci)' : !wranglerAvailable ? 'NOT_RUN: wrangler fehlt (npm ci)' : false;
+const videoSkip = skip || (!MEDIA_DIR && 'NOT_RUN: PXK_MEDIA_DIR nicht gesetzt (echte Videos aus R2 für die Wiedergabe)');
+const formSkip = skip || SOFT_LAUNCH_SKIP;
 /* Antworten auf Video-Anfragen einer Seite: Pfad, Range-Kopf der Anfrage, Status */
 function trackVideos(page) {
   const seen = [];
@@ -41,7 +50,8 @@ before(async () => {
   if (skip) return;
   google = await mockGoogle().start();
   mail = await mockResend().start();
-  app = await startPages({ google, mail });
+  const media = MEDIA_DIR ? Object.fromEntries(R2_VIDEOS.map(k => [k, join(MEDIA_DIR, k)])) : {};
+  app = await startPages(SOFT_LAUNCH ? { worker: false, media } : { google, mail, media });
   browser = await pw.chromium.launch();
   if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 });
@@ -96,9 +106,10 @@ async function tabTo(page, pred, max = 40) {
   throw new Error('Element per Tab nicht erreichbar');
 }
 
-test('Mobile Hauptansicht: kein horizontaler Überlauf, Formular sichtbar, Navigationsbutton in der Pille (320/390/768/1440)', { skip }, async t => {
+test('Mobile Hauptansicht: kein horizontaler Überlauf, Formular (im Soft-Launch der Hinweis) sichtbar, Navigationsbutton in der Pille (320/390/768/1440)', { skip }, async t => {
   for (const width of [320, 390, 768, 1440]) {
-    for (const path of ['/index.html', '/api/anfrage', '/impressum.html', '/datenschutz.html', '/agb.html', '/wissen/index.html', '/wissen/seo-geo-ai-visibility.html', '/wissen/wie-ki-websites-liest.html', '/wissen/wie-websites-ausgeliefert-werden.html', '/wissen/answerability.html', '/wissen/entity-trust.html', '/wissen/agent-readiness.html', '/analyse/index.html', '/analyse/auffindbarkeit-seo.html', '/analyse/performance-technik.html', '/analyse/nutzerfuehrung-conversion.html', '/analyse/vertrauen-datenschutz.html', '/analyse/barrierefreiheit.html', '/analyse/ki-verstaendlichkeit.html', '/analyse/methodik.html', '/analyse/warum-website-analyse.html', '/analyse/ki-crawler-agenten.html', '/gibt/es/nicht']) {
+    /* Soft-Launch: /api/anfrage antwortet in Produktion mit 503 (kein Worker), daher nur die Seiten der Website */
+    for (const path of SOFT_LAUNCH ? SEITEN : ['/index.html', '/api/anfrage', '/impressum.html', '/datenschutz.html', '/agb.html', '/wissen/index.html', '/wissen/seo-geo-ai-visibility.html', '/wissen/wie-ki-websites-liest.html', '/wissen/wie-websites-ausgeliefert-werden.html', '/wissen/answerability.html', '/wissen/entity-trust.html', '/wissen/agent-readiness.html', '/analyse/index.html', '/analyse/auffindbarkeit-seo.html', '/analyse/performance-technik.html', '/analyse/nutzerfuehrung-conversion.html', '/analyse/vertrauen-datenschutz.html', '/analyse/barrierefreiheit.html', '/analyse/ki-verstaendlichkeit.html', '/analyse/methodik.html', '/analyse/warum-website-analyse.html', '/analyse/ki-crawler-agenten.html', '/gibt/es/nicht']) {
       const { context, page, errors, blocked } = await open(path, { width, height: 800 });
       await page.$$eval('details', ds => ds.forEach(d => { d.open = true; }));
       assert.ok(await overflow(page) <= 0, `${path} ${width}: Überlauf`);
@@ -113,7 +124,10 @@ test('Mobile Hauptansicht: kein horizontaler Überlauf, Formular sichtbar, Navig
         return [m.width > 0, m.right <= n.right && m.left >= n.left];
       });
       assert.deepEqual(menu, width <= 760 ? [true, true] : [false, menu[1]], `${path} ${width}: Menü-Button nur mobil und in der Pille`);
-      if (['/index.html', '/api/anfrage'].includes(path)) {
+      if (SOFT_LAUNCH && path === '/index.html') {
+        const hinweis = await page.evaluate(() => { const r = document.querySelector('.hero .bald').getBoundingClientRect(); return r.width > 0 && r.left >= 0 && r.right <= innerWidth; });
+        assert.ok(hinweis, `${path} ${width}: Hinweis „in Kürze verfügbar“ vollständig sichtbar`);
+      } else if (['/index.html', '/api/anfrage'].includes(path)) {
         const form = await page.evaluate(() => ['#url', '.url-field .btn', '#agb', 'label.consent', 'label.consent a'].map(s => { const r = document.querySelector(s).getBoundingClientRect(); return r.width > 0 && r.left >= 0 && r.right <= innerWidth; }));
         assert.deepEqual(form, [true, true, true, true, true], `${path} ${width}: Eingabefeld, Button, AGB-Häkchen und AGB-Link vollständig sichtbar`);
         const target = await page.evaluate(() => document.querySelector('label.consent').getBoundingClientRect().height);
@@ -130,7 +144,7 @@ test('Mobile Hauptansicht: kein horizontaler Überlauf, Formular sichtbar, Navig
   t.diagnostic(SHOTS ? `Screenshots: ${SHOTS}` : 'Screenshots nicht gespeichert (PXK_SCREENSHOT_DIR nicht gesetzt)');
 });
 
-test('Hero beim Öffnen: Überschrift, Text, Website-Eingabe und AGB-Häkchen im ersten Bildschirm (ab 360×640) und kontrastreich (Desktop und Mobil)', { skip }, async () => {
+test('Hero beim Öffnen: Überschrift, Text, Website-Eingabe und AGB-Häkchen im ersten Bildschirm (ab 360×640) und kontrastreich (Desktop und Mobil)', { skip: formSkip }, async () => {
   /* Alles inklusive AGB-Häkchen, Hinweis und Faktenzeile sichtbar. 360×640: Faktenzeile darf seit dem AGB-Häkchen (BE-02) knapp unter
      den Rand rutschen, Häkchen und Hinweis nicht. Beim sehr kleinen 320×568 wie bisher mindestens Überschrift, Text, Eingabe und Button;
      das Häkchen liegt dort knapp darunter (ohne Häkchen setzt „Analysieren“ den Fokus mit Fehlertext darauf). */
@@ -163,41 +177,42 @@ test('Hero beim Öffnen: Überschrift, Text, Website-Eingabe und AGB-Häkchen im
   }
 });
 
-test('Video unter dem Hero: mittig, abgerundet, ohne Bedienelemente, startet beim Hineinscrollen und läuft in Schleife (Range-Antworten 206)', { skip }, async () => {
-  const state = page => page.evaluate(() => {
-    const v = document.querySelector('.showcase-video'), f = v.closest('.showcase-frame'), r = f.getBoundingClientRect(), cs = getComputedStyle(f);
-    return { paused: v.paused, time: v.currentTime, loop: v.loop, muted: v.muted, controls: v.controls, inline: v.playsInline,
-      top: r.top, left: r.left, right: innerWidth - r.right, width: r.width, vw: innerWidth, vh: innerHeight, radius: parseFloat(cs.borderTopLeftRadius), overflow: cs.overflow };
-  });
+test('Befund-Video bei „Jeder Befund verständlich erklärt“: links neben den Punkten (mobil darunter), 5:4, abgerundet, lädt und startet erst beim Hineinscrollen, Schleife (Range-Antworten 206)', { skip: videoSkip }, async () => {
+  /* An der Stelle der früheren Beispielkarte (Entscheidung des Auftraggebers 03.11.2026, PXK-159); das Hero-Video ist nicht eingebunden */
   for (const [width, height] of [[1440, 900], [390, 844]]) {
     const { context, page, errors, blocked, videos } = await open('/index.html', { width, height, reducedMotion: 'no-preference', videos: true });
-    const before = await state(page);
-    assert.ok(before.top >= before.vh - 1, `${width}: Video liegt unter dem ersten Bildschirm`);
-    assert.equal(before.paused, true, `${width}: läuft vor dem Scrollen noch nicht`);
-    await page.evaluate(() => scrollBy(0, 250));
-    await page.waitForFunction(() => { const v = document.querySelector('.showcase-video'); return !v.paused && v.currentTime > 0.3; }, null, { timeout: 5000 });
-    const m = await state(page);
+    const state = () => page.evaluate(() => {
+      const v = document.querySelector('#nutzen .showcase-video'), f = v.closest('.showcase-frame'), t = document.querySelector('#nutzen .split-copy');
+      const fr = f.getBoundingClientRect(), tr = t.getBoundingClientRect(), cs = getComputedStyle(f);
+      return { paused: v.paused, time: v.currentTime, loop: v.loop, muted: v.muted, controls: v.controls, inline: v.playsInline, buffered: v.buffered.length,
+        left: fr.right <= tr.left, below: fr.top >= tr.bottom, radius: parseFloat(cs.borderTopLeftRadius), overflow: cs.overflow, ratio: fr.width / fr.height, width: fr.width,
+        heroVideo: document.querySelectorAll('.showcase').length };
+    });
+    const before = await state();
+    assert.deepEqual([before.paused, before.buffered, before.heroVideo], [true, 0, 0], `${width}: läuft und lädt erst beim Hineinscrollen; kein Hero-Video`);
+    await page.evaluate(() => document.querySelector('#nutzen .showcase-frame').scrollIntoView({ block: 'center' }));
+    await page.waitForFunction(() => { const v = document.querySelector('#nutzen .showcase-video'); return !v.paused && v.currentTime > 0.3; }, null, { timeout: 8000 });
+    const m = await state();
+    assert.ok(width >= 1000 ? m.left : m.below, `${width}: ${width >= 1000 ? 'links neben' : 'unter'} den Punkten`);
     assert.deepEqual([m.loop, m.muted, m.controls, m.inline], [true, true, false, true], `${width}: Schleife, stumm, ohne Bedienelemente`);
-    assert.ok(Math.abs(m.left - m.right) <= 1, `${width}: mittig (${m.left} / ${m.right})`);
-    assert.ok(m.width <= 960 && m.width < m.vw, `${width}: nicht über die ganze Breite (${m.width})`);
     assert.ok(m.radius >= 12 && m.overflow === 'hidden', `${width}: abgerundete Ecken`);
-    /* Schleife: kurz vor dem Ende springt das Video wieder an den Anfang */
-    await page.evaluate(() => { const v = document.querySelector('.showcase-video'); v.currentTime = v.duration - 0.3; });
-    await page.waitForFunction(() => { const v = document.querySelector('.showcase-video'); return !v.paused && v.currentTime < 2; }, null, { timeout: 5000 });
-    assertRanges(await videos(), ['/media/360-pixelkiez-video-1080p.mp4'], `Chromium ${width}`);
+    assert.ok(Math.abs(m.ratio - 1.25) < 0.01 && m.width <= 640, `${width}: 5:4, höchstens 640 px (${m.width} px, ${m.ratio.toFixed(3)})`);
+    await page.evaluate(() => { const v = document.querySelector('#nutzen .showcase-video'); v.currentTime = v.duration - 0.3; });
+    await page.waitForFunction(() => { const v = document.querySelector('#nutzen .showcase-video'); return !v.paused && v.currentTime < 2; }, null, { timeout: 5000 });
+    assertRanges(await videos(), ['/media/section-bericht-peach-5x4.mp4'], `Chromium ${width}`);
     assert.deepEqual(errors, [], `${width}: Konsolenfehler`);
     assert.deepEqual(blocked, [], `${width}: unerwartete Fremd-Requests`);
     await context.close();
   }
   /* Bewegung reduzieren (Betriebssystem): Standbild statt automatischer Wiedergabe */
   const { context, page } = await open('/index.html', { width: 1440, height: 900, reducedMotion: 'reduce' });
-  await page.evaluate(() => scrollBy(0, 400));
+  await page.evaluate(() => document.querySelector('#nutzen .showcase-frame').scrollIntoView({ block: 'center' }));
   await page.waitForTimeout(800);
-  assert.equal((await state(page)).paused, true);
+  assert.equal(await page.evaluate(() => document.querySelector('#nutzen .showcase-video').paused), true);
   await context.close();
 });
 
-test('Video bei „Ihr Bericht“: rechts neben dem Text (mobil darunter), abgerundet, lädt und startet erst beim Hineinscrollen (Range-Antworten 206)', { skip }, async () => {
+test('Video bei „Ihr Bericht“: rechts neben dem Text (mobil darunter), abgerundet, lädt und startet erst beim Hineinscrollen (Range-Antworten 206)', { skip: videoSkip }, async () => {
   for (const [width, height] of [[1440, 900], [390, 844]]) {
     const { context, page, errors, blocked } = await open('/index.html', { width, height, reducedMotion: 'no-preference' });
     const videos = trackVideos(page);
@@ -218,15 +233,15 @@ test('Video bei „Ihr Bericht“: rechts neben dem Text (mobil darunter), abger
     assert.deepEqual([m.loop, m.controls], [true, false]);
     assert.ok(m.radius >= 12 && m.overflow === 'hidden', `${width}: abgerundete Ecken`);
     assert.ok(m.square && m.width <= 560, `${width}: quadratisch, höchstens 560 px (${m.width})`);
-    assert.equal(await page.evaluate(() => document.querySelector('.showcase-video').paused), true, `${width}: Video unter dem Hero hält außerhalb des Bildes an`);
-    assertRanges(await videos(), ['/media/report-pdf-de-1x1.mp4'], `Chromium ${width}`);
+    assert.equal(await page.evaluate(() => document.querySelector('#nutzen .showcase-video').paused), true, `${width}: Befund-Video außerhalb des Bildes läuft nicht`);
+    assertRanges(await videos(), ['/media/report-pdf-de-1x1-lavendel.mp4'], `Chromium ${width}`);
     assert.deepEqual(errors, [], `${width}: Konsolenfehler`);
     assert.deepEqual(blocked, [], `${width}: unerwartete Fremd-Requests`);
     await context.close();
   }
 });
 
-test('Safari-Engine (WebKit): beide Videos laufen – Range-Anfragen bekommen 206 von der Video-Function; scheitert das Laden, steht das Standbild in gleicher Größe da', { skip }, async t => {
+test('Safari-Engine (WebKit): beide Videos laufen – Range-Anfragen bekommen 206 von der Video-Function (R2); scheitert das Laden, steht das Standbild in gleicher Größe da', { skip: videoSkip }, async t => {
   let wk;
   try { wk = await pw.webkit.launch(); } catch { t.skip('NOT_RUN: Playwright-WebKit nicht installiert (playwright install webkit)'); return; }
   const frames = page => page.evaluate(() => [...document.querySelectorAll('.showcase-video')].map(e => {
@@ -241,7 +256,7 @@ test('Safari-Engine (WebKit): beide Videos laufen – Range-Anfragen bekommen 20
       page.on('pageerror', e => errors.push(String(e)));
       const videos = trackVideos(page);
       await page.goto(app.base + '/', { waitUntil: 'load' });
-      for (const sel of ['.showcase', '#bericht .showcase-frame']) {
+      for (const sel of ['#bericht .showcase-frame', '#nutzen .showcase-frame']) {
         await page.evaluate(s => document.querySelector(s).scrollIntoView({ block: 'center' }), sel);
         /* Echte Wiedergabe: das Element bleibt ein Video (kein Standbild-Ersatz) und die Zeit läuft */
         await page.waitForFunction(s => {
@@ -256,7 +271,7 @@ test('Safari-Engine (WebKit): beide Videos laufen – Range-Anfragen bekommen 20
         assert.match(e.label, /^Animierte/, `${width}: Alternativtext bleibt`);
       }
       const list = await videos();
-      assertRanges(list, ['/media/360-pixelkiez-video-1080p.mp4', '/media/report-pdf-de-1x1.mp4'], `WebKit ${width}`);
+      assertRanges(list, ['/media/report-pdf-de-1x1-lavendel.mp4', '/media/section-bericht-peach-5x4.mp4'], `WebKit ${width}`);
       assert.deepEqual(errors, [], `${width}: Skriptfehler`);
       if (SHOTS) await page.screenshot({ path: join(SHOTS, `webkit-${width}.png`) });
       t.diagnostic(`WebKit ${width}: beide Videos spielen; MP4-Antworten: ${list.map(x => `${x.path.slice(7)} ${x.range ?? 'ohne Range'} → ${x.status}`).join(', ')}`);
@@ -267,7 +282,7 @@ test('Safari-Engine (WebKit): beide Videos laufen – Range-Anfragen bekommen 20
     await ctx.route('**/*.mp4', r => r.abort());
     const page = await ctx.newPage();
     await page.goto(app.base + '/', { waitUntil: 'load' });
-    for (const sel of ['.showcase', '#bericht .showcase-frame']) {
+    for (const sel of ['#bericht .showcase-frame', '#nutzen .showcase-frame']) {
       await page.evaluate(s => document.querySelector(s).scrollIntoView({ block: 'center' }), sel);
       await page.waitForFunction(s => { const e = document.querySelector(s).querySelector('.showcase-video'); return e.tagName === 'IMG' && e.complete && e.naturalWidth > 0; }, sel, { timeout: 10000 });
     }
@@ -276,6 +291,35 @@ test('Safari-Engine (WebKit): beide Videos laufen – Range-Anfragen bekommen 20
     await ctx.close();
   } finally {
     await wk.close();
+  }
+});
+
+test('Videos: Läuft app.js, während die Quellenauswahl noch läuft (networkState NO_SOURCE), bleibt das Video und spielt; nur ein echter Ladefehler zeigt das Standbild (Chromium und WebKit)', { skip: videoSkip }, async t => {
+  /* Nachstellung des Rennens aus WebKit unter Last: networkState meldet NO_SOURCE, bis die Seite load() aufruft */
+  const race = () => {
+    const d = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'networkState');
+    const load = HTMLMediaElement.prototype.load;
+    const neu = new WeakSet();
+    Object.defineProperty(HTMLMediaElement.prototype, 'networkState', { configurable: true, get() { return neu.has(this) ? d.get.call(this) : HTMLMediaElement.NETWORK_NO_SOURCE; } });
+    HTMLMediaElement.prototype.load = function () { neu.add(this); return load.call(this); };
+  };
+  let wk = null;
+  try { wk = await pw.webkit.launch(); } catch { /* unten als NOT_RUN gemeldet */ }
+  try {
+    for (const [name, engine] of [['Chromium', browser], ['WebKit', wk]]) {
+      await t.test(name, { skip: !engine && 'NOT_RUN: Playwright-WebKit nicht installiert (playwright install webkit)' }, async () => {
+        const ctx = await engine.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'no-preference' });
+        await ctx.addInitScript(race);
+        const page = await ctx.newPage();
+        await page.goto(app.base + '/', { waitUntil: 'load' });
+        assert.deepEqual(await page.$$eval('#bericht .showcase-video, #nutzen .showcase-video', es => es.map(e => e.tagName)), ['VIDEO', 'VIDEO'], `${name}: kein Standbild ohne Ladefehler`);
+        await page.evaluate(() => document.querySelector('#nutzen .showcase-frame').scrollIntoView({ block: 'center' }));
+        await page.waitForFunction(() => { const e = document.querySelector('#nutzen .showcase-video'); return e.tagName === 'VIDEO' && !e.paused && e.currentTime > 0.3; }, null, { timeout: 15000 });
+        await ctx.close();
+      });
+    }
+  } finally {
+    if (wk) await wk.close();
   }
 });
 
@@ -298,7 +342,7 @@ test('Scrollen: Inhalte blenden beim Hineinscrollen ein; oben nichts versteckt; 
   }
 });
 
-test('Tastatur: ungültige Adresse und fehlendes AGB-Häkchen bleiben im Formular (Fokus, nichts gesendet); mit Häkchen per Tab/Leertaste/Enter über Google direkt zur Referenz (mobil und Desktop)', { skip }, async () => {
+test('Tastatur: ungültige Adresse und fehlendes AGB-Häkchen bleiben im Formular (Fokus, nichts gesendet); mit Häkchen per Tab/Leertaste/Enter über Google direkt zur Referenz (mobil und Desktop)', { skip: formSkip }, async () => {
   for (const width of [390, 1440]) {
     await resetData();
     /* bypassCSP nur hier: Die statische Meta-CSP erlaubt als Formularziel nur https://accounts.google.com, nicht den lokalen Mock.
@@ -354,7 +398,7 @@ test('Tastatur: ungültige Adresse und fehlendes AGB-Häkchen bleiben im Formula
   }
 });
 
-test('Kleine Bildschirme (320×568, 360×640) in Chromium und WebKit: „Analysieren“ ohne AGB-Häkchen zeigt Häkchen und Fehlertext vollständig im Bild, Fokus am Häkchen; nichts gesendet, kein Auftrag, keine Benachrichtigung', { skip }, async t => {
+test('Kleine Bildschirme (320×568, 360×640) in Chromium und WebKit: „Analysieren“ ohne AGB-Häkchen zeigt Häkchen und Fehlertext vollständig im Bild, Fokus am Häkchen; nichts gesendet, kein Auftrag, keine Benachrichtigung', { skip: formSkip }, async t => {
   /* Gemessen wird nach dem Klick, ohne dass der Test selbst scrollt: Beide Elemente liegen zwischen Navigation und unterem Fensterrand
      und sind an ihrem Mittelpunkt nicht verdeckt. Mit und ohne „Bewegung reduzieren“ – sonst scrollt die Seite weich, daher warten, bis sie steht. */
   const settle = page => page.evaluate(() => new Promise(done => {
@@ -415,7 +459,7 @@ test('Kleine Bildschirme (320×568, 360×640) in Chromium und WebKit: „Analysi
   }
 });
 
-test('Ohne JavaScript: fehlendes Häkchen → Server-Fehlerseite mit Fokus am Häkchen, kein Auftrag; mit Häkchen Anfrage per POST bis zur Referenz; Adresse nie in einer GET-URL', { skip }, async () => {
+test('Ohne JavaScript: fehlendes Häkchen → Server-Fehlerseite mit Fokus am Häkchen, kein Auftrag; mit Häkchen Anfrage per POST bis zur Referenz; Adresse nie in einer GET-URL', { skip: formSkip }, async () => {
   await resetData();
   const before = google.log.auth || 0;
   const { context, page, requests, blocked } = await open('/index.html', { width: 390, height: 800, bypassCSP: true, javaScriptEnabled: false });
@@ -437,7 +481,7 @@ test('Ohne JavaScript: fehlendes Häkchen → Server-Fehlerseite mit Fokus am H�
   await context.close();
 });
 
-test('Browser-Zurück und Abbruch bei Google: Formular wieder benutzbar, kein Auftrag ohne abgeschlossene Anmeldung; erneuter Rücksprung nach Erfolg legt nichts doppelt an', { skip }, async () => {
+test('Browser-Zurück und Abbruch bei Google: Formular wieder benutzbar, kein Auftrag ohne abgeschlossene Anmeldung; erneuter Rücksprung nach Erfolg legt nichts doppelt an', { skip: formSkip }, async () => {
   await resetData();
   google.state.authPage = true;
   try {
@@ -538,9 +582,10 @@ test('Menü: Pfeil bei „Wissen“ klappt sechs Beiträge und „Mehr im Wissen
 });
 
 test('Accessibility-Snapshot (axe-core): keine schweren Verstöße auf Startseite (auch mit Fehlern), Methodik, Wissens- und Analyseseiten, Rechtsseiten, Eingabe-, Fehler- und Bestätigungsseite', { skip: skip || (!AXE && 'NOT_RUN: PXK_AXE nicht gesetzt') }, async t => {
-  await resetData();
+  if (!SOFT_LAUNCH) await resetData();
   const report = {};
-  for (const path of ['/index.html', 'hero-fehler', '/impressum.html', '/datenschutz.html', '/agb.html', '/wissen/index.html', '/wissen/seo-geo-ai-visibility.html', '/wissen/wie-ki-websites-liest.html', '/wissen/wie-websites-ausgeliefert-werden.html', '/wissen/answerability.html', '/wissen/entity-trust.html', '/wissen/agent-readiness.html', '/analyse/index.html', '/analyse/auffindbarkeit-seo.html', '/analyse/performance-technik.html', '/analyse/nutzerfuehrung-conversion.html', '/analyse/vertrauen-datenschutz.html', '/analyse/barrierefreiheit.html', '/analyse/ki-verstaendlichkeit.html', '/analyse/methodik.html', '/analyse/warum-website-analyse.html', '/analyse/ki-crawler-agenten.html', '/api/anfrage', 'server-fehler', 'angenommen']) {
+  /* Soft-Launch: ohne Formular und ohne Worker nur die 22 Seiten der Website */
+  for (const path of SOFT_LAUNCH ? SEITEN.slice(0, -1) : ['/index.html', 'hero-fehler', '/impressum.html', '/datenschutz.html', '/agb.html', '/wissen/index.html', '/wissen/seo-geo-ai-visibility.html', '/wissen/wie-ki-websites-liest.html', '/wissen/wie-websites-ausgeliefert-werden.html', '/wissen/answerability.html', '/wissen/entity-trust.html', '/wissen/agent-readiness.html', '/analyse/index.html', '/analyse/auffindbarkeit-seo.html', '/analyse/performance-technik.html', '/analyse/nutzerfuehrung-conversion.html', '/analyse/vertrauen-datenschutz.html', '/analyse/barrierefreiheit.html', '/analyse/ki-verstaendlichkeit.html', '/analyse/methodik.html', '/analyse/warum-website-analyse.html', '/analyse/ki-crawler-agenten.html', '/api/anfrage', 'server-fehler', 'angenommen']) {
     /* axe wird als Inline-Skript injiziert; die CSP der Seite würde das (korrekt) blockieren */
     const o = await open(path.startsWith('/') ? path : path === 'server-fehler' ? '/api/anfrage' : '/index.html', { bypassCSP: true });
     if (path === 'hero-fehler') await o.page.click('.url-field .btn');
@@ -562,4 +607,52 @@ test('Accessibility-Snapshot (axe-core): keine schweren Verstöße auf Startseit
     await o.context.close();
   }
   t.diagnostic(`axe: ${JSON.stringify(report)}`);
+});
+
+test('Soft-Launch im Browser (Chromium und WebKit, 320/390/768/1440, alle 22 Seiten): Hinweis statt Formular, Partner-Logos geladen und verlinkt; keine Anfrage an /api/, Google oder fremde Server (auch keine Schriften)', { skip: skip || (!SOFT_LAUNCH && 'nur im Soft-Launch') }, async t => {
+  let wk = null;
+  try { wk = await pw.webkit.launch(); } catch { /* unten als NOT_RUN gemeldet */ }
+  try {
+    for (const [name, engine] of [['Chromium', browser], ['WebKit', wk]]) {
+      await t.test(name, { skip: !engine && 'NOT_RUN: Playwright-WebKit nicht installiert (playwright install webkit)' }, async st => {
+        let n = 0;
+        for (const width of [320, 390, 768, 1440]) {
+          for (const path of SEITEN) {
+            const { context, page, errors, blocked, requests } = await open(path, { width, height: width >= 768 ? 900 : 800, engine });
+            /* Seite ganz durchscrollen, damit alles nachgeladen wird, was beim Scrollen lädt (Videos laden erst im Bild) */
+            await page.evaluate(async () => { for (let y = 0; y < document.body.scrollHeight; y += innerHeight / 2) { scrollTo(0, y); await new Promise(r => setTimeout(r, 30)); } });
+            await page.waitForTimeout(150);
+            const fremd = requests.filter(r => !r.url.startsWith(app.base + '/'));
+            assert.deepEqual([fremd, blocked], [[], []], `${name} ${path} ${width}: Anfragen an fremde Server (Google, Schriften, OAuth)`);
+            assert.deepEqual(requests.filter(r => r.method !== 'GET' || new URL(r.url).pathname.startsWith('/api')), [], `${name} ${path} ${width}: Anfrage an /api/ oder kein GET`);
+            assert.equal(await page.locator('form, input, textarea, select, button[type=submit]').count(), 0, `${name} ${path} ${width}: kein Formular`);
+            assert.ok(await overflow(page) <= 0, `${name} ${path} ${width}: Überlauf`);
+            /* Die 404-Seite kommt korrekt mit Status 404; Browser melden das für das Dokument selbst als Konsolenfehler */
+            assert.deepEqual(errors.filter(e => !(path === '/gibt/es/nicht' && /status of 404/.test(e))), [], `${name} ${path} ${width}: Konsolenfehler`);
+            if (path === '/index.html') {
+              await page.evaluate(() => scrollTo(0, 0));
+              await page.waitForTimeout(100);
+              const m = await page.evaluate(() => {
+                const r = s => document.querySelector(s).getBoundingClientRect();
+                const logos = [...document.querySelectorAll('.partner-logos a')].map(a => { const img = a.querySelector('img'), b = img.getBoundingClientRect();
+                  return [a.href, a.target, a.rel, img.alt, img.complete && img.naturalWidth > 0, b.width > 0 && b.left >= 0 && b.right <= innerWidth]; });
+                return { vh: innerHeight, nav: r('#nav').bottom, bald: r('.hero .bald'), text: document.querySelector('.hero .bald').innerText.trim(), logos,
+                  footer: (() => { const img = document.querySelector('.footer .footer-partner'); return img.complete && img.naturalWidth > 0; })() };
+              });
+              assert.match(m.text, /^Kostenlose Analyse-Anfragen in Kürze verfügbar\./, `${name} ${width}: Hinweis`);
+              assert.ok(m.bald.top >= m.nav && m.bald.bottom <= m.vh, `${name} ${width}: Hinweis im ersten Bildschirm (${Math.round(m.bald.top)}–${Math.round(m.bald.bottom)} px von ${m.vh})`);
+              assert.deepEqual(m.logos, [['https://pixelkiez.de/', '_blank', 'noopener', 'Pixelkiez', true, true], ['https://studio.dyai.cloud/', '_blank', 'noopener', 'DYAI Studio', true, true]], `${name} ${width}: Partner-Logos geladen, sichtbar, verlinkt`);
+              assert.ok(m.footer, `${name} ${width}: Pixelkiez-Logo im Footer geladen`);
+              if (SHOTS) await page.screenshot({ path: join(SHOTS, `softlaunch-${name.toLowerCase()}-${width}.png`), fullPage: true });
+            }
+            n++;
+            await context.close();
+          }
+        }
+        st.diagnostic(`${name}: ${n} Seitenaufrufe ohne Fremd-, API- oder Google-Anfrage`);
+      });
+    }
+  } finally {
+    if (wk) await wk.close();
+  }
 });
