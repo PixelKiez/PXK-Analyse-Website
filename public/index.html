@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self' https://accounts.google.com">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="robots" content="noindex,nofollow">
 <title>360°Pixelkiez – kostenlose Website-Analyse als PDF</title>
 <meta name="description" content="Kostenlose Website-Analyse von 360°Pixelkiez in sechs Bereichen: Auffindbarkeit &amp; SEO, Performance &amp; Technik, Nutzerführung, Vertrauen &amp; Datenschutz, Barrierefreiheit sowie KI-Verständlichkeit (GEO &amp; AI Visibility). Persönlich erstellt, als PDF mit sieben Seiten per E-Mail.">
@@ -32,7 +32,6 @@
 <link rel="stylesheet" href="assets/anfrage.css">
 <link rel="stylesheet" href="assets/donut.css">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","inLanguage":"de","mainEntity":[{"@type":"Question","name":"Ist die Analyse wirklich kostenlos?","acceptedAnswer":{"@type":"Answer","text":"Ja. Die Analyse kostet 0 €. Es gibt kein Abo, keine Folgekosten und kein bezahltes Zusatzpaket."}},{"@type":"Question","name":"Warum muss ich mich mit Google anmelden?","acceptedAnswer":{"@type":"Answer","text":"Damit wir den Bericht an eine bestätigte E-Mail-Adresse schicken. Wir erhalten nur die Kennung Ihres Google-Kontos und Ihre bestätigte E-Mail-Adresse, keinen Zugriff auf Ihr Postfach."}},{"@type":"Question","name":"Brauchen Sie Zugriff auf meine Website?","acceptedAnswer":{"@type":"Answer","text":"Nein. Wir betrachten nur öffentlich erreichbare Seiten. Sie installieren nichts und teilen keine Zugangsdaten."}},{"@type":"Question","name":"Was bedeutet GEO & AI Visibility?","acceptedAnswer":{"@type":"Answer","text":"GEO steht für Generative Engine Optimization. Wir prüfen, ob KI-Systeme Ihre Inhalte lesen, verstehen und als Quelle zitieren können."}},{"@type":"Question","name":"Wann bekomme ich den Bericht?","acceptedAnswer":{"@type":"Answer","text":"Pixelkiez erstellt jeden Bericht persönlich und schickt ihn per E-Mail an Ihre bestätigte Adresse. Eine feste Bearbeitungszeit sagen wir nicht zu."}},{"@type":"Question","name":"Gibt es eine Garantie für Rankings oder KI-Erwähnungen?","acceptedAnswer":{"@type":"Answer","text":"Nein. Der Bericht enthält Befunde und Empfehlungen, aber keine Garantie für Rankings, Punktzahlen oder Nennungen in KI-Antworten."}},{"@type":"Question","name":"Ist der Bericht ein Rechtsgutachten?","acceptedAnswer":{"@type":"Answer","text":"Nein. Die Analyse ist keine Rechtsberatung und keine Zertifizierung, etwa nach DSGVO, BFSG oder WCAG."}}]}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"VideoObject","name":"So läuft die kostenlose Website-Analyse ab","inLanguage":"de-DE","description":"Animierter Ablauf der Website-Analyse: Website-Adresse eingeben, Prüfung öffentlicher Seiten, Einordnung, Befunde mit Beleg, nächste Schritte und der Bericht als PDF. Beispielhafte Darstellung, alle gezeigten Werte sind Beispieldaten.","thumbnailUrl":"https://360.pixelkiez.de/media/360-pixelkiez-video-poster.jpg","contentUrl":"https://360.pixelkiez.de/media/360-pixelkiez-video-1080p.mp4","uploadDate":"2026-10-31T02:38:51+01:00","duration":"PT44S","width":1920,"height":1080},{"@type":"VideoObject","name":"Der PDF-Bericht mit sieben Seiten","inLanguage":"de-DE","description":"Animierte Vorstellung des PDF-Berichts mit sieben Seiten: Kernaussage zuerst, Überblick auf einen Blick, die Bereiche im Detail und ein Fahrplan mit den nächsten Schritten. Beispielbericht, alle gezeigten Werte sind Beispieldaten.","thumbnailUrl":"https://360.pixelkiez.de/media/report-pdf-poster.jpg","contentUrl":"https://360.pixelkiez.de/media/report-pdf-de-1x1.mp4","uploadDate":"2026-10-31T02:38:51+01:00","duration":"PT35S","width":1080,"height":1080}]}</script>
 </head>
 <body>
 <svg class="sr-only" width="0" height="0" aria-hidden="true">
@@ -83,40 +82,19 @@
     <span class="badge"><span class="pixel" aria-hidden="true"></span>Kostenlose Website-Analyse</span>
     <h1 class="h1">Sehen Sie, was Ihre Website <em>ausbremst</em>.</h1>
     <p class="lead">Pixelkiez prüft Ihre Website persönlich in sechs Bereichen, inklusive GEO &amp; AI Visibility. Den Bericht erhalten Sie kostenlos als PDF mit sieben Seiten per E-Mail.</p>
-    <form class="analyze" id="analyze" action="/api/anfrage" method="post" novalidate>
-      <input type="hidden" name="action" value="start">
-      <input type="hidden" name="agb_version" value="ENTWURF-2026-10-31">
-      <label class="sr-only" for="url">Adresse Ihrer Website</label>
-      <div class="url-field">
-        <svg class="i"><use href="#i-globe"/></svg>
-        <input id="url" name="website" type="text" inputmode="url" autocomplete="url" maxlength="2048" placeholder="ihre-website.de">
-        <button class="btn btn--accent" type="submit">Analysieren <svg class="i"><use href="#i-arrow"/></svg></button>
-      </div>
-      <p class="form-error" id="url-error" hidden>Bitte geben Sie eine öffentliche Website-Adresse wie beispiel.de ein.</p>
-      <label class="consent consent--hero"><input id="agb" type="checkbox" name="agb" value="1" required><span>Ich akzeptiere die <a href="agb.html">AGB</a> von 360°Pixelkiez.</span></label>
-      <p class="form-error" id="agb-error" hidden>Bitte akzeptieren Sie die AGB, damit wir Ihre Website analysieren können.</p>
-      <p class="hero-note">Kostenlose Website-Analyse – 0 €, kein Abo. <a href="datenschutz.html">Datenschutzerklärung</a></p>
+    <!-- Soft-Launch: kein Anfrageformular, bis die Google-Anmeldung freigegeben ist (keine Eingabe, kein POST, kein Google-Login) -->
+    <div class="analyze">
+      <p class="bald"><svg class="i"><use href="#i-globe"/></svg><span><b>Kostenlose Analyse-Anfragen in Kürze verfügbar.</b> Bis dahin nimmt diese Website noch keine Anfragen an.</span></p>
       <div class="facts">
         <span><svg class="i"><use href="#i-check"/></svg>0 €</span>
         <span><svg class="i"><use href="#i-check"/></svg>Sechs Bereiche</span>
         <span><svg class="i"><use href="#i-check"/></svg>PDF mit 7 Seiten</span>
       </div>
-    </form>
-  </section>
-
-  <section class="showcase" aria-label="Beispielansicht">
-    <figure class="showcase-media">
-      <div class="showcase-frame">
-        <video class="showcase-video" muted loop playsinline preload="auto" width="1920" height="1080" poster="media/360-pixelkiez-video-poster.jpg" aria-label="Animierter Ablauf der Website-Analyse: Website-Adresse eingeben, Prüfung öffentlicher Seiten, Einordnung, Befunde mit Beleg, nächste Schritte und der Bericht als PDF.">
-          <source src="media/360-pixelkiez-video-1080p.mp4" type="video/mp4">
-        </video>
-      </div>
-      <figcaption class="showcase-note">Beispielhafte Darstellung. Alle gezeigten Werte sind Beispieldaten.</figcaption>
-    </figure>
+    </div>
   </section>
 
   <section class="section cw-peach" id="ablauf">
-    <div class="section-head"><h2 class="h2">In drei Schritten zum PDF-Bericht.</h2></div>
+    <div class="section-head"><h2 class="h2">In drei Schritten zum PDF-Bericht.</h2><p class="text">So läuft die kostenlose Analyse ab, sobald Anfragen möglich sind.</p></div>
     <div class="steps steps--cards">
       <div class="step cw-lilac"><span>01</span><h3>Website eingeben</h3><p>Sie nennen die öffentliche Adresse der Website, die wir analysieren sollen.</p></div>
       <div class="step cw-lilac"><span>02</span><h3>AGB akzeptieren und anmelden</h3><p>Sie akzeptieren die AGB und melden sich mit Google an. Danach ist Ihre Anfrage gespeichert. So wissen wir, wohin der Bericht geht.</p></div>
@@ -125,7 +103,7 @@
   </section>
 
   <section class="section cw-white" id="bericht">
-    <div class="split">
+    <div class="split split--solo">
       <div class="split-copy">
         <h2 class="h2">Ein PDF. Sieben Seiten.</h2>
         <p class="text">Pixelkiez erstellt den Bericht von Hand und schickt ihn an die E-Mail-Adresse, die Google bestätigt hat. Er zeigt, was auf den geprüften Seiten auffällt und womit Sie beginnen.</p>
@@ -136,14 +114,6 @@
           <li><svg class="i"><use href="#i-check"/></svg>Kein automatisch erzeugter Bericht</li>
         </ul>
       </div>
-      <figure class="report-media">
-        <div class="showcase-frame">
-          <video class="showcase-video showcase-video--square" muted loop playsinline preload="none" width="1080" height="1080" poster="media/report-pdf-poster.jpg" aria-label="Animierte Vorstellung des PDF-Berichts mit sieben Seiten: Kernaussage zuerst, Überblick auf einen Blick, die Bereiche im Detail und ein Fahrplan mit den nächsten Schritten.">
-            <source src="media/report-pdf-de-1x1.mp4" type="video/mp4">
-          </video>
-        </div>
-        <figcaption class="showcase-note">Beispielbericht. Alle gezeigten Werte sind Beispieldaten.</figcaption>
-      </figure>
     </div>
   </section>
 
@@ -203,7 +173,7 @@
         <div class="price"><b class="num">0 €</b><span>einmalig</span></div>
         <p>Persönlich erstellt, als PDF per E-Mail.</p>
         <ul><li><svg class="i"><use href="#i-check"/></svg>Sechs Bereiche inklusive GEO &amp; AI Visibility</li><li><svg class="i"><use href="#i-check"/></svg>PDF-Bericht mit sieben Seiten</li><li><svg class="i"><use href="#i-check"/></svg>Priorisierte Verbesserungen</li><li><svg class="i"><use href="#i-check"/></svg>Kein Abo, keine Folgekosten</li></ul>
-        <a class="btn btn--accent btn--block" href="#top">Website eingeben</a>
+        <p class="plan-bald">In Kürze verfügbar</p>
       </article>
       <article class="plan">
         <div class="plan-name">Anmeldung</div>
@@ -239,8 +209,8 @@
   </section>
 
   <section class="section closing cw-lilac">
-    <h2 class="h2">Kostenlos anfragen. Persönlich geprüft.</h2>
-    <button class="btn btn--accent" type="button" id="to-top">Website eingeben <svg class="i"><use href="#i-arrow"/></svg></button>
+    <h2 class="h2">Kostenlose Analyse-Anfragen in Kürze verfügbar.</h2>
+    <a class="btn btn--ghost" href="wissen/index.html">Zum Wissensbereich <svg class="i"><use href="#i-arrow"/></svg></a>
   </section>
 
   <footer class="cw-lilac">

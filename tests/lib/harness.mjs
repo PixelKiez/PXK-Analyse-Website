@@ -26,8 +26,10 @@ export const NOTIFY_TO = '360@pixelkiez.de';
 export const CUSTOMER = 'kunde@beispiel-kunde.de';
 export const GOOGLE_AUTH = 'https://accounts.google.com/o/oauth2/v2/auth';
 export const PRODUCTION_BASE = 'https://360.pixelkiez.de';
-/* AGB-Version, die der Hero zur Zustimmung anbietet (Feld agb_version); lokale Tests nutzen genau diesen Entwurf */
-export const TERMS_VERSION = /<input type="hidden" name="agb_version" value="([^"]+)">/.exec(readFileSync(join(ROOT, 'public/index.html'), 'utf8'))[1];
+/* AGB-Version, die der Hero zur Zustimmung anbietet (Feld agb_version); lokale Tests nutzen genau diesen Entwurf.
+   Soft-Launch (Hero ohne Formular): dieselbe Version aus der Worker-Konfiguration */
+export const TERMS_VERSION = (/<input type="hidden" name="agb_version" value="([^"]+)">/.exec(readFileSync(join(ROOT, 'public/index.html'), 'utf8'))
+  ?? /^TERMS_VERSION = "([^"]+)"$/m.exec(readFileSync(join(ROOT, 'worker/wrangler.toml'), 'utf8')))[1];
 
 const load = async name => { try { return await import(name); } catch { return null; } };
 const miniflare = await load('miniflare');
