@@ -120,7 +120,7 @@ test('Dokumente: valides Gerüst, genau eine H1, Landmarks, CSP, keine Inline-St
   }
 });
 
-test('Startseite: kostenloses Angebot, vier Bereiche, sieben PDF-Seiten, GEO & AI Visibility, Google-Anmeldung', () => {
+test('Startseite: kostenloses Angebot, sechs Bereiche, sieben PDF-Seiten, GEO & AI Visibility, Google-Anmeldung', () => {
   const { root } = H.parse(read('public/index.html'));
   const txt = el => H.norm(H.textOf(el));
   const text = H.norm(H.visibleText(root));
@@ -130,6 +130,8 @@ test('Startseite: kostenloses Angebot, vier Bereiche, sieben PDF-Seiten, GEO & A
   for (const v of videos) assert.ok(['muted', 'loop', 'playsinline', 'poster', 'aria-label'].every(a => v.attrs.has(a)) && !v.attrs.has('controls') && !v.attrs.has('autoplay'));
   assert.ok(H.byTag(H.byId(root, 'bericht'), 'video').length === 1, 'Berichtsvideo im Abschnitt „Ihr Bericht“');
   for (const s of ['GEO', 'AI Visibility', 'Generative Engine Optimization', '0 €', 'mit Google an', 'sieben Seiten']) assert.ok(text.includes(s), `fehlt: ${s}`);
+  /* Es sind sechs Bereiche; nirgends mehr „vier Bereiche“ und keine Seitenangabe je Bereich (der Bericht bleibt bei sieben Seiten) */
+  assert.ok(text.includes('in sechs Bereichen') && !/[Vv]ier Bereich|Seite \d des Berichts|je eine Seite pro Bereich/.test(read('public/index.html')), 'sechs Bereiche');
   /* AI-08 ist gestrichen (48 Kriterien): keine Zusage beobachteter KI-Antwort-Stichproben mehr */
   assert.ok(!/beobachtet|Stichprobe tatsächlich/.test(read('public/index.html')), 'keine KI-Antwort-Stichproben');
   /* Abschnitt „So setzt sich der Pixelkiez Score zusammen.“ ersetzt „Vier Bereiche. Ein klares Bild.“ an derselben Stelle (#bereiche);
@@ -177,14 +179,21 @@ test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen n
   const hero = html => { const i = html.indexOf('<section class="hero">'); return html.slice(i, html.indexOf('</section>', i) + '</section>'.length); };
   const lines = html => hero(html).split('\n').map(l => l.trim());
   const [a, b] = [lines(old), lines(now)];
-  assert.deepEqual(a.filter(l => !b.includes(l)), ['<button class="btn btn--accent" type="submit">Kostenlos anfragen <svg class="i"><use href="#i-arrow"/></svg></button>'], 'entfernt nur der alte Buttontext');
+  /* Es sind sechs Bereiche (Entscheidung des Auftraggebers 03.11.2026): Einleitung und Faktenzeile nennen sechs statt vier */
+  assert.deepEqual(a.filter(l => !b.includes(l)), [
+    '<p class="lead">Pixelkiez prüft Ihre Website persönlich in vier Bereichen, inklusive GEO &amp; AI Visibility. Den Bericht erhalten Sie kostenlos als PDF mit sieben Seiten per E-Mail.</p>',
+    '<button class="btn btn--accent" type="submit">Kostenlos anfragen <svg class="i"><use href="#i-arrow"/></svg></button>',
+    '<span><svg class="i"><use href="#i-check"/></svg>Vier Bereiche</span>',
+  ], 'entfernt nur der alte Buttontext und die beiden Angaben „vier Bereiche“');
   assert.deepEqual(b.filter(l => !a.includes(l)), [
+    '<p class="lead">Pixelkiez prüft Ihre Website persönlich in sechs Bereichen, inklusive GEO &amp; AI Visibility. Den Bericht erhalten Sie kostenlos als PDF mit sieben Seiten per E-Mail.</p>',
     '<input type="hidden" name="agb_version" value="ENTWURF-2026-10-31">',
     '<button class="btn btn--accent" type="submit">Analysieren <svg class="i"><use href="#i-arrow"/></svg></button>',
     '<label class="consent consent--hero"><input id="agb" type="checkbox" name="agb" value="1" required><span>Ich akzeptiere die <a href="agb.html">AGB</a> von 360°Pixelkiez.</span></label>',
     '<p class="form-error" id="agb-error" hidden>Bitte akzeptieren Sie die AGB, damit wir Ihre Website analysieren können.</p>',
     '<p class="hero-note">Kostenlose Website-Analyse – 0 €, kein Abo. <a href="datenschutz.html">Datenschutzerklärung</a></p>',
-  ], 'neu nur Häkchen, Fehlertext, Hinweis, Version und Buttontext');
+    '<span><svg class="i"><use href="#i-check"/></svg>Sechs Bereiche</span>',
+  ], 'neu nur Häkchen, Fehlertext, Hinweis, Version, Buttontext und „sechs Bereiche“');
   const kept = a.filter(l => b.includes(l));
   assert.deepEqual(b.filter(l => kept.includes(l)), kept, 'Badge, H1, Lead, URL-Feld und Faktenzeile in unveränderter Reihenfolge');
   const outside = html => html.replace(hero(html), '').replace(/<div class="step cw-lilac"><span>02<\/span>.*?<\/div>/, '<SCHRITT-02>');
@@ -210,7 +219,12 @@ test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen n
     .replace('<li><a href="pruefkriterien.html">Alle Prüfpunkte</a></li><li><a href="pruefkriterien.html#findability_seo">SEO &amp; Auffindbarkeit</a></li><li><a href="pruefkriterien.html#geo_ai_visibility">GEO &amp; AI Visibility</a></li>',
       '<li><a href="analyse/methodik.html">Methodik</a></li><li><a href="analyse/auffindbarkeit-seo.html">SEO &amp; Auffindbarkeit</a></li><li><a href="analyse/ki-verstaendlichkeit.html">GEO &amp; AI Visibility</a></li>')
     .replace(' KI-Antworten nennen wir nur, wenn wir sie in einer Stichprobe tatsächlich beobachtet haben.', '').replace('<span>beobachtete KI-Antworten</span>', '')
-    .replaceAll(' KI-Antworten zeigen wir nur, wenn wir sie in einer datierten Stichprobe tatsächlich beobachtet haben.', '');
+    .replaceAll(' KI-Antworten zeigen wir nur, wenn wir sie in einer datierten Stichprobe tatsächlich beobachtet haben.', '')
+    /* Sechs Bereiche; der Bericht bleibt bei sieben Seiten, Seitenangaben je Bereich entfallen */
+    .replace('in vier Bereichen: SEO, Performance, GEO &amp; AI Visibility sowie UX, Barrierefreiheit und Vertrauen.', 'in sechs Bereichen: Auffindbarkeit &amp; SEO, Performance &amp; Technik, Nutzerführung, Vertrauen &amp; Datenschutz, Barrierefreiheit sowie KI-Verständlichkeit (GEO &amp; AI Visibility).')
+    .replace('</svg>Vier Bereiche inklusive GEO &amp; AI Visibility</li>', '</svg>Sechs Bereiche inklusive GEO &amp; AI Visibility</li>')
+    .replace('<p>Seite 6 des Berichts ordnet die Verbesserungen,', '<p>Der Bericht ordnet die Verbesserungen,')
+    .replace('je eine Seite pro Bereich', 'die Bereiche im Detail');
   assert.equal(ohneNeues(outside(now)), ohneAlt(withWissen(withoutEyebrows(outside(old)))).replaceAll('kontakt@pixelkiez.de', '360@pixelkiez.de'), 'übrige Startseite unverändert (außer Schritt 02, Kontaktadresse, Eyebrow-Zeilen, Links zu Wissen und Analyse, Score-Abschnitt statt Prüfpunkte-Liste, AI-08 und Metadaten)');
   assert.match(now, /<span>02<\/span><h3>AGB akzeptieren und anmelden<\/h3>/);
 });

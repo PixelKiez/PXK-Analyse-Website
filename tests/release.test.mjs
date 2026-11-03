@@ -22,7 +22,7 @@ const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8',
 const MEDIA = {
   'media/360-pixelkiez-video-1080p.mp4': '593d8ebaa2b9915fe3294cde395b126f6763fd80b81e940d92e77b78b9ee3a50',
   'media/360-pixelkiez-video-poster.jpg': 'ed00b1672e93f78e005f246817e6c098a15daddc651c0ed4ac74a7b12a7faef6',
-  'media/report-pdf-de-1x1.mp4': '8b616ebf7971600cce4a5d91a8b8b657ddc0dd522f2b8fe514010c6bdac8331d',
+  'media/report-pdf-de-1x1.mp4': 'e05ebeb36d2cdbeab20a3ada9e33a615fd3aafc3e4985433ba98c80011e7fdc9',
   'media/report-pdf-poster.jpg': 'a45494725853ee2acadf0e47ae4aff871531034f1d0a29397389cda7b6b9ceb2',
 };
 /* Titelbilder (og:image) je Seite und Icons gehören zur Website */
