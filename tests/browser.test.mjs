@@ -407,6 +407,36 @@ test('Videos ohne Autoplay (Stromsparmodus/Autoplay-Sperre, emuliert) und bei �
   }
 });
 
+test('Autoplay am Bildschirmrand: Ein Video, das nur an die Unterkante stößt, wird noch nicht gestartet und läuft nach dem Hineinscrollen von selbst (WebKit und Chromium mobil, alle drei Videos)', { skip: videoSkip }, async t => {
+  /* Live 04.11.2026 (WebKit mobil, 390 × 844): Das Hero-Video lag beim Laden genau an der Unterkante; play() kam bei einem Bruchteil
+     eines Pixels, WebKit lehnte ab (NotAllowedError) und der automatische Start blieb danach aus. */
+  let wk = null;
+  try { wk = await pw.webkit.launch(); } catch { /* unten als NOT_RUN gemeldet */ }
+  try {
+    for (const [name, engine] of [['WebKit', wk], ['Chromium', browser]]) {
+      await t.test(name, { skip: !engine && 'NOT_RUN: Playwright-WebKit nicht installiert (playwright install webkit)' }, async () => {
+        const ctx = await engine.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'no-preference' });
+        await ctx.route('**/*', r => r.request().url().startsWith(app.base + '/') ? r.continue() : r.abort());
+        const page = await ctx.newPage();
+        await page.goto(app.base + '/', { waitUntil: 'load' });
+        for (const sec of ['#demo', '#bericht', '#nutzen']) {
+          /* 2 px des Videos im Bild: noch kein Start */
+          await page.evaluate(s => { const r = document.querySelector(`${s} .showcase-frame`).getBoundingClientRect(); scrollBy({ top: r.top - innerHeight + 2, behavior: 'instant' }); }, sec);
+          await page.waitForTimeout(700);
+          assert.equal(await page.evaluate(s => document.querySelector(`${s} .showcase-video`).paused, sec), true, `${name} ${sec}: am Rand noch nicht gestartet`);
+          /* Ganz im Bild: startet von selbst, ohne „Abspielen“ */
+          await page.evaluate(s => document.querySelector(`${s} .showcase-frame`).scrollIntoView({ block: 'center', behavior: 'instant' }), sec);
+          await page.waitForFunction(s => { const v = document.querySelector(`${s} .showcase-video`); return !v.paused && v.currentTime > 0.3; }, sec, { timeout: 15000 });
+          assert.equal(await page.evaluate(s => document.querySelector(`${s} .showcase-frame`).classList.contains('braucht-start'), sec), false, `${name} ${sec}: kein „Abspielen“ nötig`);
+        }
+        await ctx.close();
+      });
+    }
+  } finally {
+    if (wk) await wk.close();
+  }
+});
+
 test('Partner-Logos: echter Klick bzw. Tipp trifft den Link (elementFromPoint, kein überlagernder Abschnitt) und öffnet pixelkiez.de bzw. studio.dyai.cloud im neuen Tab; Footer-Logo ebenso (Chromium und WebKit, 320/390/768/1440)', { skip }, async t => {
   /* P0-Hotfix PXK-159: Der negative Abstand zog die Logos in den positionierten Hero; dessen Fläche lag über den Logos und fing Klicks ab */
   let wk = null;

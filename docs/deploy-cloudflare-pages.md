@@ -208,7 +208,8 @@ R2-Fehler). `Content-Type: video/mp4` ist fest, unabhängig von den Metadaten im
 Functions; ein Test vergleicht beide), dazu `Cross-Origin-Resource-Policy: same-origin` und `X-Robots-Tag: noindex`.
 Lokal geprüft (`wrangler pages dev` mit lokalem R2, Playwright): Chromium und WebKit spielen alle drei eingebundenen Videos mit 206.
 
-Wiedergabe (`app.js`): Die Videos starten stumm, sobald sie ins Bild scrollen. Lehnt der Browser den automatischen Start ab
+Wiedergabe (`app.js`): Die Videos starten stumm, sobald sie zu mindestens 20 % im Bild sind (WebKit mobil lehnt `play()` für ein
+Video ab, das nur an den Bildschirmrand stößt); ganz aus dem Bild halten sie an. Lehnt der Browser den automatischen Start ab
 (iOS-Stromsparmodus, Datensparen, Autoplay-Sperre: `play()` wird abgelehnt) oder ist „Bewegung reduzieren“ eingestellt,
 steht mittig „Abspielen“ auf dem Standbild; ein Tippen startet das Video. Eine eigene Schaltfläche (mindestens 44 × 44 px)
 hält jedes Video an und startet es wieder; die Browser-Leiste (`controls`) bleibt aus, weil WebKit deren Symbole aus

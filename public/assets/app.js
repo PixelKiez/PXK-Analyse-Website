@@ -64,11 +64,12 @@
     note.className = 'video-hinweis';
     note.textContent = 'Das Video konnte gerade nicht geladen werden.';
     frame.append(note, button);
-    /* auto: automatischer Start erlaubt; started: einmal per Geste gestartet; stopped: per Schaltfläche angehalten; failed: Ladefehler */
-    const p = { v, auto: !reduce, started: false, stopped: false, failed: false };
+    /* auto: automatischer Start erlaubt; started: einmal per Geste gestartet; stopped: per Schaltfläche angehalten; failed: Ladefehler;
+       refused: der letzte automatische Start wurde abgelehnt (dann „Abspielen“; beim nächsten Hineinscrollen neuer Versuch) */
+    const p = { v, auto: !reduce, started: false, stopped: false, failed: false, refused: false };
     const render = () => {
       const playing = !v.paused && !v.ended;
-      const wait = !playing && (p.stopped || p.failed || !(p.auto || p.started));
+      const wait = !playing && (p.stopped || p.failed || p.refused || !(p.auto || p.started));
       frame.classList.toggle('is-playing', playing);
       frame.classList.toggle('braucht-start', wait);
       note.hidden = !p.failed;
@@ -78,9 +79,10 @@
     const fail = () => { p.failed = true; v.pause(); render(); };
     p.play = gesture => {
       const run = v.play();
-      if (run) run.then(() => { p.failed = false; render(); }, err => {
-        /* Ohne Geste abgelehnt: ab jetzt nur noch per Tippen. Abgebrochen (pause() oder load() kam dazwischen): kein Fehler. */
-        if (err && err.name === 'NotAllowedError') { if (!gesture) p.auto = p.started = false; }
+      if (run) run.then(() => { p.failed = p.refused = false; render(); }, err => {
+        /* Ohne Geste abgelehnt (Stromsparmodus, Autoplay-Sperre; WebKit mobil auch, solange das Video kaum sichtbar ist): „Abspielen“
+           zeigen, beim nächsten Hineinscrollen erneut versuchen. Abgebrochen (pause() oder load() kam dazwischen): kein Fehler. */
+        if (err && err.name === 'NotAllowedError') { if (!gesture) p.refused = true; }
         else if (!err || err.name !== 'AbortError') p.failed = true;
         render();
       });
@@ -105,12 +107,13 @@
     return p;
   });
   if (players.length && 'IntersectionObserver' in window) {
-    /* intersectionRatio > 0: Ein Video, das nur an den Bildschirmrand stößt, gilt noch nicht als sichtbar */
+    /* Automatisch starten erst ab 20 % im Bild: WebKit mobil lehnt play() für ein Video ab, das nur an den Bildschirmrand stößt
+       (Hero-Video beim Laden genau an der Unterkante). Ganz aus dem Bild: anhalten. Dazwischen nichts ändern. */
     const io = new IntersectionObserver(entries => entries.forEach(e => {
       const p = players.find(x => x.v === e.target);
-      if (e.intersectionRatio > 0) { if ((p.auto || p.started) && !p.stopped && !p.failed) p.play(false); }
-      else if (!e.target.paused) e.target.pause();
-    }), { threshold: [0, 0.01] });
+      if (e.intersectionRatio >= 0.2) { if ((p.auto || p.started) && !p.stopped && !p.failed && e.target.paused) p.play(false); }
+      else if (e.intersectionRatio === 0 && !e.target.paused) e.target.pause();
+    }), { threshold: [0, 0.2, 0.6] });
     players.forEach(p => io.observe(p.v));
   }
 
