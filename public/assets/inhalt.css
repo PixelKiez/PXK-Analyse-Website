@@ -1,0 +1,104 @@
+/* 360°Pixelkiez – Inhaltsseiten (Wissen, Analyse): ruhige Mittelspalte, verwaschene Pfirsichfläche ab dem oberen Rand,
+   weicher Übergang von Pfirsich zu Lila am Seitenende. Ergänzt styles.css (unverändert) und anfrage.css. */
+
+/* Seite: Pfirsich läuft vom oberen Rand weich in das Papiergrau aus; kein Rahmen um den Inhalt */
+/* Kopfbereich: dieselbe verwaschene Fläche wie am Seitenende, gespiegelt – Lila am oberen Rand, darunter Pfirsich, dann Papier */
+.inhalt { background: linear-gradient(180deg, #EBE2FC 0%, #EFE2F6 9%, #F8E3E6 20%, #FFE6DD 34%, rgb(255 230 221 / .6) 58%, rgb(255 230 221 / 0) 100%) no-repeat, var(--paper); background-size: 100% 1150px, auto; }
+.inhalt .frame { max-width: none; border-inline: 0; }
+
+/* Kopf: Brotkrumen, Titel, Einleitung, Bild – alles mittig */
+.kopf { display: grid; justify-items: center; gap: 22px; max-width: 900px; margin-inline: auto; padding: clamp(56px, 9vw, 112px) var(--gutter) clamp(32px, 5vw, 56px); text-align: center; }
+.krumen ol { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 0; padding: 0; list-style: none; font: 500 12px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-45); }
+.krumen li + li::before { content: "/"; margin-right: 6px; color: var(--line); }
+.krumen a:hover { color: var(--accent-text); }
+.kopf-titel { margin: 0; font-size: clamp(34px, 5vw, 60px); line-height: 1.04; letter-spacing: -.035em; font-weight: 500; text-wrap: balance; }
+.kopf-lead { margin: 0; max-width: 62ch; font-size: clamp(17px, 1.6vw, 20px); line-height: 1.6; color: var(--ink-70); text-wrap: pretty; }
+
+/* Bild je Seite: Linienszene, Konturen in Textfarbe, Akzent aus der Pfirsich-/Orange-Palette */
+.szene { width: 100%; max-width: 760px; margin: clamp(8px, 2vw, 20px) auto 0; }
+.szene-bild { padding: clamp(18px, 3vw, 32px); background: rgb(255 255 255 / .62); border: 1px solid #F5CDBF; border-radius: 22px; box-shadow: 0 24px 60px -36px rgb(180 65 30 / .35); }
+.szene svg { display: block; width: 100%; height: auto; stroke: var(--ink); stroke-width: 1.6; }
+.szene figcaption { max-width: 62ch; margin: 14px auto 0; font-size: 15px; line-height: 1.6; color: var(--ink-45); }
+.szene figcaption b { color: var(--ink-70); font-weight: 500; }
+.kb-akzent { fill: var(--accent); stroke: none; }
+.kb-akzent-linie { stroke: var(--accent); }
+.kb-gestrichelt { stroke-dasharray: 3 6; }
+.kb-leise { stroke: #A9AAAE; }
+
+/* Lesespalte */
+.spalte { max-width: 760px; margin-inline: auto; padding: 0 var(--gutter) clamp(56px, 8vw, 96px); }
+.toc { margin: 0 0 clamp(36px, 5vw, 56px); padding: 22px 26px; background: rgb(255 255 255 / .7); border: 1px solid var(--line-soft); border-radius: var(--r-card); }
+.toc-titel { margin: 0 0 10px; font: 500 12px var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-45); }
+.toc ul { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; font-size: 15px; color: var(--ink-70); }
+/* Tippfläche mindestens 24 px hoch (WCAG 2.5.8) */
+.toc a { display: inline-block; padding-block: 4px; }
+.toc a:hover { color: var(--accent-text); }
+.lesetext { color: var(--ink-70); font-size: 17px; line-height: 1.75; }
+.lesetext > :first-child { margin-top: 0; }
+.lesetext h2 { margin: clamp(44px, 6vw, 64px) 0 14px; font-size: clamp(24px, 2.6vw, 30px); line-height: 1.2; letter-spacing: -.02em; font-weight: 500; color: var(--ink); scroll-margin-top: 104px; }
+.lesetext h3 { margin: 32px 0 8px; font-size: 19px; line-height: 1.35; font-weight: 600; color: var(--ink); scroll-margin-top: 104px; }
+.lesetext p { margin: 0 0 16px; }
+.lesetext ul, .lesetext ol { margin: 0 0 18px; padding-left: 1.3em; }
+.lesetext li { margin: 6px 0; }
+.lesetext strong, .lesetext b { color: var(--ink); font-weight: 600; }
+.lesetext a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+.lesetext a:hover { color: var(--accent-text); }
+.lesetext code { font: 500 .88em var(--font-mono); padding: 1px 6px; background: var(--paper-2); border-radius: 6px; }
+.lesetext pre { overflow-x: auto; padding: 16px 18px; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 12px; font-size: 14px; line-height: 1.6; }
+.lesetext pre code { padding: 0; background: none; }
+.tabelle { overflow-x: auto; margin: 0 0 22px; border: 1px solid var(--line-soft); border-radius: 12px; background: var(--surface); }
+.tabelle table { width: 100%; border-collapse: collapse; font-size: 15px; line-height: 1.5; }
+.tabelle th, .tabelle td { padding: 10px 14px; border-bottom: 1px solid var(--line-soft); text-align: left; vertical-align: top; }
+.tabelle th { font-weight: 600; color: var(--ink); background: var(--paper); }
+.tabelle tr:last-child td { border-bottom: 0; }
+/* Seitlich scrollbare Tabellen und Codeblöcke sind per Tastatur erreichbar (tabindex=0) – sichtbarer Fokus nur bei Tastaturbedienung */
+.tabelle:focus, .lesetext pre:focus { outline: none; }
+.tabelle:focus-visible, .lesetext pre:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Abschnitte wie auf der Startseite (Häufige Fragen, Weiterlesen): Fläche über die ganze Breite, Inhalt auf Rahmenbreite */
+.inhalt .section { padding-inline: max(var(--gutter), calc((100% - var(--frame)) / 2 + var(--gutter))); scroll-margin-top: 88px; }
+.inhalt .section .h2 { scroll-margin-top: 104px; }
+.inhalt .faq details p a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+
+/* Quellen */
+.quellen-lead { font-size: 15px; color: var(--ink-45); }
+.quellen { display: grid; gap: 14px; margin: 0; }
+.q-group { padding: 16px 20px; background: rgb(255 255 255 / .7); border: 1px solid var(--line-soft); border-radius: 14px; }
+.q-group dt { font-weight: 600; color: var(--ink); }
+.q-desc { margin: 4px 0 8px; font-size: 15px; color: var(--ink-45); }
+.q-links { margin: 0; }
+.q-links ul, .quellen-liste { display: grid; gap: 8px; margin: 0; padding-left: 1.1em; font-size: 15px; line-height: 1.55; }
+
+/* Übersichtsseiten: geordnete Karten mit Bild */
+.uebersicht { max-width: 1120px; margin-inline: auto; padding: 0 var(--gutter) clamp(56px, 8vw, 96px); }
+.uebersicht-kopf { max-width: 760px; margin: 0 auto 28px; text-align: center; }
+.uebersicht-kopf h2 { margin: 0 0 10px; font-size: clamp(26px, 3vw, 36px); line-height: 1.15; letter-spacing: -.025em; font-weight: 500; }
+.uebersicht-kopf p { margin: 0; color: var(--ink-45); }
+.karten { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin: 0 0 clamp(48px, 7vw, 80px); padding: 0; list-style: none; }
+.karte { display: grid; grid-template-rows: auto 1fr; height: 100%; overflow: hidden; background: rgb(255 255 255 / .8); border: 1px solid var(--line-soft); border-radius: 18px; text-decoration: none; transition: border-color .2s, transform .2s var(--ease), box-shadow .2s; }
+.karte:hover { border-color: var(--accent); transform: translateY(-3px); box-shadow: 0 18px 40px -28px rgb(180 65 30 / .45); }
+.karte-bild { padding: 14px 16px; background: #FFF3EE; border-bottom: 1px solid #F5CDBF; }
+.karte-bild svg { display: block; width: 100%; height: auto; stroke: var(--ink); stroke-width: 2.2; }
+.karte-text { display: grid; align-content: start; gap: 6px; padding: 18px 20px 22px; }
+.karte-nr { font: 500 12px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--accent-text); }
+.karte-titel { font-size: 18px; line-height: 1.3; font-weight: 600; color: var(--ink); }
+.karte-teaser { font-size: 15px; line-height: 1.55; color: var(--ink-45); }
+.hinweis { max-width: 760px; margin: 0 auto; text-align: center; font-size: 15px; color: var(--ink-45); }
+
+/* Seitenende: Pfirsich geht weich in Lila über (von unten nach oben gelesen: Lila → Pfirsich → Papier) */
+.ende { background: linear-gradient(180deg, rgb(255 230 221 / 0) 0%, #FFE6DD 24%, #F8E3E6 48%, #EFE2F6 70%, #EBE2FC 88%); }
+.ende .footer-cols, .ende .footer { border-top-color: rgb(91 63 166 / .14); }
+.ende footer { background: transparent; }
+.ende-cta { display: grid; justify-items: center; gap: 18px; max-width: 760px; margin-inline: auto; padding: clamp(88px, 12vw, 144px) var(--gutter) clamp(56px, 8vw, 88px); text-align: center; }
+.ende-cta h2 { margin: 0; font-size: clamp(30px, 4vw, 46px); line-height: 1.08; letter-spacing: -.03em; font-weight: 500; }
+.ende-cta p { margin: 0; max-width: 56ch; color: var(--ink-70); }
+
+@media (max-width: 960px) {
+  .karten { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .karten { grid-template-columns: minmax(0, 1fr); }
+  .toc { padding: 18px 18px; }
+  .lesetext { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .karte { transition: none; } .karte:hover { transform: none; } }

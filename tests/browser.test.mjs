@@ -50,11 +50,13 @@ after(async () => {
   await browser.close(); await app.stop(); await google.stop(); await mail.stop();
 });
 
-async function open(path, { width = 1440, height = 900, reducedMotion = 'reduce', bypassCSP = false, javaScriptEnabled = true, engine = browser } = {}) {
+async function open(path, { width = 1440, height = 900, reducedMotion = 'reduce', bypassCSP = false, javaScriptEnabled = true, engine = browser, videos = false } = {}) {
   const context = await engine.newContext({ viewport: { width, height }, reducedMotion, bypassCSP, javaScriptEnabled });
   const page = await context.newPage();
   const errors = [], blocked = [], requests = [];
   page.on('request', r => requests.push({ method: r.method(), url: r.url(), body: r.postData() ?? '' }));
+  /* Video-Antworten ab der Navigation mitschreiben: preload="auto" fragt schon vor 'load' an */
+  const tracked = videos ? trackVideos(page) : null;
   await context.route('**/*', route => {
     const u = new URL(route.request().url());
     if (u.origin === app.base || FONT_HOSTS.includes(u.hostname)) return route.continue();
@@ -67,7 +69,7 @@ async function open(path, { width = 1440, height = 900, reducedMotion = 'reduce'
   /* 'load' statt 'networkidle': Video-Anfragen (preload) können länger offen bleiben */
   await page.goto(app.base + path, { waitUntil: 'load' });
   if (javaScriptEnabled) await page.evaluate(() => document.fonts.ready);
-  return { context, page, errors, blocked, requests };
+  return { context, page, errors, blocked, requests, videos: tracked };
 }
 const resetData = async () => { await app.exec('DELETE FROM notifications; DELETE FROM orders; DELETE FROM rate_limits; DELETE FROM sessions'); mail.reset(); };
 const orderCount = () => app.sql('SELECT COUNT(*) AS n FROM orders')[0].n;
@@ -96,7 +98,7 @@ async function tabTo(page, pred, max = 40) {
 
 test('Mobile Hauptansicht: kein horizontaler Überlauf, Formular sichtbar, Navigationsbutton in der Pille (320/390/768/1440)', { skip }, async t => {
   for (const width of [320, 390, 768, 1440]) {
-    for (const path of ['/index.html', '/pruefkriterien.html', '/api/anfrage', '/impressum.html', '/datenschutz.html', '/agb.html', '/gibt/es/nicht']) {
+    for (const path of ['/index.html', '/api/anfrage', '/impressum.html', '/datenschutz.html', '/agb.html', '/wissen/index.html', '/wissen/seo-geo-ai-visibility.html', '/wissen/wie-ki-websites-liest.html', '/wissen/wie-websites-ausgeliefert-werden.html', '/wissen/answerability.html', '/wissen/entity-trust.html', '/wissen/agent-readiness.html', '/analyse/index.html', '/analyse/auffindbarkeit-seo.html', '/analyse/performance-technik.html', '/analyse/nutzerfuehrung-conversion.html', '/analyse/vertrauen-datenschutz.html', '/analyse/barrierefreiheit.html', '/analyse/ki-verstaendlichkeit.html', '/analyse/methodik.html', '/analyse/warum-website-analyse.html', '/analyse/ki-crawler-agenten.html', '/gibt/es/nicht']) {
       const { context, page, errors, blocked } = await open(path, { width, height: 800 });
       await page.$$eval('details', ds => ds.forEach(d => { d.open = true; }));
       assert.ok(await overflow(page) <= 0, `${path} ${width}: Überlauf`);
@@ -105,6 +107,12 @@ test('Mobile Hauptansicht: kein horizontaler Überlauf, Formular sichtbar, Navig
         return b.right <= n.right && b.left >= n.left;
       });
       assert.ok(nav, `${path} ${width}: Navigationsbutton ragt aus der Pille`);
+      /* Mobil (ohne Menüleiste) steht daneben der Menü-Button, ebenfalls ganz in der Pille */
+      const menu = await page.evaluate(() => {
+        const n = document.querySelector('.nav').getBoundingClientRect(), m = document.querySelector('.nav-menu summary').getBoundingClientRect();
+        return [m.width > 0, m.right <= n.right && m.left >= n.left];
+      });
+      assert.deepEqual(menu, width <= 760 ? [true, true] : [false, menu[1]], `${path} ${width}: Menü-Button nur mobil und in der Pille`);
       if (['/index.html', '/api/anfrage'].includes(path)) {
         const form = await page.evaluate(() => ['#url', '.url-field .btn', '#agb', 'label.consent', 'label.consent a'].map(s => { const r = document.querySelector(s).getBoundingClientRect(); return r.width > 0 && r.left >= 0 && r.right <= innerWidth; }));
         assert.deepEqual(form, [true, true, true, true, true], `${path} ${width}: Eingabefeld, Button, AGB-Häkchen und AGB-Link vollständig sichtbar`);
@@ -162,8 +170,7 @@ test('Video unter dem Hero: mittig, abgerundet, ohne Bedienelemente, startet bei
       top: r.top, left: r.left, right: innerWidth - r.right, width: r.width, vw: innerWidth, vh: innerHeight, radius: parseFloat(cs.borderTopLeftRadius), overflow: cs.overflow };
   });
   for (const [width, height] of [[1440, 900], [390, 844]]) {
-    const { context, page, errors, blocked } = await open('/index.html', { width, height, reducedMotion: 'no-preference' });
-    const videos = trackVideos(page);
+    const { context, page, errors, blocked, videos } = await open('/index.html', { width, height, reducedMotion: 'no-preference', videos: true });
     const before = await state(page);
     assert.ok(before.top >= before.vh - 1, `${width}: Video liegt unter dem ersten Bildschirm`);
     assert.equal(before.paused, true, `${width}: läuft vor dem Scrollen noch nicht`);
@@ -477,10 +484,63 @@ test('Browser-Zurück und Abbruch bei Google: Formular wieder benutzbar, kein Au
   }
 });
 
-test('Accessibility-Snapshot (axe-core): keine schweren Verstöße auf Startseite (auch mit Fehlern), Methodik, Rechtsseiten, Eingabe-, Fehler- und Bestätigungsseite', { skip: skip || (!AXE && 'NOT_RUN: PXK_AXE nicht gesetzt') }, async t => {
+test('Menü: Pfeil bei „Wissen“ klappt sechs Beiträge und „Mehr im Wissensbereich“ auf, Escape und Klick daneben schließen; mobil Menü-Button neben „Analyse“; ohne JavaScript bedienbar (Chromium und WebKit)', { skip }, async t => {
+  /* Entscheidung des Auftraggebers 03.11.2026: kein doppeltes „Analyse“ im Menü, Mega-Menü für Wissen, Menü-Button mobil */
+  const sichtbar = (page, s) => page.$$eval(s, es => es.map(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight; }));
+  let wk = null;
+  try { wk = await pw.webkit.launch(); } catch { /* unten als NOT_RUN gemeldet */ }
+  try {
+    for (const [name, engine] of [['Chromium', browser], ['WebKit', wk]]) {
+      await t.test(name, { skip: !engine && 'NOT_RUN: Playwright-WebKit nicht installiert (playwright install webkit)' }, async () => {
+        /* Desktop: Menüpunkte ohne „Analyse“, rechts der Button „Analyse“, kein Menü-Button */
+        let { context, page, errors, blocked } = await open('/index.html', { engine });
+        assert.deepEqual(await page.$$eval('.nav-links > a', as => as.map(a => a.textContent.trim())), ['Bericht', 'Bereiche', 'Angebot', 'FAQ', 'Wissen']);
+        assert.deepEqual(await page.$$eval('.nav .btn', as => as.map(a => a.textContent.trim())), ['Analyse']);
+        assert.equal(await page.isVisible('.nav-menu summary'), false, `${name}: kein Menü-Button auf dem Desktop`);
+        assert.equal(await page.isVisible('.mega-panel'), false, `${name}: Beiträge zunächst zugeklappt`);
+        await page.click('.mega summary');
+        assert.deepEqual(await sichtbar(page, '.mega-panel a'), Array(7).fill(true), `${name}: sechs Beiträge und „Mehr“ vollständig sichtbar`);
+        await page.mouse.click(20, 860);
+        assert.equal(await page.isVisible('.mega-panel'), false, `${name}: Klick daneben schließt`);
+        /* Tastatur: Enter öffnet, Escape schließt und lässt den Fokus auf dem Pfeil */
+        await page.focus('.mega summary');
+        await page.keyboard.press('Enter');
+        assert.equal(await page.isVisible('.mega-panel'), true, `${name}: Enter öffnet`);
+        await page.keyboard.press('Escape');
+        assert.deepEqual([await page.isVisible('.mega-panel'), await page.evaluate(() => document.activeElement.matches('.mega summary'))], [false, true], `${name}: Escape schließt, Fokus auf dem Pfeil`);
+        await page.click('.mega summary');
+        await Promise.all([page.waitForURL(/\/wissen\/(index(\.html)?)?$/), page.click('.mega-mehr a')]);
+        assert.deepEqual(errors, [], `${name}: Konsolenfehler`);
+        assert.deepEqual(blocked, [], `${name}: Fremd-Requests`);
+        await context.close();
+        /* Mobil: Menü-Button öffnet die Punkte; ein Sprungziel auf derselben Seite schließt das Menü */
+        ({ context, page, errors, blocked } = await open('/index.html', { width: 390, height: 800, engine }));
+        assert.equal(await page.isVisible('.nav-links'), false);
+        await page.click('.nav-menu summary');
+        assert.deepEqual(await sichtbar(page, '.nav-menu-panel a'), Array(5).fill(true), `${name}: fünf Menüpunkte vollständig sichtbar`);
+        await page.click('.nav-menu-panel a[href="#faq"]');
+        await page.waitForURL(/#faq$/);
+        assert.equal(await page.isVisible('.nav-menu-panel'), false, `${name}: nach der Wahl geschlossen`);
+        assert.deepEqual(errors, [], `${name}: Konsolenfehler (mobil)`);
+        await context.close();
+        /* Ohne JavaScript: beide Menüs öffnen trotzdem (<details>) */
+        for (const [width, s] of [[1440, '.mega'], [390, '.nav-menu']]) {
+          ({ context, page } = await open('/wissen/entity-trust.html', { width, height: 800, engine, javaScriptEnabled: false }));
+          await page.click(`${s} summary`);
+          assert.deepEqual(await sichtbar(page, `${s} ul a`), Array(s === '.mega' ? 7 : 5).fill(true), `${name} ${width} ohne JavaScript: ${s} öffnet`);
+          await context.close();
+        }
+      });
+    }
+  } finally {
+    if (wk) await wk.close();
+  }
+});
+
+test('Accessibility-Snapshot (axe-core): keine schweren Verstöße auf Startseite (auch mit Fehlern), Methodik, Wissens- und Analyseseiten, Rechtsseiten, Eingabe-, Fehler- und Bestätigungsseite', { skip: skip || (!AXE && 'NOT_RUN: PXK_AXE nicht gesetzt') }, async t => {
   await resetData();
   const report = {};
-  for (const path of ['/index.html', 'hero-fehler', '/pruefkriterien.html', '/impressum.html', '/datenschutz.html', '/agb.html', '/api/anfrage', 'server-fehler', 'angenommen']) {
+  for (const path of ['/index.html', 'hero-fehler', '/impressum.html', '/datenschutz.html', '/agb.html', '/wissen/index.html', '/wissen/seo-geo-ai-visibility.html', '/wissen/wie-ki-websites-liest.html', '/wissen/wie-websites-ausgeliefert-werden.html', '/wissen/answerability.html', '/wissen/entity-trust.html', '/wissen/agent-readiness.html', '/analyse/index.html', '/analyse/auffindbarkeit-seo.html', '/analyse/performance-technik.html', '/analyse/nutzerfuehrung-conversion.html', '/analyse/vertrauen-datenschutz.html', '/analyse/barrierefreiheit.html', '/analyse/ki-verstaendlichkeit.html', '/analyse/methodik.html', '/analyse/warum-website-analyse.html', '/analyse/ki-crawler-agenten.html', '/api/anfrage', 'server-fehler', 'angenommen']) {
     /* axe wird als Inline-Skript injiziert; die CSP der Seite würde das (korrekt) blockieren */
     const o = await open(path.startsWith('/') ? path : path === 'server-fehler' ? '/api/anfrage' : '/index.html', { bypassCSP: true });
     if (path === 'hero-fehler') await o.page.click('.url-field .btn');

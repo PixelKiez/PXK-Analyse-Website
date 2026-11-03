@@ -78,8 +78,36 @@ export class View {
 <header class="nav-wrap" id="nav">
   <nav class="nav" aria-label="Hauptnavigation">
     <a class="logo" href="${b}/index.html#top">360°Pixelkiez<span>Analyse</span></a>
-    <div class="nav-links"><a href="${b}/index.html#bericht">Bericht</a><a href="${b}/index.html#bereiche">Bereiche</a><a href="${b}/index.html#angebot">Angebot</a><a href="${b}/index.html#faq">FAQ</a></div>
-    <a class="btn btn--ghost btn--sm" href="${b}/index.html">Start</a>
+    <div class="nav-links">
+      <a href="${b}/index.html#bericht">Bericht</a>
+      <a href="${b}/index.html#bereiche">Bereiche</a>
+      <a href="${b}/index.html#angebot">Angebot</a>
+      <a href="${b}/index.html#faq">FAQ</a>
+      <a href="${b}/wissen/index.html">Wissen</a>
+      <details class="mega">
+        <summary aria-label="Beiträge im Wissensbereich"><svg class="mega-pfeil" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+        <ul class="mega-panel">
+          <li><a href="${b}/wissen/seo-geo-ai-visibility.html">SEO, GEO und AI Visibility: Begriffe, Grundlagen, Grenzen</a></li>
+          <li><a href="${b}/wissen/wie-ki-websites-liest.html">Wie KI-Systeme Ihre Website abrufen und was dabei ankommt</a></li>
+          <li><a href="${b}/wissen/wie-websites-ausgeliefert-werden.html">Was Ihre Website beim ersten Abruf tatsächlich ausliefert</a></li>
+          <li><a href="${b}/wissen/answerability.html">Answerability: Wann eine Website Kundenfragen wirklich beantwortet</a></li>
+          <li><a href="${b}/wissen/entity-trust.html">Entity Trust: Ist Ihr Unternehmen für Maschinen eindeutig?</a></li>
+          <li><a href="${b}/wissen/agent-readiness.html">Agent-Readiness: Von der lesbaren zur bedienbaren Website</a></li>
+          <li class="mega-mehr"><a href="${b}/wissen/index.html">Mehr im Wissensbereich <span aria-hidden="true">→</span></a></li>
+        </ul>
+      </details>
+    </div>
+    <a class="btn btn--ghost btn--sm" href="${b}/analyse/index.html">Analyse</a>
+    <details class="nav-menu">
+      <summary aria-label="Menü"><svg class="nav-menu-auf" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M3 6h14M3 10h14M3 14h14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><svg class="nav-menu-zu" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M5 5l10 10M15 5 5 15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></summary>
+      <ul class="nav-menu-panel">
+        <li><a href="${b}/index.html#bericht">Bericht</a></li>
+        <li><a href="${b}/index.html#bereiche">Bereiche</a></li>
+        <li><a href="${b}/index.html#angebot">Angebot</a></li>
+        <li><a href="${b}/index.html#faq">FAQ</a></li>
+        <li><a href="${b}/wissen/index.html">Wissen</a></li>
+      </ul>
+    </details>
   </nav>
 </header>
 <main class="frame" id="top">

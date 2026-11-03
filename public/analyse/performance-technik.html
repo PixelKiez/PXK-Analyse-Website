@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self' https://accounts.google.com">
+<meta name="robots" content="noindex,nofollow">
+<title>Website-Performance prüfen: 9 Kriterien | 360°Pixelkiez</title>
+<meta name="description" content="Core Web Vitals, Labor- und Felddaten, Bilder, Caching, Rendering: Wie die Website-Analyse Ladezeit und Technik prüft und was die Werte wirklich aussagen.">
+<link rel="canonical" href="https://360.pixelkiez.de/analyse/performance-technik">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="360°Pixelkiez">
+<meta property="og:title" content="Website-Performance prüfen: 9 Kriterien">
+<meta property="og:description" content="Core Web Vitals, Labor- und Felddaten, Bilder, Caching, Rendering: Wie die Website-Analyse Ladezeit und Technik prüft und was die Werte wirklich aussagen.">
+<meta property="og:url" content="https://360.pixelkiez.de/analyse/performance-technik">
+<meta property="og:locale" content="de_DE">
+<meta property="og:image" content="https://360.pixelkiez.de/assets/og/analyse-performance-technik.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Titelbild: „Performance &amp; Technik: 9 Prüfkriterien der Website-Analyse“ mit Linienillustration – 360°Pixelkiez Analyse">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://360.pixelkiez.de/assets/og/analyse-performance-technik.jpg">
+<meta name="twitter:image:alt" content="Titelbild: „Performance &amp; Technik: 9 Prüfkriterien der Website-Analyse“ mit Linienillustration – 360°Pixelkiez Analyse">
+<link rel="icon" href="../favicon.ico" sizes="32x32">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../assets/styles.css">
+<link rel="stylesheet" href="../assets/anfrage.css">
+<link rel="stylesheet" href="../assets/inhalt.css">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "Article", "headline": "Performance & Technik: 9 Prüfkriterien der Website-Analyse", "description": "Core Web Vitals, Labor- und Felddaten, Bilder, Caching, Rendering: Wie die Website-Analyse Ladezeit und Technik prüft und was die Werte wirklich aussagen.", "image": {"@type": "ImageObject", "url": "https://360.pixelkiez.de/assets/og/analyse-performance-technik.jpg", "width": 1200, "height": 630}, "inLanguage": "de-DE", "url": "https://360.pixelkiez.de/analyse/performance-technik", "mainEntityOfPage": "https://360.pixelkiez.de/analyse/performance-technik", "dateModified": "2026-11-02", "author": {"@type": "Organization", "name": "360°Pixelkiez", "url": "https://360.pixelkiez.de/"}, "publisher": {"@type": "Organization", "name": "360°Pixelkiez", "url": "https://360.pixelkiez.de/"}, "isPartOf": {"@type": "CollectionPage", "url": "https://360.pixelkiez.de/analyse/"}}, {"@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Warum unterscheidet sich mein PageSpeed-Insights-Wert von Tag zu Tag?", "acceptedAnswer": {"@type": "Answer", "text": "Der Leistungswert von Lighthouse basiert auf einem Labortest, der von Serverauslastung, Netzwerk und Messbedingungen beeinflusst wird. Schwankungen von einigen Punkten sind normal. Aussagekräftiger für die tatsächliche Nutzererfahrung sind die Felddaten im oberen Bereich des Berichts, sofern sie für Ihre Website verfügbar sind."}}, {"@type": "Question", "name": "Was ist wichtiger: der Lighthouse-Wert oder die Core Web Vitals?", "acceptedAnswer": {"@type": "Answer", "text": "Für die Nutzererfahrung und für die Einordnung durch Google sind die Core Web Vitals aus Felddaten maßgeblich. Der Lighthouse-Wert ist ein Diagnosewerkzeug, das hilft, Ursachen zu finden. Ein Wert von 100 ist kein Ziel an sich."}}, {"@type": "Question", "name": "Meine Website hat keine Felddaten. Ist das ein Problem?", "acceptedAnswer": {"@type": "Answer", "text": "Nein, das bedeutet nur, dass nicht genügend Besuche für eine Auswertung im Chrome User Experience Report vorliegen. In diesem Fall stützen wir uns auf Labormessungen; das Kriterium Felddaten fließt dann nicht in die Bewertung ein. Mit einem eigenen Messwerkzeug für echte Besuche (Real User Monitoring) lassen sich solche Daten auch für kleinere Websites erheben."}}, {"@type": "Question", "name": "Wird meine Website durch bessere Ladezeiten auch in KI-Antworten sichtbarer?", "acceptedAnswer": {"@type": "Answer", "text": "Ein direkter Zusammenhang ist nicht belegt. Relevant ist aber die Darstellungsfrage: Inhalte, die nur per JavaScript entstehen, erreichen viele KI-Crawler gar nicht. Serverseitig ausgelieferte Inhalte sind für Suchmaschinen und KI-Systeme gleichermaßen zugänglich."}}]}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Start", "item": "https://360.pixelkiez.de/"}, {"@type": "ListItem", "position": 2, "name": "Analyse", "item": "https://360.pixelkiez.de/analyse/"}, {"@type": "ListItem", "position": 3, "name": "Performance & Technik", "item": "https://360.pixelkiez.de/analyse/performance-technik"}]}]}</script>
+</head>
+<body class="inhalt">
+<svg class="sr-only" width="0" height="0" aria-hidden="true">
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+</svg>
+
+<header class="nav-wrap" id="nav">
+  <nav class="nav" aria-label="Hauptnavigation">
+    <a class="logo" href="../index.html#top">360°Pixelkiez<span>Analyse</span></a>
+    <div class="nav-links">
+      <a href="../index.html#bericht">Bericht</a>
+      <a href="../index.html#bereiche">Bereiche</a>
+      <a href="../index.html#angebot">Angebot</a>
+      <a href="../index.html#faq">FAQ</a>
+      <a href="../wissen/index.html">Wissen</a>
+      <details class="mega">
+        <summary aria-label="Beiträge im Wissensbereich"><svg class="mega-pfeil" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+        <ul class="mega-panel">
+          <li><a href="../wissen/seo-geo-ai-visibility.html">SEO, GEO und AI Visibility: Begriffe, Grundlagen, Grenzen</a></li>
+          <li><a href="../wissen/wie-ki-websites-liest.html">Wie KI-Systeme Ihre Website abrufen und was dabei ankommt</a></li>
+          <li><a href="../wissen/wie-websites-ausgeliefert-werden.html">Was Ihre Website beim ersten Abruf tatsächlich ausliefert</a></li>
+          <li><a href="../wissen/answerability.html">Answerability: Wann eine Website Kundenfragen wirklich beantwortet</a></li>
+          <li><a href="../wissen/entity-trust.html">Entity Trust: Ist Ihr Unternehmen für Maschinen eindeutig?</a></li>
+          <li><a href="../wissen/agent-readiness.html">Agent-Readiness: Von der lesbaren zur bedienbaren Website</a></li>
+          <li class="mega-mehr"><a href="../wissen/index.html">Mehr im Wissensbereich <span aria-hidden="true">→</span></a></li>
+        </ul>
+      </details>
+    </div>
+    <a class="btn btn--ghost btn--sm" href="../analyse/index.html" aria-current="page">Analyse</a>
+    <details class="nav-menu">
+      <summary aria-label="Menü"><svg class="nav-menu-auf" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M3 6h14M3 10h14M3 14h14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><svg class="nav-menu-zu" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M5 5l10 10M15 5 5 15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></summary>
+      <ul class="nav-menu-panel">
+        <li><a href="../index.html#bericht">Bericht</a></li>
+        <li><a href="../index.html#bereiche">Bereiche</a></li>
+        <li><a href="../index.html#angebot">Angebot</a></li>
+        <li><a href="../index.html#faq">FAQ</a></li>
+        <li><a href="../wissen/index.html">Wissen</a></li>
+      </ul>
+    </details>
+  </nav>
+</header>
+
+<main class="frame" id="top">
+  <section class="kopf">
+<nav class="krumen" aria-label="Brotkrumen"><ol><li><a href="../index.html">Start</a></li><li><a href="index.html">Analyse</a></li><li aria-current="page">Performance &amp; Technik</li></ol></nav>
+<h1 class="kopf-titel">Performance &amp; Technik: 9 Prüfkriterien der Website-Analyse</h1>
+<p class="kopf-lead">Eine Website kann inhaltlich überzeugen und trotzdem Besucher verlieren, weil sie zu lange lädt, beim Antippen verzögert reagiert oder Inhalte während des Ladens verspringen. Solche Probleme fallen am eigenen schnellen Rechner im Büro oft nicht auf – wohl aber auf einem älteren Smartphone in einer Bahnfahrt mit schwankendem Netz.</p>
+<figure class="szene"><div class="szene-bild"><svg role="img" aria-label="Illustration: Ein Smartphone neben einem Ladeverlauf; ein hervorgehobener Balken verzögert den Hauptinhalt, eine gestrichelte Linie markiert den Grenzwert." viewBox="0 0 640 300" xmlns="http://www.w3.org/2000/svg" fill="none" stroke-linecap="round" stroke-linejoin="round">
+<rect x="36" y="56" width="104" height="188" rx="14"/><line x1="72" y1="70" x2="104" y2="70"/>
+<rect x="50" y="88" width="76" height="44" rx="4" class="kb-akzent"/><line x1="50" y1="146" x2="126" y2="146"/><line x1="50" y1="160" x2="110" y2="160" class="kb-leise"/><line x1="50" y1="174" x2="118" y2="174" class="kb-leise"/>
+<line x1="176" y1="60" x2="176" y2="248"/><line x1="176" y1="248" x2="612" y2="248"/>
+<rect x="188" y="72" width="120" height="14" rx="7"/>
+<rect x="232" y="100" width="96" height="14" rx="7"/>
+<rect x="250" y="128" width="236" height="14" rx="7" class="kb-akzent"/>
+<rect x="300" y="156" width="88" height="14" rx="7"/>
+<rect x="320" y="184" width="150" height="14" rx="7"/>
+<rect x="420" y="212" width="66" height="14" rx="7" class="kb-gestrichelt"/>
+<line x1="500" y1="60" x2="500" y2="248" class="kb-gestrichelt"/><path d="M492 60 h16" class="kb-akzent-linie"/></svg></div><figcaption><b>Was beim Laden zuerst zählt.</b> Ein Ladeverlauf zeigt, welche Ressourcen den sichtbaren Hauptinhalt verzögern. Die gestrichelte Linie steht für einen veröffentlichten Grenzwert, an dem sich Messungen einordnen lassen.</figcaption></figure>
+  </section>
+  <div class="spalte">
+<nav class="toc" aria-labelledby="toc-titel"><p class="toc-titel" id="toc-titel">Inhalt</p><ul><li><a href="#auf-einen-blick">Auf einen Blick</a></li><li><a href="#warum-ladezeit-und-technik-geschäftlich-relevant-sind">Warum Ladezeit und Technik geschäftlich relevant sind</a></li><li><a href="#feld--und-labordaten-zwei-verschiedene-fragen">Feld- und Labordaten: zwei verschiedene Fragen</a></li><li><a href="#prüfkriterien-im-detail">Prüfkriterien im Detail</a></li><li><a href="#quellen">Quellen</a></li><li><a href="#haeufige-fragen">Häufige Fragen</a></li><li><a href="#weiterlesen">Weiterlesen</a></li></ul></nav>
+<article class="lesetext">
+<p>Performance ist deshalb keine einzelne Zahl, sondern ein Zusammenspiel: Wie erleben echte Besucher die Seite? Wo liegen die technischen Ursachen? Und welche Ressourcen bremsen? Die neun Kriterien dieses Bereichs beantworten diese Fragen getrennt voneinander, weil jede Messart nur einen Teil der Wirklichkeit zeigt.</p>
+<h2 id="auf-einen-blick">Auf einen Blick</h2>
+<ul>
+<li>Geprüft werden <strong>Felddaten echter Besuche, kontrollierte Labormessungen für Mobil und Desktop, Ressourcengewicht, Bildauslieferung, Caching und Kompression, blockierende Ressourcen, responsive Darstellung</strong> sowie ein <strong>öffentlicher Technologie-Snapshot</strong>.</li>
+<li><strong>Felddaten und Labordaten sind nicht austauschbar.</strong> Felddaten zeigen, wie reale Besuche verlaufen sind; Labordaten helfen, Ursachen reproduzierbar zu finden (<a href="https://web.dev/articles/vitals-tools" rel="noopener">web.dev: Tools zum Messen der Core Web Vitals</a>).</li>
+<li>Laut dem im Januar 2026 veröffentlichten Web Almanac 2025 des HTTP Archive erreichten nur <strong>48 % der Websites auf Mobilgeräten</strong> und <strong>56 % auf Desktop</strong> gute Werte in allen drei Core Web Vitals (Datenbasis Juli 2025) (<a href="https://almanac.httparchive.org/en/2025/performance" rel="noopener">HTTP Archive: Web Almanac 2025, Performance</a>).</li>
+<li>Gute Werte sind ein Qualitätsmerkmal, aber <strong>keine Ranking-Garantie</strong> (<a href="https://developers.google.com/search/docs/appearance/page-experience?hl=en" rel="noopener">Google Search Central: Page Experience</a>).</li>
+</ul>
+<h2 id="warum-ladezeit-und-technik-geschäftlich-relevant-sind">Warum Ladezeit und Technik geschäftlich relevant sind</h2>
+<p>Google beschreibt mit den Core Web Vitals drei Aspekte der Nutzererfahrung: wie schnell der Hauptinhalt erscheint (Largest Contentful Paint, LCP), wie schnell die Seite auf Eingaben reagiert (Interaction to Next Paint, INP) und wie stabil das Layout bleibt (Cumulative Layout Shift, CLS). Als gut gelten ein LCP von höchstens 2,5 Sekunden, ein INP von höchstens 200 Millisekunden und ein CLS von höchstens 0,1 – jeweils gemessen am 75. Perzentil der Seitenaufrufe, getrennt nach Mobil und Desktop. (<a href="https://web.dev/articles/vitals" rel="noopener">web.dev: Web Vitals</a>).</p>
+<p>Google empfiehlt gute Core Web Vitals für den Erfolg in der Suche, stellt aber klar, dass gute Werte allein keine Top-Positionen garantieren; relevante Inhalte bleiben entscheidend (<a href="https://developers.google.com/search/docs/appearance/page-experience?hl=en" rel="noopener">Google Search Central: Page Experience</a>). Der geschäftliche Effekt zeigt sich vor allem bei den Menschen auf der Seite. Ray-Ban ließ Produktseiten per Prerendering vorab laden; Besucher vorgeladener Produktseiten wiesen auf Mobilgeräten eine etwa doppelt so hohe Conversion-Rate auf wie Besucher regulär ausgelieferter Seiten. Laut der Fallstudie aus dem Jahr 2025 wurde das per A/B-Test bestätigt, Angaben zu Stichprobe und Laufzeit fehlen allerdings (<a href="https://web.dev/case-studies/rayban-speculation-rules" rel="noopener">web.dev: Ray-Ban-Fallstudie</a>). Beim Onlinehändler Trendyol führte eine etwa halbierte Reaktionszeit der Listenseiten (INP) in einem A/B-Test zu rund 1 % mehr Klicks auf Produktseiten pro Sitzung – ein messbarer, aber kleiner Effekt (<a href="https://web.dev/case-studies/trendyol-inp" rel="noopener">web.dev: Trendyol-Fallstudie</a>). Solche Fallstudien sind Einzelfälle, keine Prognose für jede Website.</p>
+<p>Wie verbreitet Performance-Probleme sind, zeigt der Web Almanac des HTTP Archive: Auf Mobilgeräten erreichten 2025 nur 62 % der Websites einen guten LCP, 77 % einen guten INP und 81 % einen guten CLS. Der Ladevorgang des Hauptinhalts ist damit die häufigste Schwachstelle. Startseiten schneiden dabei schlechter ab als Unterseiten: Nur 45 % der mobilen Startseiten erreichten gute Core Web Vitals, gegenüber 56 % der mobilen Unterseiten (<a href="https://almanac.httparchive.org/en/2025/performance" rel="noopener">HTTP Archive: Web Almanac 2025, Performance</a>). Einen anderen Ausschnitt zeigen die aktuellen Felddaten des Chrome User Experience Report, die Websites (Origins) statt einzelner Seiten zählen und sich deshalb nicht direkt mit dem Web Almanac vergleichen lassen: Im September 2026 hatten 55,9 % der rund 18,4 Millionen im Chrome User Experience Report erfassten Websites (Origins) gute Werte in allen drei Core Web Vitals; eine Aufteilung nach Gerätetyp weisen die Release Notes nicht aus (<a href="https://developer.chrome.com/docs/crux/release-notes?hl=en" rel="noopener">Chrome for Developers: CrUX Release Notes</a>).</p>
+<h2 id="feld--und-labordaten-zwei-verschiedene-fragen">Feld- und Labordaten: zwei verschiedene Fragen</h2>
+<p>Bevor die einzelnen Kriterien folgen, lohnt sich ein Blick auf den wichtigsten methodischen Unterschied dieses Bereichs.</p>
+<p><strong>Felddaten</strong> stammen aus echten Besuchen, etwa aus dem Chrome User Experience Report (CrUX). Sie beantworten die Frage: Wie haben reale Menschen mit ihren Geräten und Verbindungen die Seite erlebt? Sie sind die Grundlage für die Bewertung der Core Web Vitals, liegen aber nur vor, wenn eine Seite oder Website genügend Besuche hat, und bilden einen zurückliegenden Zeitraum ab.</p>
+<p><strong>Labordaten</strong> entstehen in einem kontrollierten Test, etwa mit Lighthouse, unter festgelegten Bedingungen für Gerät und Netzwerk. Sie beantworten die Frage: Was passiert technisch beim Laden, und welche Ressource verursacht eine Verzögerung? Sie sind wiederholbar und ideal für die Fehlersuche, zeigen aber nicht, wie es echten Besuchern ergangen ist (<a href="https://web.dev/articles/vitals-tools" rel="noopener">web.dev: Tools zum Messen der Core Web Vitals</a>).</p>
+<p>Ein hoher Lighthouse-Wert bedeutet deshalb nicht automatisch, dass die Core Web Vitals im Feld gut sind – und umgekehrt. In unserer Auswertung bleiben beide Datenarten getrennt.</p>
+<h2 id="prüfkriterien-im-detail">Prüfkriterien im Detail</h2>
+<h3 id="core-web-vitals-felddaten">Core Web Vitals Felddaten</h3>
+<p><strong>Worum es geht.</strong> Ausgewertet werden aktuelle Felddaten zu LCP, INP und CLS für die geprüfte Adresse oder die gesamte Website, sofern öffentlich verfügbar.</p>
+<p><strong>Warum das wichtig ist.</strong> Nur Felddaten zeigen, wie Ihre Website bei Ihrem tatsächlichen Publikum funktioniert – mit dessen Geräten, Netzen und Nutzungsgewohnheiten. Die Schwellenwerte für „gut“ beziehen sich ausdrücklich auf das 75. Perzentil; drei von vier Seitenaufrufen sollen den Wert also erreichen (<a href="https://web.dev/articles/vitals" rel="noopener">web.dev: Web Vitals</a>).</p>
+<p><strong>So prüfen wir.</strong> Wir verwenden aktuelle, öffentlich verfügbare Felddaten und dokumentieren, ob sie sich auf eine einzelne Adresse oder die gesamte Website beziehen und welchen Zeitraum sie abdecken. Ein einzelner Labortest wird nie als Felddatum ausgegeben.</p>
+<p><strong>Typische Befunde.</strong></p>
+<ul>
+<li>Gute Desktop-Werte, aber ein zu langsamer LCP auf Mobilgeräten.</li>
+<li>Ein schlechter INP durch umfangreiche Skripte, etwa für Tracking, Chat-Widgets oder Cookie-Banner.</li>
+<li>Ein erhöhter CLS durch nachladende Werbe- oder Bannerflächen.</li>
+</ul>
+<p><strong>Was Sie tun können.</strong> Beobachten Sie die Werte im Bericht „Core Web Vitals“ der Google Search Console oder in PageSpeed Insights und priorisieren Sie die Kennzahl, die den Schwellenwert am deutlichsten verfehlt. Prüfen Sie nach einer Optimierung über mehrere Wochen, ob sich die Felddaten tatsächlich verbessern.</p>
+<p><strong>Grenzen der Aussage.</strong> Felddaten sind eine Stichprobe realer Besuche. Fehlen sie, weil eine Website zu wenig Besuche hat, ist das kein schlechtes Ergebnis, sondern der Status „nicht geprüft“. Felddaten belegen keine Geschäftsergebnisse.</p>
+<h3 id="mobile-labormessung">Mobile Labormessung</h3>
+<p><strong>Worum es geht.</strong> Eine kontrollierte Messung simuliert ein typisches Smartphone mit gedrosselter Verbindung und zeichnet auf, wie die Seite lädt.</p>
+<p><strong>Warum das wichtig ist.</strong> Mobilgeräte haben meist weniger Rechenleistung und oft langsamere Verbindungen als Desktop-Rechner. Viele Engpässe – etwa ein zu großes Titelbild oder umfangreiches JavaScript – treten erst unter diesen Bedingungen deutlich hervor. Die Labormessung macht sie reproduzierbar sichtbar und zeigt, welche Ressource die Verzögerung verursacht (<a href="https://web.dev/articles/optimize-lcp" rel="noopener">web.dev: LCP optimieren</a>).</p>
+<p><strong>So prüfen wir.</strong> Werkzeug, Version, Datum, Geräte- und Netzwerkprofil sowie die getestete Adresse werden dokumentiert, damit ein späterer Vergleich unter denselben Bedingungen möglich ist.</p>
+<p><strong>Typische Befunde.</strong></p>
+<ul>
+<li>Das Titelbild wird spät entdeckt, weil es erst per JavaScript oder CSS eingebunden wird.</li>
+<li>Schriftdateien oder Skripte verzögern die erste Darstellung.</li>
+<li>Der Hauptthread ist durch umfangreiche Skripte lange blockiert.</li>
+</ul>
+<p><strong>Was Sie tun können.</strong> Nutzen Sie den Labortest als Diagnosewerkzeug: Beheben Sie die größten Verursacher und messen Sie danach unter identischen Bedingungen erneut. Ergänzen Sie die Ergebnisse, sobald verfügbar, durch Felddaten.</p>
+<p><strong>Grenzen der Aussage.</strong> Ein Labortest bildet nicht ab, wie alle Geräte, Netze und Besucher die Seite erleben. Einzelne Läufe schwanken; Aussagen beruhen deshalb auf dokumentierten Bedingungen, nicht auf Kommastellen.</p>
+<h3 id="desktop-labormessung">Desktop Labormessung</h3>
+<p><strong>Worum es geht.</strong> Dieselbe kontrollierte Messung erfolgt mit einem Desktop-Profil.</p>
+<p><strong>Warum das wichtig ist.</strong> Viele Geschäftskunden recherchieren am Arbeitsplatz. Auch dort fallen langsame Serverantworten, schwere Skripte oder fehlerhafte Ladereihenfolgen auf. Der Desktop-Test hilft zudem, Ursachen von Geräteeinflüssen zu trennen: Ist eine Seite auch am Desktop langsam, liegt das Problem häufig beim Server oder bei der Auslieferung.</p>
+<p><strong>So prüfen wir.</strong> Wie bei der mobilen Messung werden Werkzeug, Version, Profil, Datum und Adresse dokumentiert.</p>
+<p><strong>Typische Befunde.</strong></p>
+<ul>
+<li>Lange Serverantwortzeiten (Time to First Byte), etwa durch fehlendes Caching im CMS.</li>
+<li>Große Bibliotheken, die nur für einzelne Funktionen geladen werden.</li>
+<li>Gute Desktop-Werte, die über deutliche Mobilprobleme hinwegtäuschen.</li>
+</ul>
+<p><strong>Was Sie tun können.</strong> Vergleichen Sie Desktop- und Mobilergebnis direkt. Sind beide langsam, beginnen Sie bei Server und Caching; ist nur Mobil langsam, bei Bildgrößen, Skriptumfang und Rechenlast.</p>
+<p><strong>Grenzen der Aussage.</strong> Auch Desktop-Laborwerte sind keine realen Nutzerdaten und lassen sich nicht auf alle Seitentypen übertragen.</p>
+<h3 id="asset-gewicht--ressourcenlast">Asset-Gewicht &amp; Ressourcenlast</h3>
+<p><strong>Worum es geht.</strong> Erfasst wird, wie viele Daten eine Seite überträgt und welche Ressourcenarten dominieren: Bilder, JavaScript, CSS, Schriften oder Drittanbieter-Skripte.</p>
+<p><strong>Warum das wichtig ist.</strong> Jede Ressource muss übertragen, verarbeitet und gegebenenfalls ausgeführt werden. Besonders JavaScript belastet Mobilgeräte doppelt – beim Herunterladen und beim Ausführen. web.dev empfiehlt, unnötige Downloads zu vermeiden und die verbleibenden Ressourcen komprimiert zu übertragen (<a href="https://web.dev/articles/optimizing-content-efficiency-optimize-encoding-and-transfer" rel="noopener">web.dev: Kodierung und Übertragung optimieren</a>).</p>
+<p><strong>So prüfen wir.</strong> In einer Stichprobe wichtiger Seitentypen werden Übertragungsgröße und auffällige Ressourcenklassen erfasst und im Zusammenhang mit dem Ladeverhalten bewertet.</p>
+<p><strong>Typische Befunde.</strong></p>
+<ul>
+<li>Bilder in Druckauflösung, die im Browser stark verkleinert dargestellt werden.</li>
+<li>Mehrere Tracking-, Chat- und Marketing-Skripte, die auf jeder Seite laden.</li>
+<li>Schriftfamilien mit vielen ungenutzten Schnitten.</li>
+</ul>
+<p><strong>Was Sie tun können.</strong> Prüfen Sie jedes Drittanbieter-Skript auf seinen tatsächlichen Nutzen, entfernen Sie ungenutzte Bibliotheken und laden Sie Funktionen nur auf den Seiten, die sie benötigen.</p>
+<p><strong>Grenzen der Aussage.</strong> Das Gewicht allein sagt nicht zuverlässig voraus, wie schnell sich eine Seite anfühlt. Ein großes, aber korrekt priorisiertes Bild kann unproblematisch sein; ein kleines, aber blockierendes Skript dagegen nicht.</p>
+<h3 id="bild---media-pipeline">Bild- &amp; Media-Pipeline</h3>
+<p><strong>Worum es geht.</strong> Geprüft wird, wie Bilder und Videos ausgeliefert werden: in welchen Formaten, in welchen Größen, mit responsiven Varianten, mit festen Abmessungen und mit welcher Ladepriorität.</p>
+<p><strong>Warum das wichtig ist.</strong> Meist ist ein Bild das größte sichtbare Element einer Seite und bestimmt damit den LCP: Laut Web Almanac 2025 war das auf 76 % der mobilen Seiten der Fall. Zugleich hatten 62 % der mobilen Seiten mindestens ein Bild ohne feste Abmessungen – eine häufige Ursache für verspringende Layouts (<a href="https://almanac.httparchive.org/en/2025/performance" rel="noopener">HTTP Archive: Web Almanac 2025, Performance</a>). web.dev empfiehlt, das wichtigste Bild früh im HTML auffindbar zu machen und es nicht verzögert zu laden (<a href="https://web.dev/articles/optimize-lcp" rel="noopener">web.dev: LCP optimieren</a>).</p>
+<p><strong>So prüfen wir.</strong> Auf repräsentativen Seiten werden Bildformate, Abmessungen, responsive Varianten (<code>srcset</code> und <code>sizes</code>), verzögertes Laden und die Priorisierung des Hauptbildes untersucht.</p>
+<p><strong>Typische Befunde.</strong></p>
+<ul>
+<li>Das Titelbild ist mit <code>loading="lazy"</code> ausgezeichnet und wird dadurch zu spät geladen.</li>
+<li>Smartphones erhalten dieselbe große Bilddatei wie Desktop-Bildschirme.</li>
+<li>Bilder ohne <code>width</code>- und <code>height</code>-Angaben verschieben beim Laden den Text.</li>
+</ul>
+<p><strong>Was Sie tun können.</strong> Liefern Sie Bilder in passender Größe und in modernen Formaten wie WebP oder AVIF aus, geben Sie feste Abmessungen an, laden Sie Bilder unterhalb des sichtbaren Bereichs verzögert und das wichtigste Bild bevorzugt. Viele CMS und Bild-CDNs übernehmen diese Schritte automatisch, wenn sie richtig konfiguriert sind.</p>
+<p><strong>Grenzen der Aussage.</strong> Eine gut eingerichtete Bildauslieferung beweist keine guten Felddaten, und nicht jeder Browser unterstützt jedes Format gleich.</p>
+<h3 id="caching--kompression">Caching &amp; Kompression</h3>
+<p><strong>Worum es geht.</strong> Untersucht werden öffentliche Angaben zum Zwischenspeichern (Caching) und zur Komprimierung von Ressourcen, etwa die HTTP-Header <code>Cache-Control</code> und <code>Content-Encoding</code>.</p>
+<p><strong>Warum das wichtig ist.</strong> Caching sorgt dafür, dass Browser und Zwischenserver bereits geladene Dateien wiederverwenden, statt sie erneut anzufordern. Kompression verkleinert Textdateien wie HTML, CSS und JavaScript bei der Übertragung erheblich. Beides spart Ladezeit und Serverlast, besonders bei wiederkehrenden Besuchen (<a href="https://web.dev/articles/http-cache" rel="noopener">web.dev: HTTP-Cache</a>). Gleichzeitig dürfen persönliche oder sensible Inhalte nicht in gemeinsam genutzten Zwischenspeichern landen (<a href="https://cheatsheetseries.owasp.org/cheatsheets/Transport_Layer_Security_Cheat_Sheet.html" rel="noopener">OWASP: Transport Layer Security Cheat Sheet</a>).</p>
+<p><strong>So prüfen wir.</strong> Für ausgewählte HTML-Seiten und statische Dateien werden die relevanten Header erfasst und auf Plausibilität geprüft: Werden versionierte Dateien lange zwischengespeichert, wird HTML angemessen aktualisiert, sind Textressourcen komprimiert?</p>
+<p><strong>Typische Befunde.</strong></p>
+<ul>
+<li>Statische Dateien ohne Cache-Angabe, die bei jedem Seitenaufruf neu geladen werden.</li>
+<li>Fehlende Komprimierung für CSS- oder JavaScript-Dateien.</li>
+<li>Sehr lange Cache-Dauern für Dateien ohne Versionierung, sodass Änderungen erst verzögert ankommen.</li>
+</ul>
+<p><strong>Was Sie tun können.</strong> Versehen Sie Dateinamen statischer Ressourcen mit einer Versionskennung und lassen Sie diese lange zwischenspeichern. Aktivieren Sie Brotli- oder Gzip-Kompression für Textressourcen und schließen Sie persönliche Inhalte ausdrücklich vom gemeinsamen Caching aus.</p>
+<p><strong>Grenzen der Aussage.</strong> Header zeigen die Absicht, nicht zwingend die Wirkung entlang des gesamten Übertragungswegs. Ob alle Zwischenspeicher korrekt arbeiten, lässt sich von außen nicht vollständig belegen.</p>
+<h3 id="render-blockierende-ressourcen">Render-blockierende Ressourcen</h3>
+<p><strong>Worum es geht.</strong> Gesucht wird nach CSS-, JavaScript- oder Schriftdateien, die der Browser laden muss, bevor er Inhalte darstellen kann.</p>
+<p><strong>Warum das wichtig ist.</strong> Solange blockierende Ressourcen fehlen, bleibt der Bildschirm leer oder unvollständig – auch wenn der eigentliche Inhalt längst übertragen ist. web.dev zählt es zu den wirksamsten Maßnahmen, die LCP-Ressource früh auffindbar zu machen und blockierende Abhängigkeiten zu reduzieren (<a href="https://web.dev/articles/top-cwv" rel="noopener">web.dev: Die wirksamsten Optimierungen für Core Web Vitals</a>).</p>
+<p><strong>So prüfen wir.</strong> Ressourcenabhängigkeiten werden mit Seiten- und Laborwerkzeugen analysiert. Dabei unterscheiden wir zwischen einer erkennbaren Abhängigkeit und einer tatsächlich gemessenen Verzögerung.</p>
+<p><strong>Typische Befunde.</strong></p>
+<ul>
+<li>Mehrere große CSS-Dateien im Kopfbereich, von denen nur ein Bruchteil für den ersten Bildschirm nötig ist.</li>
+<li>Skripte ohne <code>defer</code> oder <code>async</code>, die die Darstellung anhalten.</li>
+<li>Externe Schriften, die ohne Ausweichschrift geladen werden und Text zunächst unsichtbar lassen.</li>
+</ul>
+<p><strong>Was Sie tun können.</strong> Laden Sie nicht kritische Skripte verzögert, binden Sie für den ersten Bildschirm benötigtes CSS direkt ein und verwenden Sie für Schriften eine Ausweichdarstellung (<code>font-display: swap</code>). Prüfen Sie anschließend per Messung, ob sich die Darstellung tatsächlich beschleunigt hat.</p>
+<p><strong>Grenzen der Aussage.</strong> Eine statische Analyse belegt nicht, wie lange eine Ressource die Darstellung tatsächlich blockiert. Dafür sind Laufzeit- oder Labordaten nötig.</p>
+<h3 id="responsive-auslieferung">Responsive Auslieferung</h3>
+<p><strong>Worum es geht.</strong> Geprüft wird, ob Inhalte, Bilder und Bedienelemente auf repräsentativen Bildschirmbreiten vollständig, lesbar und bedienbar sind.</p>
+<p><strong>Warum das wichtig ist.</strong> Google verwendet für Indexierung und Ranking vorrangig die mobile Version einer Website. Fehlen dort Inhalte, strukturierte Daten oder Bilder, die auf dem Desktop vorhanden sind, kennt Google sie unter Umständen nicht (<a href="https://developers.google.com/search/docs/crawling-indexing/mobile/mobile-sites-mobile-first-indexing?hl=en" rel="noopener">Google Search Central: Mobile-First-Indexierung</a>). Für Besucher bedeutet eine schwache mobile Darstellung schlicht, dass sie zentrale Informationen nicht finden.</p>
+<p><strong>So prüfen wir.</strong> Stichproben auf ausgewählten Bildschirmbreiten prüfen horizontales Scrollen, Reihenfolge und Vollständigkeit der Inhalte, Medien und grundlegende Bedienbarkeit. Das ist eine gezielte Sichtprüfung, kein vollständiges Gerätelabor.</p>
+<p><strong>Typische Befunde.</strong></p>
+<ul>
+<li>Tabellen oder Bilder, die breiter als der Bildschirm sind.</li>
+<li>Inhalte, die auf Mobilgeräten ausgeblendet werden, um Platz zu sparen.</li>
+<li>Wichtige Aktionen, die erst nach langem Scrollen erreichbar sind.</li>
+</ul>
+<p><strong>Was Sie tun können.</strong> Stellen Sie sicher, dass die mobile Version dieselben Inhalte enthält wie die Desktop-Version. Testen Sie wichtige Seitentypen auf mehreren Breiten und mit echten Geräten.</p>
+<p><strong>Grenzen der Aussage.</strong> Ausgewählte Bildschirmbreiten decken nicht jedes Gerät, jedes Betriebssystem und jede Nutzungssituation ab.</p>
+<h3 id="öffentlicher-technologie-snapshot">Öffentlicher Technologie-Snapshot</h3>
+<p><strong>Worum es geht.</strong> Dokumentiert werden öffentlich erkennbare Hinweise auf CMS, Framework, Hosting oder Auslieferung – und vor allem, ob die Inhalte bereits im ausgelieferten HTML stehen oder erst im Browser per JavaScript erzeugt werden.</p>
+<p><strong>Warum das wichtig ist.</strong> Der Snapshot liefert Kontext für Empfehlungen: Welche Optimierungen bietet das eingesetzte System bereits, und wo liegen typische Schwachstellen? Besonders wichtig ist die Frage der Darstellung. Google rendert JavaScript, empfiehlt aber weiterhin serverseitiges Rendering oder Pre-Rendering, weil nicht alle Bots JavaScript ausführen können (<a href="https://developers.google.com/search/docs/crawling-indexing/javascript/javascript-seo-basics?hl=en" rel="noopener">Google Search Central: JavaScript-SEO-Grundlagen</a>). OpenAI, Anthropic und Perplexity dokumentieren nicht, ob ihre Crawler JavaScript ausführen; eine Messung von Vercel und MERJ aus dem Dezember 2024 fand bei deren Crawlern keine JavaScript-Ausführung (<a href="https://vercel.com/blog/the-rise-of-the-ai-crawler" rel="noopener">Vercel: The rise of the AI crawler</a>). Inhalte, die erst im Browser entstehen, bleiben für diese Systeme möglicherweise unsichtbar. Mehr dazu im Beitrag <a href="ki-crawler-agenten.html">KI-Crawler und KI-Agenten</a>.</p>
+<p><strong>So prüfen wir.</strong> Beobachtet werden ausschließlich öffentlich sichtbare Signale im HTML und in den HTTP-Antworten. Schlussfolgerungen werden als Hinweise formuliert, nicht als gesicherte Aussagen über interne Systeme.</p>
+<p><strong>Typische Befunde.</strong></p>
+<ul>
+<li>Ein fast leeres HTML-Gerüst, dessen Inhalt vollständig per JavaScript nachgeladen wird.</li>
+<li>Hinweise auf veraltete Bibliotheks- oder CMS-Versionen.</li>
+<li>Ein CMS, dessen eingebaute Bild- oder Cache-Optimierungen nicht aktiviert sind.</li>
+</ul>
+<p><strong>Was Sie tun können.</strong> Liefern Sie zentrale Inhalte – Texte, Überschriften, Links und strukturierte Daten – direkt im HTML aus, etwa durch serverseitiges Rendering oder statische Generierung. Halten Sie CMS, Erweiterungen und Bibliotheken aktuell.</p>
+<p><strong>Grenzen der Aussage.</strong> Öffentliche Hinweise belegen weder die Qualität des Quellcodes noch die interne Architektur oder die Sicherheit der Auslieferung.</p>
+<h2 id="quellen">Quellen</h2>
+<p class="quellen-lead">Die Aussagen auf dieser Seite stützen sich auf die folgenden Quellen, geordnet nach Herausgeber. Angaben von Anbietern beschreiben, was ein Unternehmen über sein eigenes System sagt; sie sind dafür die maßgebliche Quelle und können sich jederzeit ändern. Bei Gesetzen, Standards und technischen Referenzen nennen wir die geltende Fassung.</p><dl class="quellen"><div class="q-group"><dt>Google</dt><dd class="q-desc">Google definiert die Core Web Vitals und ihre Schwellenwerte, erklärt das Verhältnis von Feld- und Labordaten, gibt Optimierungshinweise und veröffentlicht mit dem Chrome UX Report monatlich aktuelle Felddaten; die Fallstudien auf web.dev dokumentieren einzelne Unternehmen.</dd><dd class="q-links"><ul><li><a href="https://web.dev/articles/vitals-tools" rel="noopener">web.dev: Core Web Vitals workflows with Google tools</a></li><li><a href="https://developers.google.com/search/docs/appearance/page-experience?hl=en" rel="noopener">Understanding page experience in Google Search results</a></li><li><a href="https://web.dev/articles/vitals" rel="noopener">web.dev: Web Vitals</a></li><li><a href="https://web.dev/case-studies/rayban-speculation-rules" rel="noopener">web.dev-Fallstudie: How Ray-Ban doubled conversion rate … using the Speculation Rules API</a></li><li><a href="https://web.dev/case-studies/trendyol-inp" rel="noopener">web.dev-Fallstudie: How Trendyol reduced INP by 50 %</a></li><li><a href="https://developer.chrome.com/docs/crux/release-notes?hl=en" rel="noopener">Chrome UX Report: Release notes (Datensatz September 2026)</a></li><li><a href="https://web.dev/articles/optimize-lcp" rel="noopener">web.dev: Optimize Largest Contentful Paint</a></li><li><a href="https://web.dev/articles/optimizing-content-efficiency-optimize-encoding-and-transfer" rel="noopener">web.dev: Optimize the encoding and transfer size of text-based assets</a></li><li><a href="https://web.dev/articles/http-cache" rel="noopener">web.dev: Prevent unnecessary network requests with the HTTP Cache</a></li><li><a href="https://web.dev/articles/top-cwv" rel="noopener">web.dev: The most effective ways to improve Core Web Vitals</a></li><li><a href="https://developers.google.com/search/docs/crawling-indexing/mobile/mobile-sites-mobile-first-indexing?hl=en" rel="noopener">Mobile site and mobile-first indexing best practices</a></li><li><a href="https://developers.google.com/search/docs/crawling-indexing/javascript/javascript-seo-basics?hl=en" rel="noopener">Understand JavaScript SEO basics</a></li></ul></dd></div><div class="q-group"><dt>Vercel</dt><dd class="q-desc">Die Auswertung von Vercel und MERJ ist die jüngste uns bekannte veröffentlichte Messung außerhalb von Agentur-Tests, ob KI-Crawler JavaScript ausführen (Stand November 2026).</dd><dd class="q-links"><ul><li><a href="https://vercel.com/blog/the-rise-of-the-ai-crawler" rel="noopener">The rise of the AI crawler (Auswertung mit MERJ)</a></li></ul></dd></div><div class="q-group"><dt>HTTP Archive</dt><dd class="q-desc">Der Web Almanac wertet jährlich Millionen Websites aus und liefert die Verteilung der Core-Web-Vitals-Werte nach Gerät und Seitentyp.</dd><dd class="q-links"><ul><li><a href="https://almanac.httparchive.org/en/2025/performance" rel="noopener">Web Almanac 2025, Kapitel Performance</a></li></ul></dd></div><div class="q-group"><dt>OWASP Foundation</dt><dd class="q-desc">Die OWASP Foundation beschreibt bewährte Verfahren für TLS und den Umgang mit sensiblen Inhalten in Zwischenspeichern.</dd><dd class="q-links"><ul><li><a href="https://cheatsheetseries.owasp.org/cheatsheets/Transport_Layer_Security_Cheat_Sheet.html" rel="noopener">Transport Layer Security Cheat Sheet</a></li></ul></dd></div></dl>
+
+
+</article>
+  </div>
+  <section class="section cw-white" aria-labelledby="haeufige-fragen">
+    <div class="faq-grid">
+      <div class="section-head"><h2 class="h2" id="haeufige-fragen">Häufige Fragen.</h2></div>
+      <div class="faq">
+        <details id="warum-unterscheidet-sich-mein-pagespeed-insights-wert-von-tag-zu-tag"><summary>Warum unterscheidet sich mein PageSpeed-Insights-Wert von Tag zu Tag?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Der Leistungswert von Lighthouse basiert auf einem Labortest, der von Serverauslastung, Netzwerk und Messbedingungen beeinflusst wird. Schwankungen von einigen Punkten sind normal. Aussagekräftiger für die tatsächliche Nutzererfahrung sind die Felddaten im oberen Bereich des Berichts, sofern sie für Ihre Website verfügbar sind.</p></details>
+        <details id="was-ist-wichtiger-der-lighthouse-score-oder-die-core-web-vitals"><summary>Was ist wichtiger: der Lighthouse-Wert oder die Core Web Vitals?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Für die Nutzererfahrung und für die Einordnung durch Google sind die Core Web Vitals aus Felddaten maßgeblich. Der Lighthouse-Wert ist ein Diagnosewerkzeug, das hilft, Ursachen zu finden. Ein Wert von 100 ist kein Ziel an sich.</p></details>
+        <details id="meine-website-hat-keine-felddaten-ist-das-ein-problem"><summary>Meine Website hat keine Felddaten. Ist das ein Problem?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Nein, das bedeutet nur, dass nicht genügend Besuche für eine Auswertung im Chrome User Experience Report vorliegen. In diesem Fall stützen wir uns auf Labormessungen; das Kriterium Felddaten fließt dann nicht in die Bewertung ein. Mit einem eigenen Messwerkzeug für echte Besuche (Real User Monitoring) lassen sich solche Daten auch für kleinere Websites erheben.</p></details>
+        <details id="wird-meine-website-durch-bessere-ladezeiten-auch-in-ki-antworten-sichtbarer"><summary>Wird meine Website durch bessere Ladezeiten auch in KI-Antworten sichtbarer?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Ein direkter Zusammenhang ist nicht belegt. Relevant ist aber die Darstellungsfrage: Inhalte, die nur per JavaScript entstehen, erreichen viele KI-Crawler gar nicht. Serverseitig ausgelieferte Inhalte sind für Suchmaschinen und KI-Systeme gleichermaßen zugänglich.</p></details>
+      </div>
+    </div>
+  </section>
+  <section class="section" aria-labelledby="weiterlesen">
+    <div class="section-head"><h2 class="h2" id="weiterlesen">Weiterlesen.</h2></div>
+    <div class="tools">
+      <a class="tool" href="auffindbarkeit-seo.html"><span><b>Auffindbarkeit &amp; SEO</b>Erreichbarkeit, robots.txt, Indexierung und Suchsignale</span><svg class="i"><use href="#i-arrow"/></svg></a>
+      <a class="tool" href="nutzerfuehrung-conversion.html"><span><b>Nutzerführung &amp; Conversion</b>Erster Eindruck, Navigation, Formulare und Fehlermeldungen</span><svg class="i"><use href="#i-arrow"/></svg></a>
+      <a class="tool" href="ki-crawler-agenten.html"><span><b>KI-Crawler und KI-Agenten</b>Welche KI-Systeme Ihre Website abrufen und wie Sie das steuern</span><svg class="i"><use href="#i-arrow"/></svg></a>
+      <a class="tool" href="index.html"><span><b>Alle Prüfbereiche im Überblick</b>Übersicht aller Prüfbereiche und Beiträge</span><svg class="i"><use href="#i-arrow"/></svg></a>
+    </div>
+  </section>
+  <div class="ende">
+    <section class="ende-cta" aria-labelledby="cta-titel">
+      <h2 id="cta-titel">Wie schnell und stabil ist Ihre Website auf echten Geräten?</h2>
+      <p>Pixelkiez prüft bis zu sechs öffentliche Seiten Ihrer Website persönlich und schickt Ihnen einen Bericht mit sieben Seiten als PDF. Kostenlos, ohne Abo.</p>
+      <a class="btn btn--accent" href="../index.html#top">Website eingeben <svg class="i"><use href="#i-arrow"/></svg></a>
+    </section>
+  <footer class="cw-lilac">
+    <div class="footer-cols">
+      <div class="footer-brand"><a class="logo" href="../index.html#top">360°Pixelkiez<span>Analyse</span></a><p>Kostenlose, persönlich erstellte Website-Analyse als PDF.</p></div>
+      <div><h4>Angebot</h4><ul><li><a href="../index.html#ablauf">Ablauf</a></li><li><a href="../index.html#bericht">Bericht</a></li><li><a href="../index.html#bereiche">Bereiche</a></li><li><a href="../index.html#angebot">Angebot</a></li></ul></div>
+      <div><h4>Methodik</h4><ul><li><a href="../analyse/methodik.html">Methodik</a></li><li><a href="../analyse/auffindbarkeit-seo.html">SEO &amp; Auffindbarkeit</a></li><li><a href="../analyse/ki-verstaendlichkeit.html">GEO &amp; AI Visibility</a></li><li><a href="../wissen/index.html">Wissen</a></li><li><a href="../analyse/index.html">Analyse</a></li></ul></div>
+      <div><h4>Kontakt</h4><ul><li><a href="mailto:360@pixelkiez.de">360@pixelkiez.de</a></li></ul></div>
+    </div>
+    <div class="footer">
+      <span>© 2026 360°Pixelkiez</span>
+      <nav aria-label="Rechtliches"><a href="../impressum.html">Impressum</a><a href="../datenschutz.html">Datenschutz</a></nav>
+    </div>
+  </footer>
+  </div>
+</main>
+
+<script src="../assets/app.js"></script>
+</body>
+</html>

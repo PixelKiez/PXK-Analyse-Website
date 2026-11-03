@@ -582,12 +582,13 @@ test('Routen: Worker beantwortet nur /api/anfrage und /api/auth/callback; falsch
   assert.equal((await app.sql('SELECT COUNT(*) AS n FROM rate_limits'))[0].n, 0, 'nichts gespeichert');
 });
 
-test('Hauptnavigation: Anfrageseiten verlinken dieselben Bereiche in derselben Reihenfolge wie die Methodikseite', { skip }, async () => {
+test('Hauptnavigation: Anfrageseiten haben denselben Kopf wie die übrigen Seiten (Menüpunkte, Wissen-Beiträge, Button „Analyse“, mobiles Menü)', { skip }, async () => {
   const { readFileSync } = await import('node:fs');
-  const links = html => [...(html.match(/<div class="nav-links">([\s\S]*?)<\/div>/) || ['', ''])[1].matchAll(/href="([^"]+)">([^<]+)</g)].map(m => [m[1].replace(/^.*index\.html/, 'index.html'), m[2]]);
-  const methodik = links(readFileSync(new URL('../public/pruefkriterien.html', import.meta.url), 'utf8'));
-  assert.ok(methodik.length >= 4);
-  assert.deepEqual(links((await new Client(app).req('GET', '/api/anfrage')).text), methodik);
+  /* Kopf bis auf die Basisadresse identisch: view.ts verlinkt absolut, impressum.html relativ */
+  const kopf = html => (html.match(/<header class="nav-wrap" id="nav">[\s\S]*?<\/header>/) || [''])[0].replace(/href="(?:https?:\/\/[^/"]+)?\//g, 'href="');
+  const statisch = kopf(readFileSync(new URL('../public/impressum.html', import.meta.url), 'utf8'));
+  assert.match(statisch, /<details class="mega">[\s\S]*<details class="nav-menu">/);
+  assert.equal(kopf((await new Client(app).req('GET', '/api/anfrage')).text), statisch);
 });
 
 test('Rate-Limiting: zu viele Anfragestarts von einer IP werden mit 429 gebremst, andere IPs nicht', { skip }, async () => {

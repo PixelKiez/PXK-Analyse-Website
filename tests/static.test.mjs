@@ -11,7 +11,16 @@ import { ROOT, artifactFiles, uploadFiles, MIGRATIONS } from './lib/harness.mjs'
 
 const read = p => readFileSync(join(ROOT, p), 'utf8');
 const git = (...a) => execFileSync('git', a, { cwd: ROOT, encoding: 'utf8' });
-const PAGES = ['public/index.html', 'public/pruefkriterien.html', 'public/impressum.html', 'public/datenschutz.html', 'public/agb.html', 'public/404.html'];
+/* Wissensbereich: Übersicht und sechs eigenständige 360°Pixelkiez-Beiträge (Entscheidung des Auftraggebers 02.11.2026) */
+const WISSEN = ['index', 'seo-geo-ai-visibility', 'wie-ki-websites-liest', 'wie-websites-ausgeliefert-werden', 'answerability', 'entity-trust', 'agent-readiness'].map(s => `public/wissen/${s}.html`);
+/* Analyse-Bereich: Übersicht, sechs Prüfbereiche, drei Vertiefungen (Paket rc4 ohne Score, Entscheidung des Auftraggebers 02.11.2026) */
+const ANALYSE = ['index', 'auffindbarkeit-seo', 'performance-technik', 'nutzerfuehrung-conversion', 'vertrauen-datenschutz', 'barrierefreiheit', 'ki-verstaendlichkeit', 'methodik', 'warum-website-analyse', 'ki-crawler-agenten'].map(s => `public/analyse/${s}.html`);
+const INHALT = [...WISSEN, ...ANALYSE];
+/* Titelbilder (og:image, 1200×630) je Seite, Icons; Stylesheet und Skript des Kreisdiagramms (Startseite und Analyse-Übersicht) */
+const OG = ['start', 'wissen', 'analyse', ...WISSEN.slice(1).map(s => 'wissen-' + s.split('/').pop().slice(0, -5)), ...ANALYSE.slice(1).map(s => 'analyse-' + s.split('/').pop().slice(0, -5))];
+const BILDER = ['assets/apple-touch-icon.png', 'assets/favicon.svg', 'favicon.ico', ...OG.map(n => `assets/og/${n}.jpg`)];
+const ASSETS = ['assets/anfrage.css', 'assets/app.js', 'assets/donut.css', 'assets/donut.js', 'assets/inhalt.css', 'assets/styles.css'];
+const PAGES = ['public/index.html', 'public/impressum.html', 'public/datenschutz.html', 'public/agb.html', 'public/404.html', ...INHALT];
 /* Stand vor PXWA-BE-02 (Hero ohne AGB-Häkchen): Referenz für den Hero-Schutz */
 const BASE_SHA = '13ac821f94c754a94c330b5686f5bf12f4a0282d';
 const FUNCTION = 'functions/api/[[path]].ts';
@@ -23,17 +32,25 @@ const WORKER_SRC = readdirSync(join(ROOT, 'worker/src')).filter(f => f.endsWith(
 const repoFiles = () => git('ls-files', '--cached', '--others', '--exclude-standard').split('\n').filter(f => f && existsSync(join(ROOT, f)));
 /* Text der serverseitig gerenderten Seiten: String- und Template-Literale aus view.ts ohne Platzhalter und Tags */
 const viewText = () => [...read(VIEW).matchAll(/'((?:[^'\\]|\\.)*)'|`((?:[^`\\]|\\.)*)`/g)].map(m => (m[1] ?? m[2]).replace(/\$\{[^}]*\}/g, ' ').replace(/<[^>]+>/g, ' ')).join(' ');
-const REFERENCE_ZIP = process.env.PXK_REFERENCE_ZIP || join(ROOT, '..', 'pxwa-quellen-klein.zip');
 
-const AREAS = ['SEO & Auffindbarkeit', 'Performance & Technik', 'GEO & AI Visibility', 'UX, Barrierefreiheit & Vertrauen'];
-const METHOD = [
-  ['findability_seo', 'SEO & Auffindbarkeit', [['FIND', 10]]],
-  ['performance_technology', 'Performance & Technik', [['PERF', 9]]],
-  ['geo_ai_visibility', 'GEO & AI Visibility', [['AI', 8]]],
-  ['ux_accessibility_trust', 'UX, Barrierefreiheit & Vertrauen', [['UX', 8], ['A11Y', 6], ['TRUST', 8]]],
-];
 /* 360°Pixelkiez ist eine eigenständige Website: keine Links zu pixelkiez.de, nur die Kontaktadresse 360@pixelkiez.de */
 const EXTERNAL_OK = ['mailto:360@pixelkiez.de'];
+/* Herausgeber der Quellen, die Wissens- und Analyseseiten belegen (nur dort erlaubt, nur https, nie pixelkiez.de) */
+const SOURCE_HOSTS = [
+  'about.ads.microsoft.com', 'almanac.httparchive.org', 'angular.dev', 'arxiv.org', 'baymard.com',
+  'blog.cloudflare.com', 'blog.google', 'blogs.bing.com', 'bsi.bund.de', 'cheatsheetseries.owasp.org',
+  'commoncrawl.org', 'datatracker.ietf.org', 'developer.chrome.com', 'developer.wordpress.org', 'developers.cloudflare.com',
+  'developers.facebook.com', 'developers.google.com', 'developers.openai.com', 'docs.astro.build', 'docs.claude.com',
+  'docs.perplexity.ai', 'en.wikipedia.org', 'eur-lex.europa.eu', 'help.openai.com', 'html.spec.whatwg.org',
+  'justiz.hamburg.de', 'llmstxt.org', 'nda.ie', 'nextjs.org', 'nuxt.com',
+  'oeil.europarl.europa.eu', 'platform.claude.com', 'playwright.dev', 'pubsonline.informs.org', 'react.dev',
+  'schema.org', 'static.googleusercontent.com', 'support.anthropic.com', 'support.apple.com', 'support.claude.com',
+  'support.google.com', 'svelte.dev', 'vercel.com', 'web.dev', 'webaim.org',
+  'www.bing.com', 'www.bundesfachstelle-barrierefreiheit.de', 'www.bundesgerichtshof.de', 'www.etsi.org', 'www.ftc.gov',
+  'www.gesetze-im-internet.de', 'www.gov.uk', 'www.ietf.org', 'www.nngroup.com', 'www.perplexity.ai',
+  'www.pewresearch.org', 'www.rfc-editor.org', 'www.schleswig-holstein.de', 'www.typescriptlang.org', 'www.w3.org',
+  'www.wikidata.org',
+];
 
 /* Alles, was Nutzer, Screenreader oder Suchmaschinen lesen: sichtbarer und verborgener Text, Metadaten, ARIA, JSON-LD */
 const allText = n => n.text !== undefined ? n.text : ['script', 'style', 'symbol'].includes(n.tag) ? ' ' : ` ${n.children.map(allText).join(' ')} `;
@@ -58,14 +75,26 @@ const FORBIDDEN = [/Premium/i, /Checkout/i, /Warenkorb/i, /\bPro\b/, /Dashboard/
 const NEGATED_ONLY = [/\bAbo\b/i, /Garantie|garantiert/i, /Monitoring|Überwachung/i, /Beratung/i, /Zertifizierung/i, /Rechtsgutachten|Rechtsberatung/i,
   /Sofort(analyse|scan|ergebnis)/i, /automatische[nrs]?\s+(Scan|Analyse|Bericht)/i, /Punktzahl/i, /Zugriff auf Ihr Postfach/i, /\bDSGVO\b/, /\bWCAG\b/];
 const NEGATION = /\b(kein|keine|keinen|keiner|keines|ohne|nicht|nein|weder)\b/i;
-function claimProblems(list) {
+/* Wissens- und Analyseseiten erklären Standards, Gesetze und Studien. Dort gelten die Angebotsregeln nicht für Fremdbegriffe,
+   die als Sachinformation vorkommen (WCAG, DSGVO, Marktüberwachung, Real User Monitoring, Baymards Checkout-Studie, „monatlich“
+   bei Datensätzen, „Vorschau“ bei Anbieterfunktionen, Fristen wie „24 Stunden“ für robots.txt, automatische Barrierefreiheitstests).
+   Unverändert verboten bleiben dort Premium, Score, Dashboard, Preise, Ranking-Versprechen und Konformitätsbehauptungen;
+   Abo, Garantie, Beratung, Zertifizierung, Rechtsgutachten, Sofortanalyse und Punktzahl nur verneint. */
+const CONTENT_EXEMPT = [/Checkout/i, /pro Monat|monatlich/i, /Vorschau/i, /\b\d+\s*(Werktage?|Arbeitstage?|Tage?|Stunden?|Wochen?)\b/i,
+  /Monitoring|Überwachung/i, /automatische[nrs]?\s+(Scan|Analyse|Bericht)/i, /\bDSGVO\b/, /\bWCAG\b/].map(String);
+/* Analyseseiten und der Abschnitt „Pixelkiez Score“ der Startseite zeigen, wie sich der Score zusammensetzt (Entscheidungen des
+   Auftraggebers 02.11.2026); überall sonst bleibt „Score“ verboten */
+const SCORE = String(/\bScore\b/i);
+function claimProblems(list, art = false) {
   const p = [];
+  const exempt = art === 'analyse' ? [...CONTENT_EXEMPT, SCORE] : art === 'score' ? [SCORE] : art ? CONTENT_EXEMPT : [];
+  const rules = rs => rs.filter(re => !exempt.includes(String(re).replace(/g$/, '')));
   for (const [where, text] of list) {
-    for (const re of FORBIDDEN) for (const m of text.matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g'))) {
+    for (const re of rules(FORBIDDEN)) for (const m of text.matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g'))) {
       if (m[0].replace(/\s/g, '') === '0€') continue;
       p.push(`${where}: "${m[0]}" (…${text.slice(Math.max(0, m.index - 40), m.index + 40)}…)`);
     }
-    for (const re of NEGATED_ONLY) for (const m of text.matchAll(new RegExp(re.source, re.flags + 'g'))) {
+    for (const re of rules(NEGATED_ONLY)) for (const m of text.matchAll(new RegExp(re.source, re.flags + 'g'))) {
       const ctx = text.slice(Math.max(0, m.index - 80), m.index + m[0].length + 40);
       if (!NEGATION.test(ctx)) p.push(`${where}: "${m[0]}" ohne Verneinung (…${ctx}…)`);
     }
@@ -91,17 +120,33 @@ test('Dokumente: valides Gerüst, genau eine H1, Landmarks, CSP, keine Inline-St
   }
 });
 
-test('Startseite: kostenloses Angebot, vier Bereiche, sieben PDF-Seiten, GEO & AI Visibility, Google-Anmeldung', () => {
+test('Startseite: kostenloses Angebot, sechs Bereiche, sieben PDF-Seiten, GEO & AI Visibility, Google-Anmeldung', () => {
   const { root } = H.parse(read('public/index.html'));
   const txt = el => H.norm(H.textOf(el));
   const text = H.norm(H.visibleText(root));
-  assert.deepEqual(H.byClass(H.byId(root, 'bereiche'), 'spec-row').map(r => txt(H.byTag(r, 'h3')[0])), AREAS);
   /* Videos: unter dem Hero und rechts neben dem Text bei „Ihr Bericht“; stumm, Schleife, ohne Bedienelemente */
   const videos = H.byTag(root, 'video');
   assert.deepEqual(videos.map(v => H.byTag(v, 'source')[0].attrs.get('src')), ['media/360-pixelkiez-video-1080p.mp4', 'media/report-pdf-de-1x1.mp4']);
   for (const v of videos) assert.ok(['muted', 'loop', 'playsinline', 'poster', 'aria-label'].every(a => v.attrs.has(a)) && !v.attrs.has('controls') && !v.attrs.has('autoplay'));
   assert.ok(H.byTag(H.byId(root, 'bericht'), 'video').length === 1, 'Berichtsvideo im Abschnitt „Ihr Bericht“');
-  for (const s of ['GEO', 'AI Visibility', 'Generative Engine Optimization', '0 €', 'mit Google an', 'sieben Seiten', 'Core Web Vitals', 'beobachtet']) assert.ok(text.includes(s), `fehlt: ${s}`);
+  for (const s of ['GEO', 'AI Visibility', 'Generative Engine Optimization', '0 €', 'mit Google an', 'sieben Seiten']) assert.ok(text.includes(s), `fehlt: ${s}`);
+  /* Es sind sechs Bereiche; nirgends mehr „vier Bereiche“ und keine Seitenangabe je Bereich (der Bericht bleibt bei sieben Seiten) */
+  assert.ok(text.includes('in sechs Bereichen') && !/[Vv]ier Bereich|Seite \d des Berichts|je eine Seite pro Bereich/.test(read('public/index.html')), 'sechs Bereiche');
+  /* AI-08 ist gestrichen (48 Kriterien): keine Zusage beobachteter KI-Antwort-Stichproben mehr */
+  assert.ok(!/beobachtet|Stichprobe tatsächlich/.test(read('public/index.html')), 'keine KI-Antwort-Stichproben');
+  /* Abschnitt „So setzt sich der Pixelkiez Score zusammen.“ ersetzt „Vier Bereiche. Ein klares Bild.“ an derselben Stelle (#bereiche);
+     „Alle Prüfpunkte nachlesen“ entfällt */
+  const ids = H.byTag(root, 'section').map(s => s.attrs.get('id')).filter(Boolean);
+  assert.ok(!ids.includes('tools') && !ids.includes('score'), 'Abschnitte „Alle Prüfpunkte nachlesen“ und der frühere Score-Abschnitt entfallen');
+  assert.deepEqual(ids.slice(ids.indexOf('bericht'), ids.indexOf('nutzen') + 1), ['bericht', 'bereiche', 'nutzen'], 'Score-Abschnitt an der Stelle von „Vier Bereiche“');
+  const score = H.byId(root, 'bereiche');
+  assert.equal(txt(H.byTag(score, 'h2')[0]), 'So setzt sich der Pixelkiez Score zusammen.');
+  assert.ok(!/Vier Bereiche\. Ein klares Bild\./.test(read('public/index.html')), '„Vier Bereiche. Ein klares Bild.“ entfernt');
+  const legende = H.byTag(H.byClass(score, 'donut-legende')[0], 'a');
+  assert.deepEqual(legende.map(a => a.attrs.get('href')), ['auffindbarkeit-seo', 'performance-technik', 'nutzerfuehrung-conversion', 'vertrauen-datenschutz', 'barrierefreiheit', 'ki-verstaendlichkeit'].map(s => `analyse/${s}.html`));
+  assert.equal(legende.reduce((n, a) => n + Number(a.attrs.get('data-gewicht')), 0), 100, 'Gewichte ergeben 100 %');
+  assert.equal(legende.reduce((n, a) => n + Number(a.attrs.get('data-kriterien')), 0), 48, '48 Prüfkriterien');
+  assert.equal(H.byTag(H.byClass(score, 'donut-bild')[0], 'a').length, 6, 'sechs Segmente');
   assert.equal(H.byClass(root, 'plan').length, 3);
   assert.equal(H.byClass(root, 'plan--featured').length, 1);
   assert.match(txt(H.byClass(root, 'plan--featured')[0]), /0 €/);
@@ -128,25 +173,62 @@ test('Hero (PXWA-BE-02): AGB-Pflichthäkchen nicht vorausgewählt, AGB- und Date
   assert.equal(txt(H.byTag(H.byClass(root, 'hero')[0], 'h1')[0]), 'Sehen Sie, was Ihre Website ausbremst.', 'Original-H1');
 });
 
-test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen neu, Reihenfolge erhalten; außerhalb des Hero nur der Text von Schritt 02 und die Kontaktadresse', () => {
+test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen neu, Reihenfolge erhalten; außerhalb des Hero nur die einzeln freigegebenen Änderungen', () => {
   const now = read('public/index.html');
   const old = git('show', `${BASE_SHA}:public/index.html`);
   const hero = html => { const i = html.indexOf('<section class="hero">'); return html.slice(i, html.indexOf('</section>', i) + '</section>'.length); };
   const lines = html => hero(html).split('\n').map(l => l.trim());
   const [a, b] = [lines(old), lines(now)];
-  assert.deepEqual(a.filter(l => !b.includes(l)), ['<button class="btn btn--accent" type="submit">Kostenlos anfragen <svg class="i"><use href="#i-arrow"/></svg></button>'], 'entfernt nur der alte Buttontext');
+  /* Es sind sechs Bereiche (Entscheidung des Auftraggebers 03.11.2026): Einleitung und Faktenzeile nennen sechs statt vier */
+  assert.deepEqual(a.filter(l => !b.includes(l)), [
+    '<p class="lead">Pixelkiez prüft Ihre Website persönlich in vier Bereichen, inklusive GEO &amp; AI Visibility. Den Bericht erhalten Sie kostenlos als PDF mit sieben Seiten per E-Mail.</p>',
+    '<button class="btn btn--accent" type="submit">Kostenlos anfragen <svg class="i"><use href="#i-arrow"/></svg></button>',
+    '<span><svg class="i"><use href="#i-check"/></svg>Vier Bereiche</span>',
+  ], 'entfernt nur der alte Buttontext und die beiden Angaben „vier Bereiche“');
   assert.deepEqual(b.filter(l => !a.includes(l)), [
+    '<p class="lead">Pixelkiez prüft Ihre Website persönlich in sechs Bereichen, inklusive GEO &amp; AI Visibility. Den Bericht erhalten Sie kostenlos als PDF mit sieben Seiten per E-Mail.</p>',
     '<input type="hidden" name="agb_version" value="ENTWURF-2026-10-31">',
     '<button class="btn btn--accent" type="submit">Analysieren <svg class="i"><use href="#i-arrow"/></svg></button>',
     '<label class="consent consent--hero"><input id="agb" type="checkbox" name="agb" value="1" required><span>Ich akzeptiere die <a href="agb.html">AGB</a> von 360°Pixelkiez.</span></label>',
     '<p class="form-error" id="agb-error" hidden>Bitte akzeptieren Sie die AGB, damit wir Ihre Website analysieren können.</p>',
     '<p class="hero-note">Kostenlose Website-Analyse – 0 €, kein Abo. <a href="datenschutz.html">Datenschutzerklärung</a></p>',
-  ], 'neu nur Häkchen, Fehlertext, Hinweis, Version und Buttontext');
+    '<span><svg class="i"><use href="#i-check"/></svg>Sechs Bereiche</span>',
+  ], 'neu nur Häkchen, Fehlertext, Hinweis, Version, Buttontext und „sechs Bereiche“');
   const kept = a.filter(l => b.includes(l));
   assert.deepEqual(b.filter(l => kept.includes(l)), kept, 'Badge, H1, Lead, URL-Feld und Faktenzeile in unveränderter Reihenfolge');
   const outside = html => html.replace(hero(html), '').replace(/<div class="step cw-lilac"><span>02<\/span>.*?<\/div>/, '<SCHRITT-02>');
-  /* Kontaktadresse im Footer: 360@pixelkiez.de ersetzt die frühere Adresse (PO-Entscheidung 01.11.2026), sonst nichts */
-  assert.equal(outside(now), outside(old).replaceAll('kontakt@pixelkiez.de', '360@pixelkiez.de'), 'übrige Startseite unverändert (außer Schritt 02, der den zweiten Bestätigungsklick beschrieb, und der Kontaktadresse)');
+  /* Kontaktadresse im Footer: 360@pixelkiez.de ersetzt die frühere Adresse (PO-Entscheidung 01.11.2026).
+     Eyebrow-Zeilen über den Abschnittsüberschriften entfallen (Entscheidung des Auftraggebers 02.11.2026), sonst nichts */
+  const withoutEyebrows = html => html.replace(/^[ \t]*<p class="eyebrow">[^<]*<\/p>\n/gm, '').replace(/<p class="eyebrow">[^<]*<\/p>/g, '');
+  assert.ok(!now.includes('class="eyebrow"'), 'Startseite ohne Eyebrow-Zeilen');
+  const withWissen = html => html
+    .replace('<li><a href="pruefkriterien.html#geo_ai_visibility">GEO &amp; AI Visibility</a></li></ul>', '<li><a href="pruefkriterien.html#geo_ai_visibility">GEO &amp; AI Visibility</a></li><li><a href="wissen/index.html">Wissen</a></li><li><a href="analyse/index.html">Analyse</a></li></ul>')
+    /* Menü (Entscheidung des Auftraggebers 03.11.2026): „Analyse“ nur noch als Button rechts, kein zweiter Menüpunkt */
+    .replace('      <a href="#faq">FAQ</a>\n', '      <a href="#faq">FAQ</a>\n      <a href="wissen/index.html">Wissen</a>\n');
+  /* Entscheidungen des Auftraggebers 02.11.2026 (zweite Runde): „Alle Prüfpunkte nachlesen“ entfällt, dafür der Abschnitt
+     „Pixelkiez Score“ in der Mitte; AI-08 (beobachtete KI-Antwort-Stichproben) gestrichen; Bild-Metadaten im Kopf (Canonical,
+     Open Graph, Twitter, Icons), Video-Metadaten (JSON-LD) sowie Stylesheet und Skript des Diagramms. Sonst nichts. */
+  const KOPF = /\n((?:<link rel="canonical" href="[^"]+">|<meta (?:property="og:[a-z_:]+"|name="twitter:[a-z:]+") content="[^"]*">|<link rel="(?:icon|apple-touch-icon)" href="[^"]+"(?: sizes="32x32"| type="image\/svg\+xml")?>)\n)+(?=<link rel="preconnect")/;
+  assert.match(now, KOPF, 'Kopfdaten für Bilder');
+  /* Neu im Kopf: Beiträge zu Wissen (Mega-Menü) und mobiles Menü, beide geprüft im Test „Hauptnavigation“ */
+  const MENUES = [/\n      <details class="mega">\n[\s\S]*?\n      <\/details>/, /\n    <details class="nav-menu">\n[\s\S]*?\n    <\/details>/];
+  const ohneNeues = html => MENUES.reduce((s, re) => s.replace(re, ''), html).replace(KOPF, '\n').replace('<link rel="stylesheet" href="assets/donut.css">\n', '')
+    .replace(/\n<script type="application\/ld\+json">\{"@context":"https:\/\/schema\.org","@graph":\[\{"@type":"VideoObject".*?<\/script>/, '')
+    .replace('\n<script src="assets/donut.js"></script>', '').replace(SCORE_ABSCHNITT, '');
+  const ohneAlt = html => html.replace(/  <section class="section" id="tools">\n[\s\S]*?\n  <\/section>\n\n/, '').replace(SCORE_ABSCHNITT, '')
+    /* Katalog (pruefkriterien.html) ersetzt durch die Analyse: Button oben rechts, „Methodik ansehen“ und Footer */
+    .replace('<a class="btn btn--ghost btn--sm" href="pruefkriterien.html">Katalog</a>', '<a class="btn btn--ghost btn--sm" href="analyse/index.html">Analyse</a>')
+    .replace('<a class="btn btn--ghost btn--sm" href="pruefkriterien.html">Methodik ansehen', '<a class="btn btn--ghost btn--sm" href="analyse/methodik.html">Methodik ansehen')
+    .replace('<li><a href="pruefkriterien.html">Alle Prüfpunkte</a></li><li><a href="pruefkriterien.html#findability_seo">SEO &amp; Auffindbarkeit</a></li><li><a href="pruefkriterien.html#geo_ai_visibility">GEO &amp; AI Visibility</a></li>',
+      '<li><a href="analyse/methodik.html">Methodik</a></li><li><a href="analyse/auffindbarkeit-seo.html">SEO &amp; Auffindbarkeit</a></li><li><a href="analyse/ki-verstaendlichkeit.html">GEO &amp; AI Visibility</a></li>')
+    .replace(' KI-Antworten nennen wir nur, wenn wir sie in einer Stichprobe tatsächlich beobachtet haben.', '').replace('<span>beobachtete KI-Antworten</span>', '')
+    .replaceAll(' KI-Antworten zeigen wir nur, wenn wir sie in einer datierten Stichprobe tatsächlich beobachtet haben.', '')
+    /* Sechs Bereiche; der Bericht bleibt bei sieben Seiten, Seitenangaben je Bereich entfallen */
+    .replace('in vier Bereichen: SEO, Performance, GEO &amp; AI Visibility sowie UX, Barrierefreiheit und Vertrauen.', 'in sechs Bereichen: Auffindbarkeit &amp; SEO, Performance &amp; Technik, Nutzerführung, Vertrauen &amp; Datenschutz, Barrierefreiheit sowie KI-Verständlichkeit (GEO &amp; AI Visibility).')
+    .replace('</svg>Vier Bereiche inklusive GEO &amp; AI Visibility</li>', '</svg>Sechs Bereiche inklusive GEO &amp; AI Visibility</li>')
+    .replace('<p>Seite 6 des Berichts ordnet die Verbesserungen,', '<p>Der Bericht ordnet die Verbesserungen,')
+    .replace('je eine Seite pro Bereich', 'die Bereiche im Detail');
+  assert.equal(ohneNeues(outside(now)), ohneAlt(withWissen(withoutEyebrows(outside(old)))).replaceAll('kontakt@pixelkiez.de', '360@pixelkiez.de'), 'übrige Startseite unverändert (außer Schritt 02, Kontaktadresse, Eyebrow-Zeilen, Links zu Wissen und Analyse, Menüs, Score-Abschnitt statt Prüfpunkte-Liste, AI-08 und Metadaten)');
   assert.match(now, /<span>02<\/span><h3>AGB akzeptieren und anmelden<\/h3>/);
 });
 
@@ -164,8 +246,22 @@ test('AGB-Seite: eindeutig als Entwurf gekennzeichnet, keine erfundenen Vertrags
   assert.ok(read('worker/src/config.ts').includes("(production && /^entwurf/i.test(termsVersion))) missing.push('TERMS_VERSION');"), 'Produktion lehnt AGB-Entwürfe ab');
 });
 
+const SCORE_ABSCHNITT = /  <section class="section" id="bereiche">\n[\s\S]*?\n  <\/section>\n/;
 test('Wahrheitsgemäße Aussagen: kein Premium/Checkout/Abo/Dashboard/Score, keine Garantien, keine DSGVO-Behauptung, keine Vorschau-Reste', () => {
-  for (const page of PAGES) assert.deepEqual(claimProblems(surfaces(read(page))), [], page);
+  for (const page of PAGES) {
+    const html = read(page).replace(SCORE_ABSCHNITT, '');
+    assert.deepEqual(claimProblems(surfaces(html), ANALYSE.includes(page) ? 'analyse' : INHALT.includes(page) ? 'wissen' : false), [], page);
+  }
+  /* Startseite: im Abschnitt „Pixelkiez Score“ ist nur „Score“ erlaubt, alle übrigen Regeln gelten */
+  const abschnitt = read('public/index.html').match(SCORE_ABSCHNITT)[0];
+  assert.deepEqual(claimProblems([['Score-Abschnitt', H.norm(H.visibleText(H.parse(abschnitt).root))]], 'score'), []);
+  assert.ok(claimProblems([['Probe', 'Pixelkiez Score mit Garantie und Premium.']], 'score').length >= 2, 'Score-Abschnitt: Garantie und Premium bleiben verboten');
+  /* Die Ausnahmen gelten nur für Inhaltsseiten: dieselben Fremdbegriffe bleiben auf Angebotsseiten verboten */
+  assert.ok(claimProblems([['Probe', 'Wir prüfen nach WCAG und bieten ein Monitoring pro Monat mit 24 Stunden Vorschau im Checkout.']]).length >= 6);
+  assert.ok(claimProblems([['Probe', 'Pixelkiez Score, Premium und Garantie für Rankings.']], 'wissen').length >= 3, 'Wissensseiten: Score, Premium, Garantie bleiben verboten');
+  const analyse = claimProblems([['Probe', 'Pixelkiez Score, Premium und Garantie für Rankings.']], 'analyse');
+  assert.ok(analyse.length >= 2 && !analyse.some(x => /Score/.test(x.split('(')[0])), 'Analyseseiten: Score erlaubt, Premium und Garantie bleiben verboten');
+  assert.ok(claimProblems([['Probe', 'Ihr Pixelkiez Score.']]).length >= 1, 'Angebotsseiten: Score bleibt verboten');
   assert.deepEqual(claimProblems([['view.ts', viewText()]]), []);
   for (const s of ['Kostenlose Website-Analyse – 0 €, kein Abo', 'PDF mit sieben Seiten', 'keinen Zugriff auf Ihr Postfach', 'nicht automatisch abgerufen oder gescannt', 'Version und Zeitpunkt Ihrer Zustimmung zu den AGB', 'Analysieren']) {
     assert.ok(viewText().includes(s), `view.ts enthält "${s}"`);
@@ -179,45 +275,75 @@ test('Wahrheitsgemäße Aussagen: kein Premium/Checkout/Abo/Dashboard/Score, kei
 test('JSON-LD entspricht den sichtbaren FAQ, ohne Angebot oder Preis-Markup', () => {
   const { root } = H.parse(read('public/index.html'));
   const ld = JSON.parse(H.byTag(root, 'script').find(s => s.attrs.get('type') === 'application/ld+json').raw);
-  const visible = H.byTag(root, 'details').map(d => [H.norm(H.textOf(H.byTag(d, 'summary')[0])), H.norm(H.textOf(H.byTag(d, 'p')[0]))]);
+  /* Nur der FAQ-Abschnitt: die Menüs im Kopf sind ebenfalls <details> */
+  const visible = H.byTag(H.byId(root, 'faq'), 'details').map(d => [H.norm(H.textOf(H.byTag(d, 'summary')[0])), H.norm(H.textOf(H.byTag(d, 'p')[0]))]);
   assert.deepEqual(ld.mainEntity.map(q => [q.name, q.acceptedAnswer.text]), visible);
   assert.ok(!/offers|price|Offer/.test(JSON.stringify(ld)));
 });
 
-test('Methodik: vier Bereiche in Reihenfolge, eindeutige IDs, 48 Original-Prüfpunkte unverändert plus AI-08', t => {
-  const { root } = H.parse(read('public/pruefkriterien.html'));
-  const txt = el => H.norm(H.textOf(el));
-  const sections = H.byTag(root, 'section').filter(s => METHOD.some(m => m[0] === s.attrs.get('id')));
-  assert.deepEqual(sections.map(s => s.attrs.get('id')), METHOD.map(m => m[0]));
-  const seen = [];
-  for (const [id, title, groups] of METHOD) {
-    const s = H.byId(root, id);
-    assert.equal(txt(H.byTag(s, 'h2')[0]), title);
-    const want = groups.flatMap(([prefix, n]) => Array.from({ length: n }, (_, i) => `${prefix}-${String(i + 1).padStart(2, '0')}`));
-    const ids = H.byClass(s, 'spec-row').map(r => txt(H.byClass(r, 'count')[0]));
-    assert.deepEqual(ids, want, id);
-    seen.push(...ids);
-  }
-  assert.equal(new Set(seen).size, 49);
-  const rows = Object.fromEntries(H.byClass(root, 'spec-row').map(r => [txt(H.byClass(r, 'count')[0]), [txt(H.byTag(r, 'h3')[0]), txt(H.byTag(r, 'p')[0])]]));
-  assert.match(rows['AI-08'][1], /tatsächlich beobachtete/);
-  if (!existsSync(REFERENCE_ZIP)) { t.diagnostic(`NOT_RUN: Referenz-ZIP fehlt (${REFERENCE_ZIP})`); return; }
-  const ref = execFileSync('unzip', ['-p', REFERENCE_ZIP, 'pxwa_small_build/pruefkriterien.html']).toString('utf8');
-  const refRows = [...ref.matchAll(/<h3>([A-Z0-9]+-\d\d)<\/h3><span class="count">(.*?)<\/span><\/div><p>(.*?)<\/p>/g)];
-  assert.equal(refRows.length, 48);
-  for (const [, id, name, desc] of refRows) assert.deepEqual(rows[id], [H.decode(name), H.decode(desc)], id);
+test('Katalog ersetzt durch die Analyse: keine Katalogseite, keine Verweise darauf; die Analyse-Übersicht führt sechs Prüfbereiche mit zusammen 48 Kriterien', () => {
+  /* Entscheidung des Auftraggebers 03.11.2026: pruefkriterien.html entfällt, die Analyse-Seiten enthalten alle Informationen */
+  assert.ok(!existsSync(join(ROOT, 'public/pruefkriterien.html')), 'Katalogseite entfernt');
+  for (const f of [...PAGES, VIEW]) assert.ok(!/pruefkriterien|>Katalog</.test(read(f)), `${f}: Verweis auf den Katalog`);
+  const { root } = H.parse(read('public/analyse/index.html'));
+  const legende = H.byTag(H.byClass(root, 'donut-legende')[0], 'a');
+  assert.equal(legende.length, 6);
+  assert.equal(legende.reduce((n, a) => n + Number(a.attrs.get('data-kriterien')), 0), 48, '48 Prüfkriterien');
+  assert.equal(legende.reduce((n, a) => n + Number(a.attrs.get('data-gewicht')), 0), 100, 'Gewichte ergeben 100 %');
+  for (const a of legende) assert.ok(existsSync(join(ROOT, 'public/analyse', a.attrs.get('href'))), a.attrs.get('href'));
+  /* Startseite: der Button oben rechts führt zur Analyse */
+  const nav = H.byTag(H.parse(read('public/index.html')).root, 'nav')[0];
+  assert.deepEqual(H.byClass(nav, 'btn').map(a => [a.attrs.get('href'), H.norm(H.textOf(a))]), [['analyse/index.html', 'Analyse']]);
 });
 
-test('Links: interne Anker gültig, keine Links zu pixelkiez.de, nur mailto als externes Ziel', () => {
+test('Hauptnavigation: „Analyse“ nur als Button, Wissen mit Pfeil zu den sechs Beiträgen und „Mehr im Wissensbereich“, mobiles Menü; auf allen Seiten gleich', () => {
+  /* Entscheidung des Auftraggebers 03.11.2026: kein doppeltes „Analyse“ im Menü, Mega-Menü für Wissen, Menü-Button mobil */
+  const ziel = a => [a.attrs.get('href'), H.norm(H.textOf(a))];
+  const beitraege = H.byClass(H.parse(read('public/wissen/index.html')).root, 'karte').map(k => [k.attrs.get('href'), H.norm(H.textOf(H.byClass(k, 'karte-titel')[0]))]);
+  assert.equal(beitraege.length, 6, 'sechs Beiträge im Wissensbereich');
+  for (const page of PAGES) {
+    const rel = page.slice('public/'.length);
+    const p = rel === '404.html' ? '/' : rel.includes('/') ? '../' : '';
+    const start = rel === 'index.html' ? '' : `${p}index.html`;
+    const nav = H.byTag(H.byTag(H.parse(read(page)).root, 'header')[0], 'nav')[0];
+    const links = H.byClass(nav, 'nav-links')[0];
+    const abschnitte = [['bericht', 'Bericht'], ['bereiche', 'Bereiche'], ['angebot', 'Angebot'], ['faq', 'FAQ']].map(([id, t]) => [`${start}#${id}`, t]);
+    const wissen = [`${p}wissen/index.html`, 'Wissen'];
+    assert.deepEqual(links.children.filter(e => e.tag === 'a').map(ziel), [...abschnitte, wissen], `${page}: Menüpunkte ohne „Analyse“`);
+    const mega = H.byClass(links, 'mega')[0];
+    assert.equal(mega?.tag, 'details', `${page}: Beiträge als <details> (auch ohne JavaScript)`);
+    assert.equal(H.byTag(mega, 'summary')[0].attrs.get('aria-label'), 'Beiträge im Wissensbereich', `${page}: Pfeil mit Namen`);
+    assert.deepEqual(H.byTag(H.byClass(mega, 'mega-panel')[0], 'a').map(ziel), [...beitraege.map(([h, t]) => [`${p}wissen/${h}`, t]), [`${p}wissen/index.html`, 'Mehr im Wissensbereich →']], `${page}: sechs Beiträge und „Mehr im Wissensbereich“`);
+    assert.deepEqual(H.byClass(nav, 'btn').map(ziel), [[`${p}analyse/index.html`, 'Analyse']], `${page}: genau ein Button „Analyse“`);
+    const menu = H.byClass(nav, 'nav-menu')[0];
+    assert.equal(menu?.tag, 'details', `${page}: mobiles Menü als <details>`);
+    assert.equal(H.byTag(menu, 'summary')[0].attrs.get('aria-label'), 'Menü', `${page}: Menü-Button mit Namen`);
+    assert.deepEqual(H.byTag(menu, 'a').map(ziel), [...abschnitte, wissen], `${page}: Punkte im mobilen Menü`);
+    const artikel = beitraege.find(([h]) => `wissen/${h}` === rel);
+    const aktuell = rel.startsWith('wissen/') ? [wissen, ...(artikel ? [[`${p}${rel}`, artikel[1]]] : []), wissen] : rel.startsWith('analyse/') ? [[`${p}analyse/index.html`, 'Analyse']] : [];
+    assert.deepEqual(H.find(nav, e => e.attrs.get('aria-current') === 'page').map(ziel), aktuell, `${page}: aktueller Bereich markiert`);
+  }
+  /* Anfrageseiten (view.ts) haben denselben Kopf; verglichen wird das gerenderte Markup im Worker-Test */
+  assert.match(read(VIEW), /<details class="mega">[\s\S]*<details class="nav-menu">/);
+});
+
+test('Links: interne Anker gültig, keine Links zu pixelkiez.de, nur mailto als externes Ziel (Wissensseiten zusätzlich ihre Quellen)', () => {
   const pages = Object.fromEntries(PAGES.map(p => [p.slice(7), read(p)]));
   for (const [page, html] of Object.entries(pages)) {
     for (const a of H.byTag(H.parse(html).root, 'a')) {
       const href = a.attrs.get('href');
       assert.ok(href && href !== '#', `${page}: Link ohne Ziel "${H.norm(H.textOf(a))}"`);
-      if (/^(https?:|mailto:)/.test(href)) { assert.ok(EXTERNAL_OK.includes(href), `${page}: externer Link ${href}`); continue; }
+      if (/^(https?:|mailto:)/.test(href)) {
+        /* Wissensseiten belegen ihre Aussagen: https-Quellen nur von den freigegebenen Herausgebern, nie pixelkiez.de */
+        const source = /^(wissen|analyse)\//.test(page) && href.startsWith('https://') && SOURCE_HOSTS.includes(new URL(href).hostname);
+        assert.ok(EXTERNAL_OK.includes(href) || source, `${page}: externer Link ${href}`);
+        continue;
+      }
       /* Nur 404.html verlinkt absolut (/…), weil Pages sie für Adressen in beliebiger Tiefe ausliefert */
       assert.ok(page === '404.html' ? href.startsWith('/') : !href.startsWith('/'), `${page}: ${href}`);
-      const [file, frag] = href.replace(/^\//, '').split('#');
+      /* Relativ zur Seite auflösen (Wissensseiten liegen in wissen/); ein Verzeichnis meint dessen index.html */
+      const url = new URL(href, `https://360.pixelkiez.de/${page}`);
+      const [file, frag] = [decodeURIComponent(url.pathname.slice(1)).replace(/(^|\/)$/, '$1index.html'), decodeURIComponent(url.hash.slice(1))];
       const target = file || page;
       assert.ok(pages[target], `${page}: unbekannte Datei ${target}`);
       if (frag) assert.ok(H.byId(H.parse(pages[target]).root, frag), `${page}: Anker ${href} fehlt`);
@@ -237,7 +363,8 @@ test('Eigenständige Website 360°Pixelkiez: Name in Titel, Logo und Footer; Imp
     assert.match(H.textOf(H.byTag(root, 'title')[0]), /360°Pixelkiez/, `${page}: Titel`);
     assert.ok(H.byClass(root, 'logo').every(l => H.norm(H.textOf(l)).startsWith('360°Pixelkiez')), `${page}: Logo`);
     const legal = H.find(root, e => e.tag === 'nav' && e.attrs.get('aria-label') === 'Rechtliches')[0];
-    assert.deepEqual(H.byTag(legal, 'a').map(a => a.attrs.get('href').replace(/^\//, '')), ['impressum.html', 'datenschutz.html'], `${page}: Rechtliches`);
+    /* relativ zur Seite aufgelöst: auch die Wissensseiten in wissen/ verweisen auf dieselben Rechtsseiten */
+    assert.deepEqual(H.byTag(legal, 'a').map(a => new URL(a.attrs.get('href'), `https://360.pixelkiez.de/${page.slice(7)}`).pathname.slice(1)), ['impressum.html', 'datenschutz.html'], `${page}: Rechtliches`);
     assert.match(H.norm(H.textOf(H.byClass(root, 'footer')[0])), /© 2026 360°Pixelkiez/, `${page}: Copyright`);
   }
   assert.match(view, /© 2026 360°Pixelkiez/);
@@ -257,11 +384,124 @@ test('Eigenständige Website 360°Pixelkiez: Name in Titel, Logo und Footer; Imp
   assert.ok(!/Railway|Hostinger-PHP|Supabase/.test(privacy), 'keine verworfenen Dienste');
 });
 
+/* Breite und Höhe eines JPEG aus dem SOF-Segment */
+function jpegSize(buf) {
+  for (let i = 2; i < buf.length - 9;) {
+    if (buf[i] !== 0xFF) return null;
+    const marker = buf[i + 1], len = buf.readUInt16BE(i + 2);
+    if (marker >= 0xC0 && marker <= 0xCF && ![0xC4, 0xC8, 0xCC].includes(marker)) return [buf.readUInt16BE(i + 7), buf.readUInt16BE(i + 5)];
+    i += 2 + len;
+  }
+  return null;
+}
+
+test('Unterseiten (Wissen, Analyse): Häufige Fragen und Weiterlesen im Stil der Startseite; keine Kopfzeile mit Zahlen, keine Datumszeilen bei Quellen, keine nummerierten Listen', () => {
+  for (const page of INHALT) {
+    const html = read(page);
+    const { root } = H.parse(html);
+    const txt = el => H.norm(H.textOf(el));
+    /* Häufige Fragen: Überschrift links, aufklappbare Fragen mit Plus-Symbol rechts – wie „Gut zu wissen.“ auf der Startseite */
+    const grid = H.byClass(root, 'faq-grid');
+    assert.equal(grid.length, 1, `${page}: ein FAQ-Abschnitt`);
+    assert.equal(txt(H.byTag(H.byClass(grid[0], 'section-head')[0], 'h2')[0]), 'Häufige Fragen.', page);
+    const details = H.byTag(H.byClass(grid[0], 'faq')[0], 'details');
+    assert.ok(details.length >= 3, `${page}: mindestens drei Fragen`);
+    for (const d of details) assert.equal(H.byClass(H.byTag(d, 'summary')[0], 'plus').length, 1, `${page}: Plus-Symbol`);
+    /* Strukturierte Daten entsprechen den sichtbaren Fragen */
+    const graph = H.byTag(root, 'script').filter(x => x.attrs.get('type') === 'application/ld+json').flatMap(x => JSON.parse(x.raw)['@graph'] || []);
+    const faq = graph.find(n => n['@type'] === 'FAQPage');
+    const visible = details.map(d => { const q = H.byTag(d, 'summary')[0]; return [H.norm(H.textOf(q)), txt(H.byTag(d, 'p')[0])]; });
+    assert.deepEqual(faq.mainEntity.map(q => [q.name, q.acceptedAnswer.text]), visible, `${page}: FAQ-JSON-LD`);
+    /* Weiterlesen (Artikel): Linkliste der Startseite mit Titel, Satz und Pfeil */
+    if (!page.endsWith('/index.html')) {
+      const tools = H.byClass(root, 'tools');
+      assert.equal(tools.length, 1, `${page}: Weiterlesen`);
+      assert.ok(H.byClass(tools[0], 'tool').length >= 2 && H.byClass(tools[0], 'tool').every(a => a.tag === 'a' && H.byTag(a, 'b').length === 1), page);
+    }
+    /* Entscheidung des Auftraggebers 02.11.2026: keine Zahlen mit Text unter dem Titel, keine Datumszeilen bei Quellen,
+       keine nummerierten Listen im Text; das Inhaltsverzeichnis kommt ohne Nummern aus */
+    for (const c of ['kopf-meta', 'q-stand', 'fragen', 'weiter']) assert.ok(!H.byClass(root, c).length, `${page}: .${c}`);
+    /* Wissen-Übersicht: Karten ohne Nummern und ohne orangefarbene Zeile darüber (Entscheidung des Auftraggebers 03.11.2026) */
+    if (page === 'public/wissen/index.html') assert.equal(H.byClass(root, 'karte-nr').length, 0, 'Wissen-Karten ohne Nummern');
+    for (const art of H.byClass(root, 'lesetext')) assert.equal(H.byTag(art, 'ol').length, 0, `${page}: nummerierte Liste im Text`);
+    for (const toc of H.byClass(root, 'toc')) assert.equal(H.byTag(toc, 'ol').length, 0, `${page}: Inhaltsverzeichnis ohne Nummern`);
+    assert.ok(!/Stand der Quellenprüfung|Quellenstand|Seitenstand|Min\. Lesezeit|Beobachtete KI-Antwort-Stichproben/.test(html), `${page}: Datums- oder Zahlenzeile`);
+    assert.ok(!H.find(root, e => /^h[23]$/.test(e.tag) && /^\d+\.\s/.test(txt(e))).length, `${page}: nummerierte Überschrift`);
+  }
+});
+
+test('Bild-Metadaten: Titelbild je Seite (Open Graph, Twitter, JSON-LD), Icons, Alternativtexte der Illustrationen, Video-Metadaten', () => {
+  const BASE = 'https://360.pixelkiez.de';
+  for (const page of PAGES) {
+    const html = read(page);
+    const { root } = H.parse(html);
+    const head = H.byTag(root, 'head')[0];
+    const meta = k => H.byTag(head, 'meta').find(m => m.attrs.get('property') === k || m.attrs.get('name') === k)?.attrs.get('content');
+    const links = H.byTag(head, 'link');
+    /* Icons auf jeder Seite, auch 404 (dort absolut) */
+    const icons = links.filter(l => ['icon', 'apple-touch-icon'].includes(l.attrs.get('rel'))).map(l => l.attrs.get('href'));
+    const pre = page === 'public/404.html' ? '/' : page.split('/').length > 2 ? '../' : '';
+    assert.deepEqual(icons, [`${pre}favicon.ico`, `${pre}assets/favicon.svg`, `${pre}assets/apple-touch-icon.png`], `${page}: Icons`);
+    if (page === 'public/404.html') { assert.equal(meta('og:image'), undefined, '404 ohne Titelbild'); continue; }
+    /* Canonical und Open Graph passen zusammen; Titelbild existiert, ist 1200×630 und trägt Beschreibung und Copyright */
+    const canonical = links.find(l => l.attrs.get('rel') === 'canonical')?.attrs.get('href');
+    assert.ok(canonical?.startsWith(BASE + '/') && meta('og:url') === canonical, `${page}: Canonical = og:url`);
+    for (const k of ['og:type', 'og:title', 'og:description', 'og:site_name', 'og:locale']) assert.ok(meta(k), `${page}: ${k}`);
+    const img = meta('og:image');
+    assert.match(img, /^https:\/\/360\.pixelkiez\.de\/assets\/og\/[a-z0-9-]+\.jpg$/, `${page}: og:image`);
+    const buf = readFileSync(join(ROOT, 'public', img.slice(BASE.length + 1)));
+    assert.deepEqual(jpegSize(buf), [1200, 630], `${page}: Titelbild 1200×630`);
+    assert.deepEqual([meta('og:image:width'), meta('og:image:height'), meta('og:image:type')], ['1200', '630', 'image/jpeg'], page);
+    assert.ok(meta('og:image:alt')?.length > 20 && meta('twitter:image:alt') === meta('og:image:alt'), `${page}: Bildbeschreibung`);
+    assert.ok(meta('twitter:card') === 'summary_large_image' && meta('twitter:image') === img, `${page}: Twitter`);
+    assert.ok(buf.includes(Buffer.from('© 2026 360°Pixelkiez')) && buf.includes(Buffer.from('Titelbild')), `${page}: Copyright und Beschreibung in der Bilddatei`);
+    /* Strukturierte Daten der Inhaltsseiten nennen dasselbe Titelbild */
+    if (INHALT.includes(page)) {
+      const graph = H.byTag(root, 'script').filter(x => x.attrs.get('type') === 'application/ld+json').flatMap(x => JSON.parse(x.raw)['@graph'] || []);
+      const main = graph.find(n => ['Article', 'CollectionPage'].includes(n['@type']));
+      assert.deepEqual(main.image, { '@type': 'ImageObject', url: img, width: 1200, height: 630 }, `${page}: JSON-LD image`);
+    }
+    /* Illustrationen: Bild mit Alternativtext; Vorschaubilder in Karten und das Diagramm (mit Legende als Text) sind dekorativ */
+    for (const svg of H.byTag(H.byTag(root, 'body')[0], 'svg')) {
+      if (H.find(root, e => H.hasClass(e, 'szene-bild') && H.find(e, x => x === svg).length).length) {
+        assert.ok(svg.attrs.get('role') === 'img' && svg.attrs.get('aria-label')?.startsWith('Illustration: '), `${page}: Illustration ohne Alternativtext`);
+      } else {
+        const hidden = n => n && (n.attrs?.get('aria-hidden') === 'true' || hidden(n.parent));
+        assert.ok(hidden(svg) || H.hasClass(svg, 'i') || H.hasClass(svg, 'sr-only'), `${page}: SVG ohne Alternativtext und nicht dekorativ`);
+      }
+    }
+  }
+  for (const f of ['favicon.ico', 'assets/favicon.svg', 'assets/apple-touch-icon.png']) assert.ok(statSync(join(ROOT, 'public', f)).size > 200, f);
+  /* Alle JPEGs (Titelbilder, Poster) mit XMP-Block (Titel, Beschreibung, Urheber, Copyright); Videos mit Titel, Urheber, Copyright */
+  for (const f of [...OG.map(n => `assets/og/${n}.jpg`), ...MEDIA.filter(m => m.endsWith('.jpg'))]) {
+    const buf = readFileSync(join(ROOT, 'public', f));
+    for (const s of ['http://ns.adobe.com/xap/1.0/', '<dc:creator><rdf:Seq><rdf:li>360°Pixelkiez</rdf:li>', '© 2026 360°Pixelkiez', '<dc:title>', '<dc:description>']) assert.ok(buf.includes(Buffer.from(s)), `${f}: ${s}`);
+  }
+  for (const f of MEDIA.filter(m => m.endsWith('.mp4'))) {
+    const buf = readFileSync(join(ROOT, 'public', f));
+    for (const s of ['360°Pixelkiez', '© 2026 360°Pixelkiez', 'Beispieldaten']) assert.ok(buf.includes(Buffer.from(s)), `${f}: ${s}`);
+    assert.ok(buf.indexOf('moov') < buf.indexOf('mdat'), `${f}: Faststart`);
+  }
+  /* Videos der Startseite: Beschriftung, Poster, Maße und passende Video-Metadaten */
+  const { root } = H.parse(read('public/index.html'));
+  const ld = H.byTag(root, 'script').filter(x => x.attrs.get('type') === 'application/ld+json').map(x => JSON.parse(x.raw));
+  const vids = ld.flatMap(x => x['@graph'] || []).filter(n => n['@type'] === 'VideoObject');
+  const videos = H.byTag(root, 'video');
+  assert.equal(vids.length, videos.length);
+  videos.forEach((v, i) => {
+    assert.ok(v.attrs.get('aria-label') && v.attrs.get('width') && v.attrs.get('height'), 'Video beschriftet und mit Maßen');
+    assert.equal(vids[i].thumbnailUrl, `${BASE}/${v.attrs.get('poster')}`);
+    assert.equal(vids[i].contentUrl, `${BASE}/${H.byTag(v, 'source')[0].attrs.get('src')}`);
+    assert.deepEqual([String(vids[i].width), String(vids[i].height)], [v.attrs.get('width'), v.attrs.get('height')]);
+    assert.ok(vids[i].name && vids[i].description && /^PT\d+S$/.test(vids[i].duration) && vids[i].uploadDate, 'Name, Beschreibung, Dauer, Datum');
+  });
+});
+
 test('Design: styles.css unverändert gegenüber vision.html; alle verwendeten Klassen sind definiert', () => {
   const inline = H.byTag(H.parse(read('vision.html')).root, 'style')[0].raw;
   const strip = s => s.split('\n').map(l => l.replace(/\s+$/, '')).join('\n').trim();
   assert.equal(strip(read('public/assets/styles.css')), strip(inline), 'Design-Quelle unverändert');
-  const css = read('public/assets/styles.css') + read('public/assets/anfrage.css');
+  const css = read('public/assets/styles.css') + read('public/assets/anfrage.css') + read('public/assets/inhalt.css') + read('public/assets/donut.css');
   const classes = new Set();
   for (const p of PAGES) for (const e of H.elements(H.byTag(H.parse(read(p)).root, 'body')[0])) for (const c of (e.attrs.get('class') || '').split(/\s+/).filter(Boolean)) classes.add(c);
   for (const m of read(VIEW).matchAll(/class="([^"]+)"/g)) for (const c of m[1].split(/\s+/)) classes.add(c);
@@ -270,7 +510,7 @@ test('Design: styles.css unverändert gegenüber vision.html; alle verwendeten K
 });
 
 test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, Functions nur unter /api/* und für zwei Videos, Sicherheits-Header, keine Railway- oder PHP-Reste', () => {
-  assert.deepEqual(artifactFiles(), ['404.html', '_headers', '_routes.json', 'agb.html', 'assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'datenschutz.html', 'impressum.html', 'index.html', ...MEDIA, 'pruefkriterien.html']);
+  assert.deepEqual(artifactFiles(), ['404.html', '_headers', '_routes.json', 'agb.html', ...ASSETS, ...BILDER, 'datenschutz.html', 'impressum.html', 'index.html', ...MEDIA, ...INHALT.map(p => p.slice(7))].sort());
   assert.deepEqual(repoFiles().filter(f => /\.(php|phtml)$|(^|\/)\.htaccess$|^(server|bin)\/|railway|Dockerfile|Caddyfile|\.dockerignore/i.test(f)), [], 'keine PHP-, Railway- oder Docker-Bestandteile');
   const pages = read('wrangler.toml');
   const active = pages.split('\n').filter(l => !l.trim().startsWith('#')).join('\n');
@@ -310,13 +550,14 @@ test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, F
 
 test('Release-Scan des Pages-Uploads (public/ wie `wrangler pages deploy`): nur Website-Dateien, keine Quellen, kein PHP/Railway, keine Secrets, höchstens 25 MiB je Datei', () => {
   const files = uploadFiles();
-  assert.deepEqual(files.filter(f => !f.startsWith('media/')), ['404.html', 'agb.html', 'assets/anfrage.css', 'assets/app.js', 'assets/styles.css', 'datenschutz.html', 'impressum.html', 'index.html', 'pruefkriterien.html']);
+  assert.deepEqual(files.filter(f => !f.startsWith('media/')), ['404.html', 'agb.html', ...ASSETS, ...BILDER, 'datenschutz.html', 'impressum.html', 'index.html',
+    ...INHALT.map(p => p.slice(7))].sort());
   assert.ok(files.filter(f => f.startsWith('media/')).every(f => /^media\/[\w-]+\.(mp4|jpg)$/.test(f)), 'in media/ nur Videos und Poster');
   assert.ok(files.length < 20000);
   for (const f of files) {
     const buf = readFileSync(join(ROOT, 'public', f));
     assert.ok(buf.length <= 25 * 1024 * 1024, `${f}: über 25 MiB`);
-    if (/\.(mp4|jpg)$/.test(f)) continue;
+    if (/\.(mp4|jpg|png|ico)$/.test(f)) continue;
     const text = buf.toString('utf8');
     assert.ok(!/railway|<\?php|\.php\b|caddy/i.test(text), `${f}: Railway- oder PHP-Rest`);
     assert.ok(!/-----BEGIN [A-Z ]*PRIVATE KEY|GOCSPX-|\bre_[A-Za-z0-9]{16,}|\bsk_[A-Za-z0-9]{16,}/.test(text), `${f}: Secret`);
