@@ -32,7 +32,7 @@ PRIVACY_VERSION = "ENTWURF-2026-10-31"
 TERMS_VERSION = "ENTWURF-2026-10-31"
 # Einzige freigegebene Mail-API (Resend). Der API-Key kommt als Secret MAIL_API_TOKEN.
 MAIL_API_URL = "https://api.resend.com/emails"
-# Absender erst eintragen, wenn die Versanddomain notify.pixelkiez.de bei Resend verifiziert ist (Adresse @notify.pixelkiez.de)
+# Absender erst nach separater Freigabe der konkreten MAIL_FROM-Adresse und Provider-/Launch-Gates setzen (Domain @360.pixelkiez.de).
 MAIL_FROM = ""
 # Einziger interner Empfänger (fest im Code, PRODUCTION_NOTIFY_TO). Erst deployen, wenn das Postfach 360@pixelkiez.de
 # existiert und eine Zustellung nachgewiesen ist (docs/deploy-cloudflare-pages.md, Abschnitt 6).
