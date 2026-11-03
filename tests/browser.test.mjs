@@ -294,6 +294,35 @@ test('Safari-Engine (WebKit): beide Videos laufen – Range-Anfragen bekommen 20
   }
 });
 
+test('Videos: Läuft app.js, während die Quellenauswahl noch läuft (networkState NO_SOURCE), bleibt das Video und spielt; nur ein echter Ladefehler zeigt das Standbild (Chromium und WebKit)', { skip: videoSkip }, async t => {
+  /* Nachstellung des Rennens aus WebKit unter Last: networkState meldet NO_SOURCE, bis die Seite load() aufruft */
+  const race = () => {
+    const d = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'networkState');
+    const load = HTMLMediaElement.prototype.load;
+    const neu = new WeakSet();
+    Object.defineProperty(HTMLMediaElement.prototype, 'networkState', { configurable: true, get() { return neu.has(this) ? d.get.call(this) : HTMLMediaElement.NETWORK_NO_SOURCE; } });
+    HTMLMediaElement.prototype.load = function () { neu.add(this); return load.call(this); };
+  };
+  let wk = null;
+  try { wk = await pw.webkit.launch(); } catch { /* unten als NOT_RUN gemeldet */ }
+  try {
+    for (const [name, engine] of [['Chromium', browser], ['WebKit', wk]]) {
+      await t.test(name, { skip: !engine && 'NOT_RUN: Playwright-WebKit nicht installiert (playwright install webkit)' }, async () => {
+        const ctx = await engine.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'no-preference' });
+        await ctx.addInitScript(race);
+        const page = await ctx.newPage();
+        await page.goto(app.base + '/', { waitUntil: 'load' });
+        assert.deepEqual(await page.$$eval('#bericht .showcase-video, #nutzen .showcase-video', es => es.map(e => e.tagName)), ['VIDEO', 'VIDEO'], `${name}: kein Standbild ohne Ladefehler`);
+        await page.evaluate(() => document.querySelector('#nutzen .showcase-frame').scrollIntoView({ block: 'center' }));
+        await page.waitForFunction(() => { const e = document.querySelector('#nutzen .showcase-video'); return e.tagName === 'VIDEO' && !e.paused && e.currentTime > 0.3; }, null, { timeout: 15000 });
+        await ctx.close();
+      });
+    }
+  } finally {
+    if (wk) await wk.close();
+  }
+});
+
 test('Scrollen: Inhalte blenden beim Hineinscrollen ein; oben nichts versteckt; ohne JavaScript und bei „Bewegung reduzieren“ alles sofort sichtbar', { skip }, async () => {
   const { context, page, errors } = await open('/index.html', { width: 1440, height: 900, reducedMotion: 'no-preference' });
   const info = await page.evaluate(() => ({ hiddenAbove: [...document.querySelectorAll('.reveal')].filter(e => e.getBoundingClientRect().top <= innerHeight).length, hiddenBelow: document.querySelectorAll('.reveal:not(.is-visible)').length }));

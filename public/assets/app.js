@@ -43,7 +43,7 @@
     });
   }
 
-  /* Videos (unter dem Hero und bei „Ihr Bericht“): starten, sobald sie ins Bild scrollen, und laufen dann in Schleife.
+  /* Videos (bei „Ein PDF. Sieben Seiten.“ und „Jeder Befund verständlich erklärt.“): starten, sobald sie ins Bild scrollen, und laufen dann in Schleife.
      Außerhalb des Bildes angehalten (spart Akku und Daten); bei „Bewegung reduzieren“ bleibt das Standbild. */
   const videos = document.querySelectorAll('.showcase-video');
   /* Kann der Browser ein Video nicht laden (z. B. Safari/iOS, wenn der Server Range-Anfragen nicht mit 206 beantwortet),
@@ -60,8 +60,10 @@
     };
     const source = v.querySelector('source');
     if (source) source.addEventListener('error', toStill);
-    /* Ist das Laden schon gescheitert, bevor dieses Skript lief, kam das error-Ereignis zu früh */
-    if (v.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) toStill();
+    /* Ist das Laden schon gescheitert, bevor dieses Skript lief, kam das error-Ereignis zu früh. NETWORK_NO_SOURCE allein beweist
+       das nicht: Während der Quellenauswahl steht der Wert kurz ebenfalls dort (WebKit unter Last). load() startet die Auswahl neu;
+       scheitert sie wirklich, kommt das error-Ereignis jetzt beim Listener an (bei preload="none" ohne Download). */
+    if (v.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) v.load();
   });
   if (videos.length && !reduce && 'IntersectionObserver' in window) {
     /* intersectionRatio > 0: Ein Video, das nur an den Bildschirmrand stößt, gilt noch nicht als sichtbar */
