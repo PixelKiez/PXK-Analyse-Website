@@ -586,7 +586,7 @@ test('Release-Grenze API (privater Worker): keine Route, keine workers.dev-Adres
   assert.ok(!/^ORDER_RETENTION_DAYS\s*=/m.test(active), 'Löschfrist nicht aktiv, solange die Aufbewahrungsfrist offen ist');
   const config = read('worker/src/config.ts');
   assert.match(config, /export const AUTHORIZED_MAIL_API_HOSTS: readonly string\[\] = \['api\.resend\.com'\];/);
-  assert.match(config, /export const AUTHORIZED_MAIL_FROM_DOMAINS: readonly string\[\] = \['notify\.pixelkiez\.de'\];/);
+  assert.match(config, /export const AUTHORIZED_MAIL_FROM_DOMAINS: readonly string\[\] = \['360\.pixelkiez\.de'\];/);
   assert.match(config, /export const PRODUCTION_BASE_URL = 'https:\/\/360\.pixelkiez\.de';/);
   assert.match(config, /export const PRODUCTION_NOTIFY_TO = '360@pixelkiez\.de';/, 'fester interner Empfänger in Produktion');
   /* Einzige Adresse ist 360@pixelkiez.de: Die frühere Adresse steht weder in ausgelieferten Seiten noch im Worker oder in der

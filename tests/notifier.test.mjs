@@ -116,10 +116,10 @@ test('Benachrichtigung scheitert nach der Speicherung an der Datenbank: Annahme 
   assert.equal(mail.state.accepted.length, 1, 'genau eine Mail');
 });
 
-/* Gültige Produktionskonfiguration: echte Google-Endpunkte, Resend, Absender aus notify.pixelkiez.de, freigegebene Datenschutz-Version */
+/* Gültige Produktionskonfiguration: echte Google-Endpunkte, Resend, Absender aus 360.pixelkiez.de, freigegebene Datenschutz-Version */
 const PROD = {
   ENV: 'production', BASE_URL: PRODUCTION_BASE, GOOGLE_TOKEN_ENDPOINT: undefined, GOOGLE_JWKS_URI: undefined, GOOGLE_AUTH_ENDPOINT: undefined,
-  MAIL_API_URL: 'https://api.resend.com/emails', MAIL_FROM: 'benachrichtigung@notify.pixelkiez.de', PRIVACY_VERSION: '2026-11-01', TERMS_VERSION: 'AGB-2026-11-01',
+  MAIL_API_URL: 'https://api.resend.com/emails', MAIL_FROM: 'benachrichtigung@360.pixelkiez.de', PRIVACY_VERSION: '2026-11-01', TERMS_VERSION: 'AGB-2026-11-01',
 };
 /* Hero-Formular gegen die Produktionskonfiguration (dort freigegebene AGB-Version) */
 const prodStart = () => startForm({ agbVersion: PROD.TERMS_VERSION });
@@ -147,7 +147,8 @@ test('Produktion: falscher Mail-Anbieter oder Pfad, fremder Absender, Datenschut
   const variants = [
     ['Mail-API nicht Resend', { MAIL_API_URL: 'https://api.mail-anbieter.example.net/emails' }, /MAIL_API_URL/],
     ['Resend mit falschem Pfad', { MAIL_API_URL: 'https://api.resend.com/v1/send' }, /MAIL_API_URL/],
-    ['Absender außerhalb von notify.pixelkiez.de', { MAIL_FROM: 'analyse@pixelkiez.de' }, /MAIL_FROM/],
+    ['Absender außerhalb von 360.pixelkiez.de', { MAIL_FROM: 'analyse@pixelkiez.de' }, /MAIL_FROM/],
+    ['Alte Versanddomain nicht mehr erlaubt', { MAIL_FROM: 'analyse@notify.pixelkiez.de' }, /MAIL_FROM/],
     ['Empfängerpostfach als Absender', { MAIL_FROM: '360@pixelkiez.de' }, /MAIL_FROM/],
     ['Datenschutzerklärung nur als Entwurf', { PRIVACY_VERSION: 'ENTWURF-2026-10-31' }, /PRIVACY_VERSION/],
     ['AGB nur als Entwurf', { TERMS_VERSION: 'ENTWURF-2026-10-31' }, /TERMS_VERSION/],
@@ -179,7 +180,7 @@ test('Produktion: falscher Mail-Anbieter oder Pfad, fremder Absender, Datenschut
 test('Produktion: interner Empfänger ausschließlich 360@pixelkiez.de – jede andere Adresse, auch die frühere kontakt@pixelkiez.de, sperrt die API (503, kein Cron-Versand, kein Aufruf von Resend)', { skip }, async () => {
   const variants = [
     ['frühere Adresse (kein Rückfall)', 'kontakt@pixelkiez.de'], ['anderes Postfach', 'info@pixelkiez.de'], ['andere Domain', '360@pixelkiez.com'],
-    ['Versanddomain statt Postfach', '360@notify.pixelkiez.de'], ['verworfene Adresse auf der Subdomain', 'analyse@360.pixelkiez.de'],
+    ['Versanddomain statt Postfach', '360@360.pixelkiez.de'], ['verworfene Adresse auf der Subdomain', 'analyse@360.pixelkiez.de'],
     ['verworfene Mail-Subdomain', 'analyse@mail.360.pixelkiez.de'], ['angehängte Fremddomain', '360@pixelkiez.de.example.net'],
     ['Subdomain-Präfix', '360@mail.pixelkiez.de'], ['Plus-Adresse', '360+test@pixelkiez.de'], ['andere Ziffern', '3600@pixelkiez.de'],
     ['neue und frühere Adresse (Doppelzustellung)', '360@pixelkiez.de,kontakt@pixelkiez.de'], ['zwei Empfänger mit Semikolon', '360@pixelkiez.de;kontakt@pixelkiez.de'],
