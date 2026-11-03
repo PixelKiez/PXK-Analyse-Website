@@ -6,14 +6,13 @@
 .inhalt { background: linear-gradient(180deg, #EBE2FC 0%, #EFE2F6 9%, #F8E3E6 20%, #FFE6DD 34%, rgb(255 230 221 / .6) 58%, rgb(255 230 221 / 0) 100%) no-repeat, var(--paper); background-size: 100% 1150px, auto; }
 .inhalt .frame { max-width: none; border-inline: 0; }
 
-/* Kopf: Brotkrumen, Titel, Einleitung, Angaben, Bild – alles mittig */
+/* Kopf: Brotkrumen, Titel, Einleitung, Bild – alles mittig */
 .kopf { display: grid; justify-items: center; gap: 22px; max-width: 900px; margin-inline: auto; padding: clamp(56px, 9vw, 112px) var(--gutter) clamp(32px, 5vw, 56px); text-align: center; }
 .krumen ol { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 0; padding: 0; list-style: none; font: 500 12px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-45); }
 .krumen li + li::before { content: "/"; margin-right: 6px; color: var(--line); }
 .krumen a:hover { color: var(--accent-text); }
 .kopf-titel { margin: 0; font-size: clamp(34px, 5vw, 60px); line-height: 1.04; letter-spacing: -.035em; font-weight: 500; text-wrap: balance; }
 .kopf-lead { margin: 0; max-width: 62ch; font-size: clamp(17px, 1.6vw, 20px); line-height: 1.6; color: var(--ink-70); text-wrap: pretty; }
-.kopf-meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; margin: 0; padding: 0; list-style: none; font: 500 12px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-45); }
 
 /* Bild je Seite: Linienszene, Konturen in Textfarbe, Akzent aus der Pfirsich-/Orange-Palette */
 .szene { width: 100%; max-width: 760px; margin: clamp(8px, 2vw, 20px) auto 0; }
@@ -30,7 +29,9 @@
 .spalte { max-width: 760px; margin-inline: auto; padding: 0 var(--gutter) clamp(56px, 8vw, 96px); }
 .toc { margin: 0 0 clamp(36px, 5vw, 56px); padding: 22px 26px; background: rgb(255 255 255 / .7); border: 1px solid var(--line-soft); border-radius: var(--r-card); }
 .toc-titel { margin: 0 0 10px; font: 500 12px var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-45); }
-.toc ol { display: grid; gap: 8px; margin: 0; padding-left: 20px; font-size: 15px; color: var(--ink-70); }
+.toc ul { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; font-size: 15px; color: var(--ink-70); }
+/* Tippfläche mindestens 24 px hoch (WCAG 2.5.8) */
+.toc a { display: inline-block; padding-block: 4px; }
 .toc a:hover { color: var(--accent-text); }
 .lesetext { color: var(--ink-70); font-size: 17px; line-height: 1.75; }
 .lesetext > :first-child { margin-top: 0; }
@@ -54,14 +55,10 @@
 .tabelle:focus, .lesetext pre:focus { outline: none; }
 .tabelle:focus-visible, .lesetext pre:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* Häufige Fragen als aufklappbare Liste (ohne Skript) */
-.fragen { display: grid; gap: 10px; margin: 0 0 18px; }
-.fragen details { background: rgb(255 255 255 / .75); border: 1px solid var(--line-soft); border-radius: 14px; }
-.fragen summary { display: flex; justify-content: space-between; gap: 16px; padding: 16px 20px; font-weight: 600; color: var(--ink); cursor: pointer; list-style: none; }
-.fragen summary::-webkit-details-marker { display: none; }
-.fragen summary::after { content: "+"; flex: none; font-weight: 400; color: var(--accent-text); }
-.fragen details[open] summary::after { content: "–"; }
-.fragen details > :not(summary) { margin: 0; padding: 0 20px 16px; }
+/* Abschnitte wie auf der Startseite (Häufige Fragen, Weiterlesen): Fläche über die ganze Breite, Inhalt auf Rahmenbreite */
+.inhalt .section { padding-inline: max(var(--gutter), calc((100% - var(--frame)) / 2 + var(--gutter))); scroll-margin-top: 88px; }
+.inhalt .section .h2 { scroll-margin-top: 104px; }
+.inhalt .faq details p a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
 
 /* Quellen */
 .quellen-lead { font-size: 15px; color: var(--ink-45); }
@@ -71,14 +68,6 @@
 .q-desc { margin: 4px 0 8px; font-size: 15px; color: var(--ink-45); }
 .q-links { margin: 0; }
 .q-links ul, .quellen-liste { display: grid; gap: 8px; margin: 0; padding-left: 1.1em; font-size: 15px; line-height: 1.55; }
-.q-stand { display: block; font: 500 12px var(--font-mono); letter-spacing: .04em; color: var(--ink-45); }
-
-/* Weiterlesen */
-.weiter { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 0; padding: 0; list-style: none; }
-.weiter a { display: grid; gap: 4px; height: 100%; padding: 18px 20px; background: rgb(255 255 255 / .75); border: 1px solid var(--line-soft); border-radius: 14px; text-decoration: none; transition: border-color .2s, transform .2s var(--ease); }
-.weiter a:hover { border-color: var(--accent); transform: translateY(-2px); }
-.weiter b { color: var(--ink); font-weight: 600; }
-.weiter span { font-size: 15px; color: var(--ink-45); }
 
 /* Übersichtsseiten: geordnete Karten mit Bild */
 .uebersicht { max-width: 1120px; margin-inline: auto; padding: 0 var(--gutter) clamp(56px, 8vw, 96px); }
@@ -96,51 +85,6 @@
 .karte-teaser { font-size: 15px; line-height: 1.55; color: var(--ink-45); }
 .hinweis { max-width: 760px; margin: 0 auto; text-align: center; font-size: 15px; color: var(--ink-45); }
 
-/* Kreisdiagramm: Zahl der Prüfkriterien je Bereich (statisch, ohne Skript) */
-.donut { text-align: left; display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); align-items: center; gap: clamp(24px, 4vw, 56px); max-width: 920px; margin: 0 auto clamp(48px, 7vw, 80px); padding: clamp(20px, 3vw, 32px); background: rgb(255 255 255 / .7); border: 1px solid var(--line-soft); border-radius: 22px; }
-.donut-bild { position: relative; }
-.donut-bild svg { display: block; width: 100%; height: auto; }
-.donut-mitte { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; }
-.donut-mitte b { font-size: 44px; line-height: 1; font-weight: 500; letter-spacing: -.03em; }
-.donut-mitte span { max-width: 14ch; margin-top: 6px; font-size: 13px; line-height: 1.35; color: var(--ink-45); }
-.donut-legende { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.donut-legende a { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; text-decoration: none; }
-.donut-legende a:hover { background: var(--paper); }
-.donut-legende b { font-weight: 600; color: var(--ink); }
-.donut-legende .num { font: 500 14px var(--font-mono); color: var(--ink-45); }
-.dn-sw { width: 14px; height: 14px; border-radius: 4px; }
-.donut-legende a { grid-template-columns: 14px minmax(0, 1fr) auto auto; }
-.donut-legende .dn-sub { display: block; font-size: 13px; font-weight: 400; color: var(--ink-45); }
-.donut-legende .dn-wert { font: 500 15px var(--font-mono); color: var(--ink); }
-.donut-legende .dn-go { color: var(--ink-45); }
-.donut-legende a.ist-aktiv { background: var(--paper); }
-/* Bewegung: Segmente setzen sich beim Öffnen und beim Hineinscrollen zusammen (nur mit JavaScript, nie bei „Bewegung reduzieren“) */
-/* Segmente sind reine Zeigerziele (die Tastatur nutzt die Legende): beim Anklicken kein Fokusrahmen und keine Tipp-Markierung */
-.donut-bild svg a { cursor: pointer; outline: none; -webkit-tap-highlight-color: transparent; }
-.donut-bild svg a:focus, .donut-bild svg a:focus-visible { outline: none; }
-.donut-legende a:focus:not(:focus-visible) { outline: none; }
-.donut-legende a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-/* Jedes Segment: feste, unsichtbare Klickfläche (reicht über den Außenrand) und darüber das sichtbare Stück,
-   das bei Zeigerkontakt entlang seiner Mittellinie aus dem Kreis herausrückt. Die Klickfläche bewegt sich nie. */
-.dn-treffer { fill: transparent; }
-.dn-stueck { pointer-events: none; transform-box: view-box; transition: transform .3s var(--ease), opacity .25s ease, filter .3s ease; }
-.donut-bild svg a { transform-box: view-box; transform-origin: 50% 50%; transition: transform .8s var(--ease), opacity .55s ease; }
-.donut.dn-anim .donut-bild svg a { opacity: 0; transform: rotate(-28deg) scale(.82); }
-.donut.dn-anim.dn-sichtbar .donut-bild svg a { opacity: 1; transform: none; }
-.donut.dn-anim.dn-sichtbar .donut-bild svg a:nth-child(2) { transition-delay: .08s; }
-.donut.dn-anim.dn-sichtbar .donut-bild svg a:nth-child(3) { transition-delay: .16s; }
-.donut.dn-anim.dn-sichtbar .donut-bild svg a:nth-child(4) { transition-delay: .24s; }
-.donut.dn-anim.dn-sichtbar .donut-bild svg a:nth-child(5) { transition-delay: .32s; }
-.donut.dn-anim.dn-sichtbar .donut-bild svg a:nth-child(6) { transition-delay: .40s; }
-.donut[data-aktiv] .dn-stueck { opacity: .35; }
-.donut[data-aktiv] .donut-bild svg a.ist-aktiv .dn-stueck { opacity: 1; transform: translate(var(--dx, 0px), var(--dy, 0px)); filter: drop-shadow(0 6px 10px rgb(12 12 12 / .18)); }
-.dn-1 { fill: #FE5B2A; background: #FE5B2A; }
-.dn-2 { fill: #FF8A5C; background: #FF8A5C; }
-.dn-3 { fill: #FFB596; background: #FFB596; }
-.dn-4 { fill: #B9A2EE; background: #B9A2EE; }
-.dn-5 { fill: #8F73DB; background: #8F73DB; }
-.dn-6 { fill: #5B3FA6; background: #5B3FA6; }
-
 /* Seitenende: Pfirsich geht weich in Lila über (von unten nach oben gelesen: Lila → Pfirsich → Papier) */
 .ende { background: linear-gradient(180deg, rgb(255 230 221 / 0) 0%, #FFE6DD 24%, #F8E3E6 48%, #EFE2F6 70%, #EBE2FC 88%); }
 .ende .footer-cols, .ende .footer { border-top-color: rgb(91 63 166 / .14); }
@@ -151,13 +95,10 @@
 
 @media (max-width: 960px) {
   .karten { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .donut { grid-template-columns: minmax(0, 1fr); justify-items: center; }
-  .donut-bild { width: min(300px, 100%); }
-  .donut-legende { width: 100%; }
 }
 @media (max-width: 640px) {
-  .karten, .weiter { grid-template-columns: minmax(0, 1fr); }
+  .karten { grid-template-columns: minmax(0, 1fr); }
   .toc { padding: 18px 18px; }
   .lesetext { font-size: 16px; }
 }
-@media (prefers-reduced-motion: reduce) { .karte, .weiter a, .donut-bild svg a, .dn-stueck { transition: none; } .karte:hover, .weiter a:hover { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .karte { transition: none; } .karte:hover { transform: none; } }

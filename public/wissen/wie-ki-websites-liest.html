@@ -9,21 +9,34 @@
 <meta name="description" content="Suchbots, Trainings-Crawler und Browser-Agenten lesen Websites auf verschiedenen Wegen. Was ins ausgelieferte HTML gehört und was sich von außen prüfen lässt.">
 <link rel="canonical" href="https://360.pixelkiez.de/wissen/wie-ki-websites-liest">
 <meta property="og:type" content="article">
+<meta property="og:site_name" content="360°Pixelkiez">
 <meta property="og:title" content="Was KI-Crawler und Browser-Agenten von Websites sehen">
 <meta property="og:description" content="Suchbots, Trainings-Crawler und Browser-Agenten lesen Websites auf verschiedenen Wegen. Was ins ausgelieferte HTML gehört und was sich von außen prüfen lässt.">
 <meta property="og:url" content="https://360.pixelkiez.de/wissen/wie-ki-websites-liest">
 <meta property="og:locale" content="de_DE">
+<meta property="og:image" content="https://360.pixelkiez.de/assets/og/wissen-wie-ki-websites-liest.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Titelbild: „Wie KI-Systeme Ihre Website abrufen und was dabei ankommt“ mit Linienillustration – 360°Pixelkiez Wissen">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://360.pixelkiez.de/assets/og/wissen-wie-ki-websites-liest.jpg">
+<meta name="twitter:image:alt" content="Titelbild: „Wie KI-Systeme Ihre Website abrufen und was dabei ankommt“ mit Linienillustration – 360°Pixelkiez Wissen">
+<link rel="icon" href="../favicon.ico" sizes="32x32">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="../assets/styles.css">
 <link rel="stylesheet" href="../assets/anfrage.css">
 <link rel="stylesheet" href="../assets/inhalt.css">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "Article", "headline": "Wie KI-Systeme Ihre Website abrufen und was dabei ankommt", "description": "Suchbots, Trainings-Crawler und Browser-Agenten lesen Websites auf verschiedenen Wegen. Was ins ausgelieferte HTML gehört und was sich von außen prüfen lässt.", "inLanguage": "de-DE", "url": "https://360.pixelkiez.de/wissen/wie-ki-websites-liest", "mainEntityOfPage": "https://360.pixelkiez.de/wissen/wie-ki-websites-liest", "dateModified": "2026-11-02", "author": {"@type": "Organization", "name": "360°Pixelkiez", "url": "https://360.pixelkiez.de/"}, "publisher": {"@type": "Organization", "name": "360°Pixelkiez", "url": "https://360.pixelkiez.de/"}, "isPartOf": {"@type": "CollectionPage", "url": "https://360.pixelkiez.de/wissen/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Start", "item": "https://360.pixelkiez.de/"}, {"@type": "ListItem", "position": 2, "name": "Wissen", "item": "https://360.pixelkiez.de/wissen/"}, {"@type": "ListItem", "position": 3, "name": "Wie KI Websites liest", "item": "https://360.pixelkiez.de/wissen/wie-ki-websites-liest"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "Article", "headline": "Wie KI-Systeme Ihre Website abrufen und was dabei ankommt", "description": "Suchbots, Trainings-Crawler und Browser-Agenten lesen Websites auf verschiedenen Wegen. Was ins ausgelieferte HTML gehört und was sich von außen prüfen lässt.", "image": {"@type": "ImageObject", "url": "https://360.pixelkiez.de/assets/og/wissen-wie-ki-websites-liest.jpg", "width": 1200, "height": 630}, "inLanguage": "de-DE", "url": "https://360.pixelkiez.de/wissen/wie-ki-websites-liest", "mainEntityOfPage": "https://360.pixelkiez.de/wissen/wie-ki-websites-liest", "dateModified": "2026-11-02", "author": {"@type": "Organization", "name": "360°Pixelkiez", "url": "https://360.pixelkiez.de/"}, "publisher": {"@type": "Organization", "name": "360°Pixelkiez", "url": "https://360.pixelkiez.de/"}, "isPartOf": {"@type": "CollectionPage", "url": "https://360.pixelkiez.de/wissen/"}}, {"@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Sieht eine KI meine Website so, wie ich sie im Browser sehe?", "acceptedAnswer": {"@type": "Answer", "text": "Nicht unbedingt. Ein Browser startet Skripte, lädt Grafiken und Schriften und setzt daraus die Ansicht zusammen; manche automatisierten Besucher holen dagegen nur das HTML ab, das der Server als Erstes schickt. Was ankommt, hängt davon ab, welches System zugreift, was es vorhat und wie es die Seite abruft."}}, {"@type": "Question", "name": "Führen KI-Crawler JavaScript aus?", "acceptedAnswer": {"@type": "Answer", "text": "Das hängt vom einzelnen System ab, nicht von „der KI“ als Ganzes. Eine veröffentlichte Messung fand bei den untersuchten KI-Crawlern keine JavaScript-Ausführung, nannte aber Gegenbeispiele und beschreibt nur ihren damaligen Stand; die Google-Suche führt JavaScript nach eigener Beschreibung aus. Was schon im ersten Dokument steht, erreicht auch Systeme ohne Browser."}}, {"@type": "Question", "name": "Sollte ich KI-Crawler in meiner robots.txt aussperren?", "acceptedAnswer": {"@type": "Answer", "text": "Das entscheiden Sie, am besten bewusst: Suche und Modelltraining lassen sich dort getrennt regeln, und wer pauschal sperrt, schließt womöglich auch Systeme aus, über die Ihre Inhalte gefunden werden sollen. Ein Schloss ist die robots.txt ohnehin nicht; bei Abrufen, die ein Mensch anstößt, greift sie nicht immer."}}, {"@type": "Question", "name": "Welche Angaben sollten schon im ausgelieferten HTML stehen?", "acceptedAnswer": {"@type": "Answer", "text": "Alles, was für Ihr Geschäft tragend ist, etwa Firmenname, Ort, Leistung, Kontaktweg und gegebenenfalls ein Preisrahmen. Was nur in PDFs oder Bildern steckt, erreicht nicht jedes System gleich zuverlässig, und was nur am Telefon zu erfahren ist, fehlt ganz. Mehr zur Technik dahinter im Beitrag Wie Websites ausgeliefert werden."}}]}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Start", "item": "https://360.pixelkiez.de/"}, {"@type": "ListItem", "position": 2, "name": "Wissen", "item": "https://360.pixelkiez.de/wissen/"}, {"@type": "ListItem", "position": 3, "name": "Wie KI Websites liest", "item": "https://360.pixelkiez.de/wissen/wie-ki-websites-liest"}]}]}</script>
 </head>
 <body class="inhalt">
 <svg class="sr-only" width="0" height="0" aria-hidden="true">
   <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
 </svg>
 
 <header class="nav-wrap" id="nav">
@@ -46,8 +59,7 @@
 <nav class="krumen" aria-label="Brotkrumen"><ol><li><a href="../index.html">Start</a></li><li><a href="index.html">Wissen</a></li><li aria-current="page">Wie KI Websites liest</li></ol></nav>
 <h1 class="kopf-titel">Wie KI-Systeme Ihre Website abrufen und was dabei ankommt</h1>
 <p class="kopf-lead">Ein Mensch sieht im Browser die fertige Seite, ein Crawler unter Umständen nur das HTML, das der Server als Erstes schickt. Wer zugreift, mit welchem Ziel und über welchen Abrufweg, bestimmt, welche Angaben überhaupt ankommen. Dieser Beitrag zeigt, woran Sie das an Ihrer eigenen Website erkennen und was sich davon prüfen lässt.</p>
-<ul class="kopf-meta"><li>Ca. 8 Min. Lesezeit</li><li>Stand: <time datetime="2026-11-02">2. November 2026</time></li><li>7 Quellen</li></ul>
-<figure class="szene"><div class="szene-bild" aria-hidden="true"><svg viewBox="0 0 640 300" xmlns="http://www.w3.org/2000/svg" fill="none" stroke-linecap="round" stroke-linejoin="round">
+<figure class="szene"><div class="szene-bild"><svg role="img" aria-label="Illustration: Ein Dokument läuft über einen Datenknoten zu drei Lesarten – gerenderte Ansicht, reiner Text und strukturierte Angaben." viewBox="0 0 640 300" xmlns="http://www.w3.org/2000/svg" fill="none" stroke-linecap="round" stroke-linejoin="round">
           <g>
             <rect x="24" y="60" width="150" height="180" rx="6"/>
             <rect x="40" y="78" width="80" height="12" rx="2" class="kb-akzent"/>
@@ -81,7 +93,7 @@
         </svg></div><figcaption><b>Eine Adresse, mehrere Lesarten.</b> Je nach System kommt dieselbe Seite als gerenderte Ansicht, als reiner Text oder als strukturierte Angaben an. Welchen Weg ein bestimmter Abruf nimmt, verrät die Darstellung allein nicht.</figcaption></figure>
   </section>
   <div class="spalte">
-<nav class="toc" aria-labelledby="toc-titel"><p class="toc-titel" id="toc-titel">Inhalt</p><ol><li><a href="#wer-wozu-wie">Erst klären: wer, wozu und auf welchem Weg</a></li><li><a href="#drei-zugriffsarten">Suchen, trainieren, nachschlagen: drei Arten von Zugriffen</a></li><li><a href="#erster-abruf">Was beim ersten Abruf im Dokument steht</a></li><li><a href="#javascript">Führen KI-Crawler JavaScript aus?</a></li><li><a href="#vier-stufen">Lesbar heißt noch nicht genannt</a></li><li><a href="#agenten">Wenn ein Agent auf der Seite handeln soll</a></li><li><a href="#von-aussen-erkennen">Woran Sie es an Ihrer Website erkennen</a></li><li><a href="#pruefpunkte">Welche Prüfpunkte aus dem Katalog dazu passen</a></li><li><a href="#weiterlesen">Weiterlesen</a></li><li><a href="#quellen">Quellen</a></li></ol></nav>
+<nav class="toc" aria-labelledby="toc-titel"><p class="toc-titel" id="toc-titel">Inhalt</p><ul><li><a href="#wer-wozu-wie">Erst klären: wer, wozu und auf welchem Weg</a></li><li><a href="#drei-zugriffsarten">Suchen, trainieren, nachschlagen: drei Arten von Zugriffen</a></li><li><a href="#erster-abruf">Was beim ersten Abruf im Dokument steht</a></li><li><a href="#javascript">Führen KI-Crawler JavaScript aus?</a></li><li><a href="#vier-stufen">Lesbar heißt noch nicht genannt</a></li><li><a href="#agenten">Wenn ein Agent auf der Seite handeln soll</a></li><li><a href="#von-aussen-erkennen">Woran Sie es an Ihrer Website erkennen</a></li><li><a href="#pruefpunkte">Welche Prüfkriterien der Analyse dazu passen</a></li><li><a href="#quellen">Quellen</a></li><li><a href="#haeufige-fragen">Häufige Fragen</a></li><li><a href="#weiterlesen">Weiterlesen</a></li></ul></nav>
 <article class="lesetext">
 <h2 id="wer-wozu-wie">Erst klären: wer, wozu und auf welchem Weg</h2>
 <p>Öffnet ein Mensch Ihre Startseite, erledigt der Browser im Hintergrund einiges: Er fordert das HTML an, startet die eingebundenen Skripte, lädt Grafiken und Webfonts und setzt daraus die Ansicht zusammen. Dieses Ergebnis hält man leicht für die Website selbst.</p>
@@ -98,11 +110,6 @@
 <p>Oft missverstanden wird Google-Extended. Nach Googles Crawler-Dokumentation ist das kein eigenständiger Bot mit eigener User-Agent-Kennung; gecrawlt wird mit den bestehenden Google-User-Agents. Die zugehörige Zeile in der robots.txt legt nur fest, ob Inhalte, die Google ohnehin erfasst, in das Training kommender Gemini-Modelle einfließen und in einzelnen Google-Produkten als Grounding dienen dürfen. Für die Google-Suche selbst, also Aufnahme und Platzierung, spielt sie laut derselben Quelle keine Rolle.</p>
 <h2 id="erster-abruf">Was beim ersten Abruf im Dokument steht</h2>
 <p>Ein ausgedachtes Beispiel: ein Berliner Elektrobetrieb, der Wallboxen installiert und Terminanfragen bekommen möchte. Firmenname, Angebot, Standort und das gewünschte Ziel erkennt ein Mensch auf einen Blick. Was eine Maschine davon erfasst, hängt vom Abrufweg ab.</p>
-<ol>
-<li><b>Die Angaben kommen mit dem HTML.</b> Der Server schickt Name, Leistung, Ort und Terminanfrage bereits im Dokument mit. Auch ein System ohne Browser hat damit alle vier Angaben.</li>
-<li><b>Das HTML ist nur ein Gerüst.</b> Im ersten Dokument steht kaum mehr als ein leerer Container wie <code>&lt;div id="root"&gt;&lt;/div&gt;</code>. Google nennt diesen Aufbau App-Shell-Modell: Der eigentliche Inhalt wird erst durch die Skripte im Browser aufgebaut. Ohne Browser bleibt hier fast nichts übrig, mit Browser entsteht das, was auch ein Mensch sieht.</li>
-<li><b>Die Seite wird vollständig gerendert.</b> Lässt ein System die Seite in einem Browser laufen, erhält es Überschriften, Text und Schaltflächen und sieht, welche Elemente bedienbar sind.</li>
-</ol>
 <p>Für Maschinen zählt dabei nicht nur sichtbarer Fließtext. Auch strukturierte Daten, im HTML eingebettete Datenblöcke und vom Server vorab aufbereitete Inhalte gehören zum ausgelieferten Dokument und lassen sich auslesen. Entscheidend ist, ob der Server eine Angabe mitliefert oder ob sie erst im Browser entsteht. Welchen Weg ein bestimmtes System bei einem bestimmten Abruf wählt, verrät das Beispiel nicht.</p>
 <h2 id="javascript">Führen KI-Crawler JavaScript aus?</h2>
 <p>Ob JavaScript ausgeführt wird, hängt vom einzelnen System ab, nicht von „der KI“ als Ganzes. Für einige Crawler gibt es eine datierte Messung: Vercel und MERJ werteten echte Zugriffsprotokolle aus und veröffentlichten das Ergebnis am 17. Dezember 2024. Die untersuchten KI-Crawler, darunter PerplexityBot, Bytespider, Meta-ExternalAgent, ClaudeBot von Anthropic sowie GPTBot, ChatGPT-User und OAI-SearchBot von OpenAI, führten demnach kein JavaScript aus. Einige luden JavaScript-Dateien zwar herunter, führten sie aber nicht aus.</p>
@@ -110,13 +117,7 @@
 <p>Anders bei der klassischen Google-Suche, für die es eine offizielle Beschreibung gibt: Google führt JavaScript mit einer laufend aktuell gehaltenen Chromium-Version aus und unterscheidet Crawling, Rendering und Indexierung. Diese Phasen laufen laut Google nicht streng nacheinander ab und sind von außen nicht einsehbar. Google kann im Browser erzeugte Inhalte also verarbeiten, während ein Abruf ohne Rendering nur das erste Dokument erhält. Ein Blick allein auf die eigene Google-Präsenz verrät diesen Unterschied nicht.</p>
 <p>Daraus ergibt sich keine Pauschalregel, alles serverseitig auszuliefern, sondern eine Prüffrage: Welche geschäftlich wichtigen Angaben tauchen erst im Browser auf? Für Kontaktweg, Preisrahmen, Leistung und Ort ist diese Abhängigkeit ein Risiko, das sich vermeiden lässt. Ein Bildkarussell oder Chatfenster ist weniger heikel, solange sich keine wichtige Angabe und kein nötiger Schritt nur über dieses Element erreichen lässt. Mehr zur Technik dahinter im Beitrag <a href="wie-websites-ausgeliefert-werden.html">Wie Websites ausgeliefert werden</a>.</p>
 <h2 id="vier-stufen">Lesbar heißt noch nicht genannt</h2>
-<p>Abrufbar zu sein ist erst der Anfang. Es hilft, vier Stufen zu trennen, denn jede braucht einen eigenen Nachweis, und keine frühe Stufe belegt eine spätere.</p>
-<ol>
-<li><b>Abrufbarkeit:</b> Gelangt ein System überhaupt an die Seite? Hier zählen Zugänge, Weiterleitungen, Statuscodes und robots.txt.</li>
-<li><b>Auslesbarkeit:</b> Lassen sich Leistung, Ort, Zuständigkeit und Kontaktweg als eindeutig zuordenbarer Text entnehmen, nicht nur als Gesamteindruck?</li>
-<li><b>Beantwortbarkeit:</b> Steht die Antwort auf eine konkrete Frage wirklich auf der Seite? Mehr dazu unter <a href="answerability.html">Answerability</a>.</li>
-<li><b>Beobachtete Nennung:</b> Erscheint die Domain tatsächlich in KI-Antworten? Das zeigt nur ein festgelegter, wiederholbarer Test.</li>
-</ol>
+<p>Abrufbar zu sein ist erst der Anfang. Ob sich Leistung, Ort und Kontaktweg eindeutig entnehmen lassen und ob die Seite eine konkrete Frage beantwortet (mehr dazu unter <a href="answerability.html">Answerability</a>), braucht jeweils einen eigenen Nachweis; keine frühe Stufe belegt eine spätere.</p>
 <p>Auch die Anbieter formulieren hier vorsichtig. OpenAI nennt die Freigabe für OAI-SearchBot eine Bedingung, damit eine Website überhaupt aufgenommen werden kann, und stellt im selben Zusammenhang klar, dass damit keine Platzierung zugesichert ist.</p>
 <h2 id="agenten">Wenn ein Agent auf der Seite handeln soll</h2>
 <p>Ein Browser-Agent erhält eine Oberfläche und einen Auftrag. Er muss Bedienelemente erkennen, was leichter gelingt, wenn die Seite sie korrekt ausweist: Schaltflächen als Schaltflächen, Eingabefelder mit Beschriftung, Menüs mit erkennbarem Zustand.</p>
@@ -129,17 +130,15 @@
 <li><b>Stehen Antworten als Text auf der Seite?</b> Was nur in PDFs oder Bildern steckt, erreicht nicht jedes System auf jedem Abrufweg gleich zuverlässig; was nur am Telefon zu erfahren ist, fehlt ganz. Zuständigkeiten, Fristen, Einzugsgebiete und Preise gehören deshalb auch als HTML-Text auf die Seite.</li>
 <li><b>Wird Sichtbarkeit gemessen oder behauptet?</b> Ob Ihre Domain in KI-Antworten vorkommt, belegen nur festgelegte, wiederholbare Tests.</li>
 </ul>
-<h2 id="pruefpunkte">Welche Prüfpunkte aus dem Katalog dazu passen</h2>
+<h2 id="pruefpunkte">Welche Prüfkriterien der Analyse dazu passen</h2>
 <p>In der Analyse von 360°Pixelkiez sehen wir uns bis zu sechs öffentliche Seiten Ihrer Website persönlich an und fassen die Befunde in einem siebenseitigen PDF-Bericht zusammen. Welche Prüfpunkte passen, entscheiden wir je Website. Zu diesem Thema gehören vor allem:</p>
 <ul>
-<li><b>Abruf und Steuerung</b> (<a href="../pruefkriterien.html#findability_seo">SEO &amp; Auffindbarkeit</a>): „Öffentliche Erreichbarkeit“, „robots.txt &amp; Sitemap“ und „Strukturierte Daten“.</li>
-<li><b>Auslieferung</b> (<a href="../pruefkriterien.html#performance_technology">Performance &amp; Technik</a>): „Öffentlicher Technologie-Snapshot“, also nur das, was öffentlich über CMS, Frameworks oder Auslieferung erkennbar ist.</li>
-<li><b>Auslesbarkeit und Antworten</b> (<a href="../pruefkriterien.html#geo_ai_visibility">GEO &amp; AI Visibility</a>): „Entitätsklarheit“, „Leistung, Zielgruppe &amp; Standort explizit“, „Antwortbarkeit &amp; FAQ-Struktur“ sowie „Beobachtete KI-Antwort-Stichproben“, bei denen nur datiert beobachtete Antworten festgehalten werden, sofern das im Einzelfall möglich ist.</li>
-<li><b>Bedienbarkeit</b> (<a href="../pruefkriterien.html#ux_accessibility_trust">UX, Barrierefreiheit &amp; Vertrauen</a>): „Semantische Struktur &amp; Landmarks“, „Formularbeschriftungen“ und „Tastatur &amp; sichtbarer Fokus“.</li>
+<li><b>Abruf und Steuerung</b> (<a href="../analyse/auffindbarkeit-seo.html">SEO &amp; Auffindbarkeit</a>): „Öffentliche Erreichbarkeit“, „robots.txt &amp; Sitemap“ und „Strukturierte Daten“.</li>
+<li><b>Auslieferung</b> (<a href="../analyse/performance-technik.html">Performance &amp; Technik</a>): „Öffentlicher Technologie-Snapshot“, also nur das, was öffentlich über CMS, Frameworks oder Auslieferung erkennbar ist.</li>
+<li><b>Auslesbarkeit und Antworten</b> (<a href="../analyse/ki-verstaendlichkeit.html">GEO &amp; AI Visibility</a>): „Entitätsklarheit“, „Leistung, Zielgruppe &amp; Standort explizit“ und „Antwortbarkeit &amp; FAQ-Struktur“.</li>
+<li><b>Bedienbarkeit</b> (<a href="../analyse/index.html#bereiche">UX, Barrierefreiheit &amp; Vertrauen</a>): „Semantische Struktur &amp; Landmarks“, „Formularbeschriftungen“ und „Tastatur &amp; sichtbarer Fokus“.</li>
 </ul>
 <p>Die Analyse beschreibt, was an den geprüften Seiten öffentlich nachvollziehbar ist. Ob ein bestimmtes KI-System Ihre Website künftig in Antworten nennt, kann sie nicht vorhersagen. Anbieterangaben können sich zudem ohne Vorankündigung ändern.</p>
-<h2 id="weiterlesen">Weiterlesen</h2>
-<ul class="weiter"><li><a href="seo-geo-ai-visibility.html"><b>SEO, GEO und AI Visibility: Begriffe, Grundlagen, Grenzen</b><span>Was SEO, GEO und AI Visibility jeweils meinen, welche Grundlagen sie teilen und warum sich Nennungen in KI-Antworten nur beobachten lassen.</span></a></li><li><a href="wie-websites-ausgeliefert-werden.html"><b>Was Ihre Website beim ersten Abruf tatsächlich ausliefert</b><span>Warum der Name des Frameworks wenig sagt und welche Inhalte Ihre Seite schon beim ersten Abruf mitbringen sollte.</span></a></li><li><a href="../analyse/ki-crawler-agenten.html"><b>Analyse: KI-Crawler und KI-Agenten: Wer liest Ihre Website – und wie?</b><span>welche KI-Systeme Ihre Website abrufen und wie Sie das steuern</span></a></li></ul>
 <h2 id="quellen">Quellen</h2>
 <ul class="quellen-liste">
 <li><a href="https://help.openai.com/en/articles/12627856-publishers-and-developers-faq">OpenAI: Publishers and Developers – FAQ</a></li>
@@ -152,6 +151,25 @@
 </ul>
 </article>
   </div>
+  <section class="section cw-white" aria-labelledby="haeufige-fragen">
+    <div class="faq-grid">
+      <div class="section-head"><h2 class="h2" id="haeufige-fragen">Häufige Fragen.</h2></div>
+      <div class="faq">
+        <details id="sieht-eine-ki-meine-website-so-wie-ich-sie-im-browser-sehe"><summary>Sieht eine KI meine Website so, wie ich sie im Browser sehe?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Nicht unbedingt. Ein Browser startet Skripte, lädt Grafiken und Schriften und setzt daraus die Ansicht zusammen; manche automatisierten Besucher holen dagegen nur das HTML ab, das der Server als Erstes schickt. Was ankommt, hängt davon ab, welches System zugreift, was es vorhat und wie es die Seite abruft.</p></details>
+        <details id="fuehren-ki-crawler-javascript-aus"><summary>Führen KI-Crawler JavaScript aus?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Das hängt vom einzelnen System ab, nicht von „der KI“ als Ganzes. Eine veröffentlichte Messung fand bei den untersuchten KI-Crawlern keine JavaScript-Ausführung, nannte aber Gegenbeispiele und beschreibt nur ihren damaligen Stand; die Google-Suche führt JavaScript nach eigener Beschreibung aus. Was schon im ersten Dokument steht, erreicht auch Systeme ohne Browser.</p></details>
+        <details id="sollte-ich-ki-crawler-in-meiner-robots-txt-aussperren"><summary>Sollte ich KI-Crawler in meiner robots.txt aussperren?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Das entscheiden Sie, am besten bewusst: Suche und Modelltraining lassen sich dort getrennt regeln, und wer pauschal sperrt, schließt womöglich auch Systeme aus, über die Ihre Inhalte gefunden werden sollen. Ein Schloss ist die robots.txt ohnehin nicht; bei Abrufen, die ein Mensch anstößt, greift sie nicht immer.</p></details>
+        <details id="welche-angaben-sollten-schon-im-ausgelieferten-html-stehen"><summary>Welche Angaben sollten schon im ausgelieferten HTML stehen?<span class="plus"><svg class="i"><use href="#i-plus"/></svg></span></summary><p>Alles, was für Ihr Geschäft tragend ist, etwa Firmenname, Ort, Leistung, Kontaktweg und gegebenenfalls ein Preisrahmen. Was nur in PDFs oder Bildern steckt, erreicht nicht jedes System gleich zuverlässig, und was nur am Telefon zu erfahren ist, fehlt ganz. Mehr zur Technik dahinter im Beitrag <a href="wie-websites-ausgeliefert-werden.html">Wie Websites ausgeliefert werden</a>.</p></details>
+      </div>
+    </div>
+  </section>
+  <section class="section" aria-labelledby="weiterlesen">
+    <div class="section-head"><h2 class="h2" id="weiterlesen">Weiterlesen.</h2></div>
+    <div class="tools">
+      <a class="tool" href="seo-geo-ai-visibility.html"><span><b>SEO, GEO und AI Visibility: Begriffe, Grundlagen, Grenzen</b>Was SEO, GEO und AI Visibility jeweils meinen, welche Grundlagen sie teilen und warum sich Nennungen in KI-Antworten nur beobachten lassen.</span><svg class="i"><use href="#i-arrow"/></svg></a>
+      <a class="tool" href="wie-websites-ausgeliefert-werden.html"><span><b>Was Ihre Website beim ersten Abruf tatsächlich ausliefert</b>Warum der Name des Frameworks wenig sagt und welche Inhalte Ihre Seite schon beim ersten Abruf mitbringen sollte.</span><svg class="i"><use href="#i-arrow"/></svg></a>
+      <a class="tool" href="../analyse/ki-crawler-agenten.html"><span><b>Analyse: KI-Crawler und KI-Agenten: Wer liest Ihre Website – und wie?</b>Welche KI-Systeme Ihre Website abrufen und wie Sie das steuern</span><svg class="i"><use href="#i-arrow"/></svg></a>
+    </div>
+  </section>
   <div class="ende">
     <section class="ende-cta" aria-labelledby="cta-titel">
       <h2 id="cta-titel">Wie steht Ihre Website da?</h2>
@@ -162,7 +180,7 @@
     <div class="footer-cols">
       <div class="footer-brand"><a class="logo" href="../index.html#top">360°Pixelkiez<span>Analyse</span></a><p>Kostenlose, persönlich erstellte Website-Analyse als PDF.</p></div>
       <div><h4>Angebot</h4><ul><li><a href="../index.html#ablauf">Ablauf</a></li><li><a href="../index.html#bericht">Bericht</a></li><li><a href="../index.html#bereiche">Bereiche</a></li><li><a href="../index.html#angebot">Angebot</a></li></ul></div>
-      <div><h4>Methodik</h4><ul><li><a href="../pruefkriterien.html#methodik">Alle Prüfpunkte</a></li><li><a href="../pruefkriterien.html#findability_seo">SEO &amp; Auffindbarkeit</a></li><li><a href="../pruefkriterien.html#geo_ai_visibility">GEO &amp; AI Visibility</a></li><li><a href="../wissen/index.html">Wissen</a></li><li><a href="../analyse/index.html">Analyse</a></li></ul></div>
+      <div><h4>Methodik</h4><ul><li><a href="../analyse/methodik.html">Methodik</a></li><li><a href="../analyse/auffindbarkeit-seo.html">SEO &amp; Auffindbarkeit</a></li><li><a href="../analyse/ki-verstaendlichkeit.html">GEO &amp; AI Visibility</a></li><li><a href="../wissen/index.html">Wissen</a></li><li><a href="../analyse/index.html">Analyse</a></li></ul></div>
       <div><h4>Kontakt</h4><ul><li><a href="mailto:360@pixelkiez.de">360@pixelkiez.de</a></li></ul></div>
     </div>
     <div class="footer">

@@ -17,14 +17,20 @@ const REF = process.env.PXK_RELEASE_REF || 'HEAD';
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
 /* Freigegebene öffentliche Website-Medien (eigenes 360°Pixelkiez-Material) mit SHA-256. Eine neue Fassung braucht eine
-   eigene Freigabe und eine bewusste Änderung dieser Liste. */
+   eigene Freigabe und eine bewusste Änderung dieser Liste. Fassung vom 03.11.2026 (Freigabe des Auftraggebers): eingebettete
+   Metadaten (Titel, Beschreibung, Urheber, Copyright); Video- und Bilddaten bitgleich zur vorigen Fassung. */
 const MEDIA = {
-  'media/360-pixelkiez-video-1080p.mp4': '3c34886c0bfa8130ca08b64c496813d6e199cae218d57016539a765584a073f3',
-  'media/360-pixelkiez-video-poster.jpg': 'f2867751a9b5c28e2d1d65f6857ba96e4e651bbfac482b4dc0cad5390f312095',
-  'media/report-pdf-de-1x1.mp4': '028005b2cc077a4c610457029130dd080c70f27d0b59e47e8884cf868eeb6a97',
-  'media/report-pdf-poster.jpg': '0654272d71a86d1de3473bba8c800aabd3ff546e12659b2374f9f313a0d5f477',
+  'media/360-pixelkiez-video-1080p.mp4': '593d8ebaa2b9915fe3294cde395b126f6763fd80b81e940d92e77b78b9ee3a50',
+  'media/360-pixelkiez-video-poster.jpg': 'ed00b1672e93f78e005f246817e6c098a15daddc651c0ed4ac74a7b12a7faef6',
+  'media/report-pdf-de-1x1.mp4': '8b616ebf7971600cce4a5d91a8b8b657ddc0dd522f2b8fe514010c6bdac8331d',
+  'media/report-pdf-poster.jpg': 'a45494725853ee2acadf0e47ae4aff871531034f1d0a29397389cda7b6b9ceb2',
 };
-const SITE = ['404.html', '_headers', '_routes.json', 'agb.html', 'assets/anfrage.css', 'assets/app.js', 'assets/inhalt.css', 'assets/inhalt.js', 'assets/styles.css', 'datenschutz.html', 'impressum.html', 'index.html', 'pruefkriterien.html',
+/* Titelbilder (og:image) je Seite und Icons gehören zur Website */
+const OG = ['start', 'wissen', 'analyse',
+  ...['agent-readiness', 'answerability', 'entity-trust', 'seo-geo-ai-visibility', 'wie-ki-websites-liest', 'wie-websites-ausgeliefert-werden'].map(s => `wissen-${s}`),
+  ...['auffindbarkeit-seo', 'barrierefreiheit', 'ki-crawler-agenten', 'ki-verstaendlichkeit', 'methodik', 'nutzerfuehrung-conversion', 'performance-technik', 'vertrauen-datenschutz', 'warum-website-analyse'].map(s => `analyse-${s}`)];
+const SITE = ['404.html', '_headers', '_routes.json', 'agb.html', 'assets/anfrage.css', 'assets/app.js', 'assets/donut.css', 'assets/donut.js', 'assets/inhalt.css', 'assets/styles.css',
+  'assets/apple-touch-icon.png', 'assets/favicon.svg', 'favicon.ico', ...OG.map(n => `assets/og/${n}.jpg`), 'datenschutz.html', 'impressum.html', 'index.html',
   ...['agent-readiness', 'answerability', 'entity-trust', 'index', 'seo-geo-ai-visibility', 'wie-ki-websites-liest', 'wie-websites-ausgeliefert-werden'].map(s => `wissen/${s}.html`),
   ...['auffindbarkeit-seo', 'barrierefreiheit', 'index', 'ki-crawler-agenten', 'ki-verstaendlichkeit', 'methodik', 'nutzerfuehrung-conversion', 'performance-technik', 'vertrauen-datenschutz', 'warum-website-analyse'].map(s => `analyse/${s}.html`)];
 
@@ -55,10 +61,15 @@ test('Frischer Checkout: public/ enthält genau die Website-Dateien und die vier
   }
 });
 
-test('Frischer Checkout: jede in den Seiten referenzierte lokale Datei (src, poster, href) und jede feste Function-Route liegt vor', () => {
+test('Frischer Checkout: jede in den Seiten referenzierte lokale Datei (src, poster, href, Titelbild) und jede feste Function-Route liegt vor', () => {
   const missing = [];
   for (const page of SITE.filter(f => f.endsWith('.html'))) {
     for (const e of H.elements(H.parse(readFileSync(pub(page), 'utf8')).root)) {
+      /* Titelbilder werden absolut angegeben (og:image, twitter:image) und müssen im Checkout liegen */
+      if (e.tag === 'meta' && /^(og:image|twitter:image)$/.test(e.attrs.get('property') || e.attrs.get('name') || '')) {
+        const v = e.attrs.get('content');
+        if (!v.startsWith('https://360.pixelkiez.de/') || !existsSync(pub(v.slice('https://360.pixelkiez.de/'.length)))) missing.push(`${page}: Titelbild ${v}`);
+      }
       for (const a of ['src', 'poster', 'href']) {
         const v = e.attrs.get(a);
         if (!v || /^(https?:|mailto:|data:|#)/.test(v) || v.startsWith('/api/')) continue;

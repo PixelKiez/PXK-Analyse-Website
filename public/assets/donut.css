@@ -1,0 +1,60 @@
+/* 360°Pixelkiez – Kreisdiagramm „Zusammensetzung des Pixelkiez Score“ (Startseite und Analyse-Übersicht).
+   Ohne JavaScript vollständig sichtbar; donut.js ergänzt Zusammensetzen beim Hineinscrollen und Hervorheben. */
+.donut { text-align: left; display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); align-items: center; gap: clamp(24px, 4vw, 56px); max-width: 920px; margin: 0 auto clamp(48px, 7vw, 80px); padding: clamp(20px, 3vw, 32px); background: rgb(255 255 255 / .7); border: 1px solid var(--line-soft); border-radius: 22px; }
+.donut-bild { position: relative; }
+.donut-bild svg { display: block; width: 100%; height: auto; }
+.donut-mitte { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; }
+.donut-mitte b { font-size: 44px; line-height: 1; font-weight: 500; letter-spacing: -.03em; }
+.donut-mitte span { max-width: 14ch; margin-top: 6px; font-size: 13px; line-height: 1.35; color: var(--ink-45); }
+.donut-titel { margin: 0 0 10px; font: 500 12px var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-45); }
+.donut-legende { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.donut-legende a { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; text-decoration: none; }
+.donut-legende a:hover { background: var(--paper); }
+.donut-legende b { font-weight: 600; color: var(--ink); }
+.dn-sw { width: 14px; height: 14px; border-radius: 4px; }
+.donut-legende .dn-sub { display: block; font-size: 13px; font-weight: 400; color: var(--ink-45); }
+.donut-legende .dn-wert { font: 500 15px var(--font-mono); color: var(--ink); }
+.donut-legende .dn-go { color: var(--ink-45); }
+.donut-legende a.ist-aktiv { background: var(--paper); }
+/* Bewegung: Segmente setzen sich beim Öffnen und beim Hineinscrollen zusammen (nur mit JavaScript, nie bei „Bewegung reduzieren“) */
+/* Segmente sind reine Zeigerziele (die Tastatur nutzt die Legende): beim Anklicken kein Fokusrahmen und keine Tipp-Markierung */
+.donut-bild svg a { cursor: pointer; outline: none; -webkit-tap-highlight-color: transparent; }
+.donut-bild svg a:focus, .donut-bild svg a:focus-visible { outline: none; }
+.donut-legende a:focus:not(:focus-visible) { outline: none; }
+.donut-legende a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Jedes Segment: feste, unsichtbare Klickfläche (reicht über den Außenrand) und darüber das sichtbare Stück,
+   das bei Zeigerkontakt entlang seiner Mittellinie aus dem Kreis herausrückt. Die Klickfläche bewegt sich nie. */
+.dn-treffer { fill: transparent; }
+.dn-stueck { pointer-events: none; transform-box: view-box; transition: transform .3s var(--ease), opacity .25s ease, filter .3s ease; }
+.donut-bild svg a { transform-box: view-box; transform-origin: 50% 50%; transition: transform .8s var(--ease), opacity .55s ease; }
+.donut.dn-anim .donut-bild svg a { opacity: 0; transform: rotate(-28deg) scale(.82); }
+.donut.dn-anim.dn-sichtbar .donut-bild svg a { opacity: 1; transform: none; }
+.donut.dn-anim.dn-sichtbar .donut-bild svg a:nth-child(2) { transition-delay: .08s; }
+.donut.dn-anim.dn-sichtbar .donut-bild svg a:nth-child(3) { transition-delay: .16s; }
+.donut.dn-anim.dn-sichtbar .donut-bild svg a:nth-child(4) { transition-delay: .24s; }
+.donut.dn-anim.dn-sichtbar .donut-bild svg a:nth-child(5) { transition-delay: .32s; }
+.donut.dn-anim.dn-sichtbar .donut-bild svg a:nth-child(6) { transition-delay: .40s; }
+.donut[data-aktiv] .dn-stueck { opacity: .35; }
+.donut[data-aktiv] .donut-bild svg a.ist-aktiv .dn-stueck { opacity: 1; transform: translate(var(--dx, 0px), var(--dy, 0px)); filter: drop-shadow(0 6px 10px rgb(12 12 12 / .18)); }
+.dn-1 { fill: #FE5B2A; background: #FE5B2A; }
+.dn-2 { fill: #FF8A5C; background: #FF8A5C; }
+.dn-3 { fill: #FFB596; background: #FFB596; }
+.dn-4 { fill: #B9A2EE; background: #B9A2EE; }
+.dn-5 { fill: #8F73DB; background: #8F73DB; }
+.dn-6 { fill: #5B3FA6; background: #5B3FA6; }
+
+@media (max-width: 960px) {
+  .donut { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+  .donut-bild { width: min(300px, 100%); }
+  .donut-legende { width: 100%; }
+}
+/* Schmale Bildschirme: Legende ohne Pfeil, engere Abstände, lange Bereichsnamen brechen sauber um */
+@media (max-width: 480px) {
+  .donut { padding: 16px; }
+  .donut-legende a { grid-template-columns: 14px minmax(0, 1fr) auto; gap: 10px; padding: 8px; }
+  .donut-legende .dn-go { display: none; }
+  .donut-legende b { hyphens: auto; overflow-wrap: break-word; }
+}
+/* Startseite: Karte bündig unter der Abschnittsüberschrift */
+#bereiche .donut { max-width: 980px; margin: 0; }
+@media (prefers-reduced-motion: reduce) { .donut-bild svg a, .dn-stueck { transition: none; } }

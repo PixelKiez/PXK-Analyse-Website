@@ -183,6 +183,9 @@ zugelassen werden sollen, ist eine Produktentscheidung; der Code ändert die Zie
 `360-pixelkiez-video-poster.jpg`, `report-pdf-de-1x1.mp4` (3,4 MiB), `report-pdf-poster.jpg`. H.264 (High), yuv420p,
 ohne Ton, `moov` vor `mdat` (Faststart), alle Dateien weit unter 25 MiB. Die SHA-256-Werte stehen in
 `tests/release.test.mjs`; eine neue Fassung braucht eine eigene Freigabe und eine bewusste Änderung dort.
+Seit 03.11.2026 tragen Videos und Poster eingebettete Metadaten (Titel, Beschreibung, Urheber und Copyright „© 2026
+360°Pixelkiez“; Videos mit `-c copy` geschrieben, Poster per XMP-Block), Video- und Bilddaten sind bitgleich zur vorigen
+Fassung. Die Titelbilder für soziale Netzwerke liegen unter `public/assets/og/` (1200×630, je Seite eines).
 
 Pages beantwortet Range-Anfragen statischer Dateien mit 200 statt 206; Safari/iOS spielt Videos dann nicht ab. Deshalb
 laufen nur die zwei Videos über die Pages Function `functions/media/[file].ts` (`public/_routes.json` nennt genau diese

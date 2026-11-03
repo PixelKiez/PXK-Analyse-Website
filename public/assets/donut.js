@@ -1,4 +1,4 @@
-/* 360°Pixelkiez – Analyse-Übersicht: Das Kreisdiagramm zur Zusammensetzung des Pixelkiez Score setzt sich beim Öffnen und
+/* 360°Pixelkiez – Startseite und Analyse-Übersicht: Das Kreisdiagramm zur Zusammensetzung des Pixelkiez Score setzt sich beim Öffnen und
    jedes Mal beim Hineinscrollen zusammen; Bereiche lassen sich per Zeiger oder Tastatur hervorheben. Ohne JavaScript und bei
    „Bewegung reduzieren“ ist das Diagramm sofort vollständig sichtbar. Keine Daten werden gesendet. */
 (() => {
