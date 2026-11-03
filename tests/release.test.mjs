@@ -51,7 +51,7 @@ after(() => { if (dir) rmSync(dir, { recursive: true, force: true }); });
 
 const pub = f => join(dir, 'public', f);
 
-test('Frischer Checkout: public/ enthält genau die Website-Dateien und die zwei freigegebenen Poster (versioniert, bytegleich), keine Videos', t => {
+test('Frischer Checkout: public/ enthält genau die Website-Dateien und die drei freigegebenen Poster (versioniert, bytegleich), keine Videos', t => {
   t.diagnostic(`geprüfter Commit: ${sha}`);
   const files = git(dir, 'ls-files', 'public').split('\n').filter(Boolean).map(f => f.slice('public/'.length)).sort();
   assert.deepEqual(files, [...SITE, ...Object.keys(MEDIA)].sort(), 'Medien fehlen im Commit oder unerwartete Dateien in public/');

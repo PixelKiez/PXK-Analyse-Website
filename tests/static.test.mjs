@@ -615,7 +615,7 @@ test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, F
     ...R2_VIDEOS.map(k => `public/media/${k}`), 'public/media/360-pixelkiez-video-poster.jpg', 'public/media/report-pdf-de-1x1.mp4']) {
     assert.equal(spawnSync('git', ['check-ignore', '-q', f], { cwd: ROOT }).status, 0, `${f} ist ignoriert`);
   }
-  /* Genau die zwei Poster sind versioniert, die Videos nie (sie liegen in R2; frischer Checkout: tests/release.test.mjs) */
+  /* Genau die drei Poster sind versioniert, die Videos nie (sie liegen in R2; frischer Checkout: tests/release.test.mjs) */
   for (const f of MEDIA) assert.equal(spawnSync('git', ['check-ignore', '-q', 'public/' + f], { cwd: ROOT }).status, 1, `public/${f} ist nicht ignoriert`);
   /* Video-Function: nur drei feste Pfade → feste R2-Schlüssel, nur das Binding MEDIA, nur lesen (head/get), keine Logs, kein Abruf */
   const media = read(MEDIA_FUNCTION);

@@ -438,7 +438,7 @@ const R2_OBJECTS = {
   'section-bericht-peach-5x4.mp4': [1230026, '81499189cf8a2968705b2ba4c13caccec312d4131481855f55b39300ce0c1130'],
 };
 
-test('Medien: nur die zwei Poster sind versioniert und statisch (unter 25 MiB); Videos liegen nicht im Repository oder Pages-Upload, sondern in R2', async t => {
+test('Medien: nur die drei Poster sind versioniert und statisch (unter 25 MiB); Videos liegen nicht im Repository oder Pages-Upload, sondern in R2', async t => {
   const POSTER_FILES = POSTERS.map(p => p.slice(1)).sort();
   assert.ok(POSTER_FILES.every(f => existsSync(join(ROOT, 'public', f))), 'Poster fehlen in public/media/ – Release-Blocker');
   assert.deepEqual(uploadFiles().filter(f => f.startsWith('media/')), POSTER_FILES);
