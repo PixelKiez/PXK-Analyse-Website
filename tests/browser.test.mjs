@@ -107,6 +107,12 @@ test('Mobile Hauptansicht: kein horizontaler Überlauf, Formular sichtbar, Navig
         return b.right <= n.right && b.left >= n.left;
       });
       assert.ok(nav, `${path} ${width}: Navigationsbutton ragt aus der Pille`);
+      /* Mobil (ohne Menüleiste) steht daneben der Menü-Button, ebenfalls ganz in der Pille */
+      const menu = await page.evaluate(() => {
+        const n = document.querySelector('.nav').getBoundingClientRect(), m = document.querySelector('.nav-menu summary').getBoundingClientRect();
+        return [m.width > 0, m.right <= n.right && m.left >= n.left];
+      });
+      assert.deepEqual(menu, width <= 760 ? [true, true] : [false, menu[1]], `${path} ${width}: Menü-Button nur mobil und in der Pille`);
       if (['/index.html', '/api/anfrage'].includes(path)) {
         const form = await page.evaluate(() => ['#url', '.url-field .btn', '#agb', 'label.consent', 'label.consent a'].map(s => { const r = document.querySelector(s).getBoundingClientRect(); return r.width > 0 && r.left >= 0 && r.right <= innerWidth; }));
         assert.deepEqual(form, [true, true, true, true, true], `${path} ${width}: Eingabefeld, Button, AGB-Häkchen und AGB-Link vollständig sichtbar`);
@@ -475,6 +481,59 @@ test('Browser-Zurück und Abbruch bei Google: Formular wieder benutzbar, kein Au
     await context.close();
   } finally {
     google.state.authPage = false;
+  }
+});
+
+test('Menü: Pfeil bei „Wissen“ klappt sechs Beiträge und „Mehr im Wissensbereich“ auf, Escape und Klick daneben schließen; mobil Menü-Button neben „Analyse“; ohne JavaScript bedienbar (Chromium und WebKit)', { skip }, async t => {
+  /* Entscheidung des Auftraggebers 03.11.2026: kein doppeltes „Analyse“ im Menü, Mega-Menü für Wissen, Menü-Button mobil */
+  const sichtbar = (page, s) => page.$$eval(s, es => es.map(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight; }));
+  let wk = null;
+  try { wk = await pw.webkit.launch(); } catch { /* unten als NOT_RUN gemeldet */ }
+  try {
+    for (const [name, engine] of [['Chromium', browser], ['WebKit', wk]]) {
+      await t.test(name, { skip: !engine && 'NOT_RUN: Playwright-WebKit nicht installiert (playwright install webkit)' }, async () => {
+        /* Desktop: Menüpunkte ohne „Analyse“, rechts der Button „Analyse“, kein Menü-Button */
+        let { context, page, errors, blocked } = await open('/index.html', { engine });
+        assert.deepEqual(await page.$$eval('.nav-links > a', as => as.map(a => a.textContent.trim())), ['Bericht', 'Bereiche', 'Angebot', 'FAQ', 'Wissen']);
+        assert.deepEqual(await page.$$eval('.nav .btn', as => as.map(a => a.textContent.trim())), ['Analyse']);
+        assert.equal(await page.isVisible('.nav-menu summary'), false, `${name}: kein Menü-Button auf dem Desktop`);
+        assert.equal(await page.isVisible('.mega-panel'), false, `${name}: Beiträge zunächst zugeklappt`);
+        await page.click('.mega summary');
+        assert.deepEqual(await sichtbar(page, '.mega-panel a'), Array(7).fill(true), `${name}: sechs Beiträge und „Mehr“ vollständig sichtbar`);
+        await page.mouse.click(20, 860);
+        assert.equal(await page.isVisible('.mega-panel'), false, `${name}: Klick daneben schließt`);
+        /* Tastatur: Enter öffnet, Escape schließt und lässt den Fokus auf dem Pfeil */
+        await page.focus('.mega summary');
+        await page.keyboard.press('Enter');
+        assert.equal(await page.isVisible('.mega-panel'), true, `${name}: Enter öffnet`);
+        await page.keyboard.press('Escape');
+        assert.deepEqual([await page.isVisible('.mega-panel'), await page.evaluate(() => document.activeElement.matches('.mega summary'))], [false, true], `${name}: Escape schließt, Fokus auf dem Pfeil`);
+        await page.click('.mega summary');
+        await Promise.all([page.waitForURL(/\/wissen\/(index(\.html)?)?$/), page.click('.mega-mehr a')]);
+        assert.deepEqual(errors, [], `${name}: Konsolenfehler`);
+        assert.deepEqual(blocked, [], `${name}: Fremd-Requests`);
+        await context.close();
+        /* Mobil: Menü-Button öffnet die Punkte; ein Sprungziel auf derselben Seite schließt das Menü */
+        ({ context, page, errors, blocked } = await open('/index.html', { width: 390, height: 800, engine }));
+        assert.equal(await page.isVisible('.nav-links'), false);
+        await page.click('.nav-menu summary');
+        assert.deepEqual(await sichtbar(page, '.nav-menu-panel a'), Array(5).fill(true), `${name}: fünf Menüpunkte vollständig sichtbar`);
+        await page.click('.nav-menu-panel a[href="#faq"]');
+        await page.waitForURL(/#faq$/);
+        assert.equal(await page.isVisible('.nav-menu-panel'), false, `${name}: nach der Wahl geschlossen`);
+        assert.deepEqual(errors, [], `${name}: Konsolenfehler (mobil)`);
+        await context.close();
+        /* Ohne JavaScript: beide Menüs öffnen trotzdem (<details>) */
+        for (const [width, s] of [[1440, '.mega'], [390, '.nav-menu']]) {
+          ({ context, page } = await open('/wissen/entity-trust.html', { width, height: 800, engine, javaScriptEnabled: false }));
+          await page.click(`${s} summary`);
+          assert.deepEqual(await sichtbar(page, `${s} ul a`), Array(s === '.mega' ? 7 : 5).fill(true), `${name} ${width} ohne JavaScript: ${s} öffnet`);
+          await context.close();
+        }
+      });
+    }
+  } finally {
+    if (wk) await wk.close();
   }
 });
 

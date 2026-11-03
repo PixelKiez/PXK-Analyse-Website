@@ -203,13 +203,16 @@ test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen n
   assert.ok(!now.includes('class="eyebrow"'), 'Startseite ohne Eyebrow-Zeilen');
   const withWissen = html => html
     .replace('<li><a href="pruefkriterien.html#geo_ai_visibility">GEO &amp; AI Visibility</a></li></ul>', '<li><a href="pruefkriterien.html#geo_ai_visibility">GEO &amp; AI Visibility</a></li><li><a href="wissen/index.html">Wissen</a></li><li><a href="analyse/index.html">Analyse</a></li></ul>')
-    .replace('      <a href="#faq">FAQ</a>\n', '      <a href="#faq">FAQ</a>\n      <a href="wissen/index.html">Wissen</a>\n      <a href="analyse/index.html">Analyse</a>\n');
+    /* Menü (Entscheidung des Auftraggebers 03.11.2026): „Analyse“ nur noch als Button rechts, kein zweiter Menüpunkt */
+    .replace('      <a href="#faq">FAQ</a>\n', '      <a href="#faq">FAQ</a>\n      <a href="wissen/index.html">Wissen</a>\n');
   /* Entscheidungen des Auftraggebers 02.11.2026 (zweite Runde): „Alle Prüfpunkte nachlesen“ entfällt, dafür der Abschnitt
      „Pixelkiez Score“ in der Mitte; AI-08 (beobachtete KI-Antwort-Stichproben) gestrichen; Bild-Metadaten im Kopf (Canonical,
      Open Graph, Twitter, Icons), Video-Metadaten (JSON-LD) sowie Stylesheet und Skript des Diagramms. Sonst nichts. */
   const KOPF = /\n((?:<link rel="canonical" href="[^"]+">|<meta (?:property="og:[a-z_:]+"|name="twitter:[a-z:]+") content="[^"]*">|<link rel="(?:icon|apple-touch-icon)" href="[^"]+"(?: sizes="32x32"| type="image\/svg\+xml")?>)\n)+(?=<link rel="preconnect")/;
   assert.match(now, KOPF, 'Kopfdaten für Bilder');
-  const ohneNeues = html => html.replace(KOPF, '\n').replace('<link rel="stylesheet" href="assets/donut.css">\n', '')
+  /* Neu im Kopf: Beiträge zu Wissen (Mega-Menü) und mobiles Menü, beide geprüft im Test „Hauptnavigation“ */
+  const MENUES = [/\n      <details class="mega">\n[\s\S]*?\n      <\/details>/, /\n    <details class="nav-menu">\n[\s\S]*?\n    <\/details>/];
+  const ohneNeues = html => MENUES.reduce((s, re) => s.replace(re, ''), html).replace(KOPF, '\n').replace('<link rel="stylesheet" href="assets/donut.css">\n', '')
     .replace(/\n<script type="application\/ld\+json">\{"@context":"https:\/\/schema\.org","@graph":\[\{"@type":"VideoObject".*?<\/script>/, '')
     .replace('\n<script src="assets/donut.js"></script>', '').replace(SCORE_ABSCHNITT, '');
   const ohneAlt = html => html.replace(/  <section class="section" id="tools">\n[\s\S]*?\n  <\/section>\n\n/, '').replace(SCORE_ABSCHNITT, '')
@@ -225,7 +228,7 @@ test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen n
     .replace('</svg>Vier Bereiche inklusive GEO &amp; AI Visibility</li>', '</svg>Sechs Bereiche inklusive GEO &amp; AI Visibility</li>')
     .replace('<p>Seite 6 des Berichts ordnet die Verbesserungen,', '<p>Der Bericht ordnet die Verbesserungen,')
     .replace('je eine Seite pro Bereich', 'die Bereiche im Detail');
-  assert.equal(ohneNeues(outside(now)), ohneAlt(withWissen(withoutEyebrows(outside(old)))).replaceAll('kontakt@pixelkiez.de', '360@pixelkiez.de'), 'übrige Startseite unverändert (außer Schritt 02, Kontaktadresse, Eyebrow-Zeilen, Links zu Wissen und Analyse, Score-Abschnitt statt Prüfpunkte-Liste, AI-08 und Metadaten)');
+  assert.equal(ohneNeues(outside(now)), ohneAlt(withWissen(withoutEyebrows(outside(old)))).replaceAll('kontakt@pixelkiez.de', '360@pixelkiez.de'), 'übrige Startseite unverändert (außer Schritt 02, Kontaktadresse, Eyebrow-Zeilen, Links zu Wissen und Analyse, Menüs, Score-Abschnitt statt Prüfpunkte-Liste, AI-08 und Metadaten)');
   assert.match(now, /<span>02<\/span><h3>AGB akzeptieren und anmelden<\/h3>/);
 });
 
@@ -290,6 +293,37 @@ test('Katalog ersetzt durch die Analyse: keine Katalogseite, keine Verweise dara
   /* Startseite: der Button oben rechts führt zur Analyse */
   const nav = H.byTag(H.parse(read('public/index.html')).root, 'nav')[0];
   assert.deepEqual(H.byClass(nav, 'btn').map(a => [a.attrs.get('href'), H.norm(H.textOf(a))]), [['analyse/index.html', 'Analyse']]);
+});
+
+test('Hauptnavigation: „Analyse“ nur als Button, Wissen mit Pfeil zu den sechs Beiträgen und „Mehr im Wissensbereich“, mobiles Menü; auf allen Seiten gleich', () => {
+  /* Entscheidung des Auftraggebers 03.11.2026: kein doppeltes „Analyse“ im Menü, Mega-Menü für Wissen, Menü-Button mobil */
+  const ziel = a => [a.attrs.get('href'), H.norm(H.textOf(a))];
+  const beitraege = H.byClass(H.parse(read('public/wissen/index.html')).root, 'karte').map(k => [k.attrs.get('href'), H.norm(H.textOf(H.byClass(k, 'karte-titel')[0]))]);
+  assert.equal(beitraege.length, 6, 'sechs Beiträge im Wissensbereich');
+  for (const page of PAGES) {
+    const rel = page.slice('public/'.length);
+    const p = rel === '404.html' ? '/' : rel.includes('/') ? '../' : '';
+    const start = rel === 'index.html' ? '' : `${p}index.html`;
+    const nav = H.byTag(H.byTag(H.parse(read(page)).root, 'header')[0], 'nav')[0];
+    const links = H.byClass(nav, 'nav-links')[0];
+    const abschnitte = [['bericht', 'Bericht'], ['bereiche', 'Bereiche'], ['angebot', 'Angebot'], ['faq', 'FAQ']].map(([id, t]) => [`${start}#${id}`, t]);
+    const wissen = [`${p}wissen/index.html`, 'Wissen'];
+    assert.deepEqual(links.children.filter(e => e.tag === 'a').map(ziel), [...abschnitte, wissen], `${page}: Menüpunkte ohne „Analyse“`);
+    const mega = H.byClass(links, 'mega')[0];
+    assert.equal(mega?.tag, 'details', `${page}: Beiträge als <details> (auch ohne JavaScript)`);
+    assert.equal(H.byTag(mega, 'summary')[0].attrs.get('aria-label'), 'Beiträge im Wissensbereich', `${page}: Pfeil mit Namen`);
+    assert.deepEqual(H.byTag(H.byClass(mega, 'mega-panel')[0], 'a').map(ziel), [...beitraege.map(([h, t]) => [`${p}wissen/${h}`, t]), [`${p}wissen/index.html`, 'Mehr im Wissensbereich →']], `${page}: sechs Beiträge und „Mehr im Wissensbereich“`);
+    assert.deepEqual(H.byClass(nav, 'btn').map(ziel), [[`${p}analyse/index.html`, 'Analyse']], `${page}: genau ein Button „Analyse“`);
+    const menu = H.byClass(nav, 'nav-menu')[0];
+    assert.equal(menu?.tag, 'details', `${page}: mobiles Menü als <details>`);
+    assert.equal(H.byTag(menu, 'summary')[0].attrs.get('aria-label'), 'Menü', `${page}: Menü-Button mit Namen`);
+    assert.deepEqual(H.byTag(menu, 'a').map(ziel), [...abschnitte, wissen], `${page}: Punkte im mobilen Menü`);
+    const artikel = beitraege.find(([h]) => `wissen/${h}` === rel);
+    const aktuell = rel.startsWith('wissen/') ? [wissen, ...(artikel ? [[`${p}${rel}`, artikel[1]]] : []), wissen] : rel.startsWith('analyse/') ? [[`${p}analyse/index.html`, 'Analyse']] : [];
+    assert.deepEqual(H.find(nav, e => e.attrs.get('aria-current') === 'page').map(ziel), aktuell, `${page}: aktueller Bereich markiert`);
+  }
+  /* Anfrageseiten (view.ts) haben denselben Kopf; verglichen wird das gerenderte Markup im Worker-Test */
+  assert.match(read(VIEW), /<details class="mega">[\s\S]*<details class="nav-menu">/);
 });
 
 test('Links: interne Anker gültig, keine Links zu pixelkiez.de, nur mailto als externes Ziel (Wissensseiten zusätzlich ihre Quellen)', () => {

@@ -46,8 +46,8 @@
 .legal-h { margin-top: 18px; font-size: 20px; letter-spacing: -.01em; line-height: 1.3; color: var(--ink); }
 .legal-h:first-child { margin-top: 0; }
 
-/* Längerer Name 360°Pixelkiez: auf schmalen Handys entfällt der Zusatz „Analyse“ im Navigationslogo, damit der Button in der Pille bleibt */
-@media (max-width: 379px) { .nav .logo span { display: none; } }
+/* Längerer Name 360°Pixelkiez: auf schmalen Handys entfällt der Zusatz „Analyse“ im Navigationslogo, damit Button und Menü-Button in der Pille bleiben */
+@media (max-width: 409px) { .nav .logo span { display: none; } }
 
 /* Video unter dem Hero: zentriertes Widget mit abgerundeten Ecken, nicht über die ganze Breite */
 .showcase { padding: 0 var(--gutter) clamp(56px, 8vw, 104px); }
@@ -85,10 +85,39 @@ section[id] { scroll-margin-top: 88px; }
 .reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s var(--ease), transform .7s var(--ease); transition-delay: var(--reveal-delay, 0ms); }
 .reveal.is-visible { opacity: 1; transform: none; }
 
-/* Hauptnavigation mit Wissen und Analyse: auf mittleren Breiten nur die wichtigsten Punkte, damit nichts überläuft */
-@media (max-width: 1120px) { .nav-links a:nth-child(2), .nav-links a:nth-child(3) { display: none; } }
-@media (max-width: 920px) { .nav-links a:nth-child(-n+4) { display: none; } }
-.nav-links a[aria-current="page"] { background: var(--paper); color: var(--ink); }
+/* Hauptnavigation mit Wissen, rechts der Button „Analyse“: auf mittleren Breiten nur die wichtigsten Punkte, damit nichts überläuft */
+@media (max-width: 1120px) { .nav-links > a:nth-child(2), .nav-links > a:nth-child(3) { display: none; } }
+@media (max-width: 920px) { .nav-links > a:nth-child(-n+4) { display: none; } }
+.nav-links a[aria-current="page"], .nav .btn[aria-current="page"] { background: var(--paper); color: var(--ink); }
+/* Menüs als <details>: öffnen auch ohne JavaScript; app.js schließt sie zusätzlich bei Klick daneben und mit Escape */
+.nav { position: relative; }
+.mega summary, .nav-menu summary { display: grid; place-items: center; list-style: none; cursor: pointer; color: var(--ink-70); transition: background .2s, border-color .2s; }
+.mega summary::-webkit-details-marker, .nav-menu summary::-webkit-details-marker { display: none; }
+.mega summary:focus-visible, .nav-menu summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Wissen: der Pfeil neben dem Menüpunkt klappt die Beiträge unter der Pille auf (Mega-Menü); „Mehr im Wissensbereich“ führt zur Übersicht */
+.mega { display: flex; }
+.nav-links > a:has(+ .mega) { padding-right: 6px; }
+.mega summary { width: 30px; height: 37px; margin-left: -2px; border-radius: var(--r-pill); }
+.mega summary:hover, .mega[open] summary { background: var(--paper); color: var(--ink); }
+.mega-pfeil { transition: transform .25s var(--ease); }
+.mega[open] .mega-pfeil { transform: rotate(180deg); }
+.mega-panel, .nav-menu-panel { position: absolute; top: calc(100% + 10px); left: 0; right: 0; display: grid; margin: 0; padding: 10px; list-style: none; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 24px; box-shadow: 0 24px 60px -28px rgb(12 12 12 / .28); }
+.mega-panel { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.nav-links .mega-panel a { display: block; height: 100%; padding: 14px 16px; border-radius: 16px; font-size: 15px; font-weight: 500; line-height: 1.4; color: var(--ink); }
+.nav-links .mega-panel a:hover { background: var(--paper); }
+.mega-mehr { grid-column: 1 / -1; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--line-soft); }
+.nav-links .mega-mehr a { display: flex; gap: 8px; align-items: center; font-weight: 600; color: var(--accent-text); }
+@media (max-width: 920px) { .mega-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Mobil (ohne Menüleiste): Menü-Button neben „Analyse“ öffnet die Punkte unter der Pille */
+.nav-menu { display: none; }
+.nav-menu summary { width: 40px; height: 40px; border: 1px solid var(--line); border-radius: var(--r-pill); color: var(--ink); }
+.nav-menu summary:hover, .nav-menu[open] summary { border-color: var(--ink); }
+.nav-menu-zu, .nav-menu[open] .nav-menu-auf { display: none; }
+.nav-menu[open] .nav-menu-zu { display: block; }
+.nav-menu-panel a { display: flex; align-items: center; min-height: 48px; padding: 0 16px; border-radius: 16px; font-size: 17px; color: var(--ink); }
+.nav-menu-panel a:hover, .nav-menu-panel a[aria-current="page"] { background: var(--paper); }
+@media (max-width: 760px) { .nav { gap: 8px; } .nav-menu { display: block; } }
+@media (max-width: 379px) { .nav { gap: 6px; padding-left: 16px; } }
 
 /* Startseite: am Seitenende derselbe verwaschene Übergang wie auf den Inhaltsseiten – Papier, Pfirsich, Lila bis in den Footer */
 .closing { background: linear-gradient(180deg, var(--paper) 0%, #FFE6DD 36%, #F8E3E6 66%, #EFE2F6 100%); border-top-color: transparent; }

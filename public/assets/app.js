@@ -13,6 +13,21 @@
     onScroll();
   }
 
+  /* Menüs in der Navigation (Wissen-Beiträge, mobiles Menü) sind <details> und öffnen auch ohne JavaScript.
+     Hier schließen sie zusätzlich bei einem Klick daneben, nach der Wahl eines Links und mit Escape (Fokus zurück auf den Auslöser). */
+  const menus = document.querySelectorAll('.nav details');
+  document.addEventListener('click', e => menus.forEach(d => {
+    if (d.open && (!d.contains(e.target) || e.target.closest('.mega-panel a, .nav-menu-panel a'))) d.open = false;
+  }));
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    menus.forEach(d => {
+      if (!d.open) return;
+      d.open = false;
+      if (d.contains(document.activeElement)) d.querySelector('summary').focus();
+    });
+  });
+
   /* Sanftes Einblenden beim Scrollen: nur Elemente, die beim Laden unterhalb des Bildschirms liegen (oben flackert nichts),
      Karten einer Reihe leicht versetzt. Ohne JavaScript oder bei „Bewegung reduzieren“ bleibt alles sofort sichtbar. */
   if (!reduce && 'IntersectionObserver' in window) {
