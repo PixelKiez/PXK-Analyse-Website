@@ -20,8 +20,8 @@ Browser ──HTTPS──► 360.pixelkiez.de  (CNAME bei Hostinger → <projekt
                      ▼
                 Cloudflare Pages „pxwa“ ── /, *.html, /assets/*, Poster ──► statische Dateien aus public/
                      │
-                     ├─ zwei Videos (public/_routes.json) ──► Pages Function functions/media/[file].ts (Byte-Ranges, 206)
-                     │                                          └─ liest nur aus dem eigenen Assets-Binding
+                     ├─ drei Videos (public/_routes.json) ──► Pages Function functions/media/[file].ts (Byte-Ranges, 206)
+                     │                                          └─ liest nur drei feste Schlüssel aus R2 „360pixelkiez“ (Binding MEDIA)
                      └─ /api/* (public/_routes.json) ──► Pages Function functions/api/[[path]].ts
                                                             │ Service Binding „API“ (intern, keine öffentliche Adresse)
                                                             ▼
@@ -44,9 +44,9 @@ Browser ──HTTPS──► 360.pixelkiez.de  (CNAME bei Hostinger → <projekt
       Solange `PRIVACY_VERSION` mit „ENTWURF“ beginnt, nimmt der Worker in Produktion **keine** Aufträge an (503).
 - [ ] Aufbewahrungsfrist für Auftragsdaten entschieden (D-5, Abschnitt 8)
 - [ ] Auftragsverarbeitungsverträge (Cloudflare, Resend) und Übermittlungsgrundlagen geprüft
-- [ ] Videos auf einem echten iPhone/Safari prüfen: Die Video-Function beantwortet Range-Anfragen mit 206; lokal
-      (WebKit, `wrangler pages dev`) laufen beide Videos. Auf echtem Cloudflare (Vorschau, 01.11.2026) per `curl`
-      geprüft: 206 mit `Content-Range`, 416, 405; echtes iPhone noch offen (Abschnitt 7).
+- [ ] Videos auf einem echten iPhone/Safari prüfen: Die Video-Function (R2) beantwortet Range-Anfragen mit 206; lokal
+      (WebKit, `wrangler pages dev` mit lokalem R2) laufen die eingebundenen Videos. Auf echtem Cloudflare mit R2 und
+      auf einem echten iPhone noch offen (Abschnitt 7).
 - [ ] Echte Ende-zu-Ende-Prüfung nach der Aktivierung (Abschnitt 9)
 - [ ] `noindex` bleibt gesetzt, bis eine eigene Launch-Freigabe es aufhebt
 
@@ -72,7 +72,7 @@ Zwei getrennte Konfigurationen, damit nie das Falsche deployt wird:
 ## 2. Cloudflare Pages (Website und Gateway)
 
 **Empfohlen: kontrollierter Direct Upload aus einem frischen Git-Checkout** statt GitHub-Integration. Alles, was
-ausgeliefert wird, ist versioniert (auch die vier Medien in `public/media/`); der Upload entsteht deshalb aus genau
+ausgeliefert wird, ist versioniert (auch die zwei Poster in `public/media/`; die Videos liegen in R2, Abschnitt 7); der Upload entsteht deshalb aus genau
 dem freigegebenen Commit, nie aus einem Arbeitsverzeichnis mit lokalen Dateien. Die GitHub-Integration bleibt
 unverbunden, weil sie bei jedem Push automatisch deployt (auch Feature-Branches als Vorschau).
 
@@ -92,7 +92,7 @@ unverbunden, weil sie bei jedem Push automatisch deployt (auch Feature-Branches 
    Root-Verzeichnis `/`, automatische Vorschau-Deployments abschalten. Erst mit eigener Freigabe verbinden.
 
 Was Pages ausliefert: Dateien aus `public/` (ohne `_headers`, `_routes.json`, `.DS_Store`). Functions laufen nur für
-`/api/*` und die zwei Videos (`public/_routes.json`); alle anderen Anfragen, auch die Poster, sind statisch und
+`/api/*` und die drei Videos aus R2 (`public/_routes.json`); alle anderen Anfragen, auch die Poster, sind statisch und
 verbrauchen kein Function-Kontingent. `*.html` leitet Pages mit 308
 auf die Adresse ohne Endung um; unbekannte Adressen bekommen `404.html` mit Status 404 (ohne diese Datei würde Pages
 jede unbekannte Adresse mit der Startseite beantworten).
@@ -178,34 +178,39 @@ zugelassen werden sollen, ist eine Produktentscheidung; der Code ändert die Zie
 
 ## 7. Medien
 
-`public/media/` ist versioniert, aber nur genau diese vier freigegebenen Dateien (eigenes 360°Pixelkiez-Material;
-`.gitignore` lässt alles andere dort ignoriert): `360-pixelkiez-video-1080p.mp4` (3,4 MiB),
-`360-pixelkiez-video-poster.jpg`, `report-pdf-de-1x1.mp4` (3,4 MiB), `report-pdf-poster.jpg`. H.264 (High), yuv420p,
-ohne Ton, `moov` vor `mdat` (Faststart), alle Dateien weit unter 25 MiB. Die SHA-256-Werte stehen in
-`tests/release.test.mjs`; eine neue Fassung braucht eine eigene Freigabe und eine bewusste Änderung dort.
-Seit 03.11.2026 tragen Videos und Poster eingebettete Metadaten (Titel, Beschreibung, Urheber und Copyright „© 2026
-360°Pixelkiez“; Videos mit `-c copy` geschrieben, Poster per XMP-Block), Video- und Bilddaten sind bitgleich zur vorigen
-Fassung. Die Titelbilder für soziale Netzwerke liegen unter `public/assets/og/` (1200×630, je Seite eines).
+Die Videos liegen im privaten R2-Bucket `360pixelkiez` (kein öffentlicher Zugriff, keine `r2.dev`-Adresse, keine
+Custom Domain; am 03.11.2026 per API gelesen). Pages liest sie über das Binding `MEDIA`, das in den Projekteinstellungen
+von Pages hinterlegt ist und in `wrangler.toml` dokumentiert steht. In den Projekteinstellungen hat derzeit auch die
+Vorschau `MEDIA` (R2-Bindings erlauben Lesen und Schreiben); `wrangler.toml` sieht für die Vorschau kein Binding vor.
+Ob die Vorschau den Bucket behalten soll, ist eine offene Entscheidung. Im Bucket (Stand 03.11.2026,
+per API gelesen, Größe und SHA-256 in `tests/pages.test.mjs`): `360-pixelkiez-video-1080p.mp4` (3,4 MiB),
+`report-pdf-de-1x1-lavendel.mp4` (3,4 MiB), `section-bericht-peach-5x4.mp4` (1,2 MiB); H.264 (High), yuv420p, ohne Ton,
+`moov` vor `mdat` (Faststart), ohne eingebettete Copyright-Metadaten.
 
-Pages beantwortet Range-Anfragen statischer Dateien mit 200 statt 206; Safari/iOS spielt Videos dann nicht ab. Deshalb
-laufen nur die zwei Videos über die Pages Function `functions/media/[file].ts` (`public/_routes.json` nennt genau diese
-Pfade): Sie liest die Datei aus dem eigenen Assets-Binding (feste Pfade, kein R2, kein fremder Host) und antwortet mit
-200 (ohne Range), 206 mit `Content-Range`/`Content-Length`/`Accept-Ranges` (gültiger Bereich), 416 (ungültiger oder
-nicht erfüllbarer Bereich), 304 (`If-None-Match`), 405 (andere Methoden als GET/HEAD). Poster bleiben statisch. Die
-Sicherheits-Header setzt die Function selbst (`_headers` gilt nicht für Functions); ein Test vergleicht beide.
-Lokal geprüft (`wrangler pages dev`, Playwright): Chromium und WebKit spielen beide Videos mit 206.
+Eingebunden sind seit PXK-159 (Entscheidung des Auftraggebers 03.11.2026) nur das Berichtsvideo (Lavendel) bei
+„Ein PDF. Sieben Seiten.“ und das Befund-Video (Peach) bei „Jeder Befund verständlich erklärt.“. Das Hero-Video ist über
+seine Adresse abrufbar, aber nicht eingebunden: Es nennt noch „vier Metriken“, simuliert eine laufende Analyse, zeigt
+„Jetzt analysieren“ und im Abspann kontakt@pixelkiez.de. Auch das Berichtsvideo zeigt noch „Die 4 wichtigsten Metriken“
+und „Jetzt analysieren“; so freigegeben. Versioniert in `public/media/` sind nur die zwei Poster
+(`report-pdf-lavendel-poster.jpg`, `section-bericht-peach-poster.jpg`, mit XMP-Metadaten, SHA-256 in
+`tests/release.test.mjs`). Die Titelbilder für soziale Netzwerke liegen unter `public/assets/og/` (1200×630).
 
-**Abweichung zu Confluence D-12 (offene PO-Entscheidung):** Geplantes Medienziel ist Cloudflare R2. Ausgeliefert werden
-die Videos derzeit aus den Pages-Assets über die Function oben; ein R2-Bucket, ein R2-Binding und eine R2-Domain sind
-**nicht** angelegt. Eine R2-Custom-Domain setzt eine Cloudflare-Zone voraus (DNS bleibt bei Hostinger), `r2.dev` ist
-nicht vorgesehen. Ein Wechsel auf R2 braucht eine eigene Entscheidung und einen eigenen Slice (Bucket, Binding in
-`wrangler.toml`, Function-Anpassung, Range-/Safari-Tests, Rollback).
+Pages beantwortet Range-Anfragen statischer Dateien mit 200 statt 206; Safari/iOS spielt Videos dann nicht ab. Die Pages
+Function `functions/media/[file].ts` (`public/_routes.json` nennt genau die drei Pfade) liest nur drei feste Schlüssel aus
+`MEDIA` (`head` und `get`, nie `list`, `put` oder `delete`) und antwortet mit 200 (ohne Range), 206 mit
+`Content-Range`/`Content-Length`/`Accept-Ranges` (gültiger Bereich), 416 (ungültiger oder nicht erfüllbarer Bereich),
+304 (`If-None-Match`), 404 (Objekt fehlt im Bucket), 405 (andere Methoden als GET/HEAD) und 503 (kein Binding,
+R2-Fehler). `Content-Type: video/mp4` ist fest, unabhängig von den Metadaten im Bucket. Andere Pfade unter `/media/`
+(Poster, unbekannte Dateien) bleiben statisch. Die Sicherheits-Header setzt die Function selbst (`_headers` gilt nicht für
+Functions; ein Test vergleicht beide), dazu `Cross-Origin-Resource-Policy: same-origin` und `X-Robots-Tag: noindex`.
+Lokal geprüft (`wrangler pages dev` mit lokalem R2, Playwright): Chromium und WebKit spielen beide eingebundenen Videos mit 206.
 
 Kosten und Grenzen (Free-Plan): Jede Video-Anfrage ist ein Function-Aufruf (Workers-Kontingent, 100 000 Anfragen pro
-Tag; Safari stellt je Video etwa zwei Anfragen). Ist das Kontingent erschöpft oder die Function gestört, ersetzt
-`app.js` das Video durch sein Standbild (gleiche Größe, gleicher Alternativtext). Nach dem Deploy prüfen:
-`curl -s -D - -o /dev/null -H 'Range: bytes=0-1' https://360.pixelkiez.de/media/report-pdf-de-1x1.mp4` (erwartet 206,
-`Content-Range: bytes 0-1/3582541`), im Workers-Log die CPU-Zeit der Function, und auf einem echten iPhone beide Videos.
+Tag; Safari stellt je Video etwa zwei Anfragen) und zwei R2-Lesevorgänge (`head`, `get`). Ist das Kontingent erschöpft
+oder R2 gestört, ersetzt `app.js` das Video durch sein Standbild (gleiche Größe, gleicher Alternativtext). Nach dem Deploy
+prüfen: `curl -s -D - -o /dev/null -H 'Range: bytes=0-1' https://360.pixelkiez.de/media/report-pdf-de-1x1-lavendel.mp4`
+(erwartet 206, `Content-Range: bytes 0-1/3519956`), dieselbe Anfrage mit `-X POST` (405) und mit `bytes=9999999-` (416),
+im Workers-Log die CPU-Zeit der Function, und auf einem echten iPhone beide eingebundenen Videos.
 
 ## 8. Daten, Backup, Aufbewahrung
 
@@ -250,5 +255,8 @@ schwarze Fläche). Danach Testdaten löschen:
   `wrangler.toml` nehmen) und neu deployen → `/api/*` antwortet mit 503, die Website bleibt erreichbar. Alternativ
   `MAIL_FROM` oder `BASE_URL` leeren und den Worker deployen → der Worker antwortet mit 503 (fail closed).
 - **Vorheriger Worker:** `npx wrangler rollback` (Liste: `npx wrangler deployments list`). D1 bleibt unverändert.
-- **Vorherige Website:** im Pages-Projekt unter „Deployments“ ein früheres Deployment „Rollback“.
+- **Vorherige Website:** im Pages-Projekt unter „Deployments“ ein früheres Deployment „Rollback“ (oder per API
+  `POST /accounts/<konto>/pages/projects/pxwa/deployments/<deployment-id>/rollback`). Für den Soft-Launch ist das
+  Rückfallziel das Produktions-Deployment `c6e9a5de-6a9f-404c-9de1-3513e5f3e86c` (Stand `c528d96`): ohne Videos,
+  Functions nur für `/api/*` (503). Danach per `curl` prüfen, dass `/media/…mp4` wieder 404 liefert.
 - Datenbank: keine destruktiven Migrationen; nie `DROP` oder `DELETE` ohne Export (Abschnitt 8).

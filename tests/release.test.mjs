@@ -1,6 +1,7 @@
 /* PXWA – Release-Prüfung aus einem frischen Git-Checkout. Klont das lokale Repository in ein temporäres Verzeichnis und
    prüft genau einen Commit (PXK_RELEASE_REF, Standard HEAD). Uncommittete, lokale oder ignorierte Dateien zählen nicht:
-   Fehlen die Medien im Commit, schlägt der Test fehl, auch wenn public/media/ lokal vollständig ist.
+   Fehlen die Poster im Commit, schlägt der Test fehl, auch wenn public/media/ lokal vollständig ist. Die Videos liegen im
+   R2-Bucket 360pixelkiez und werden über functions/media/[file].ts ausgeliefert (nicht im Commit).
    Ausführen im Repo-Root: npm run test:release   (oder PXK_RELEASE_REF=<sha> node --test tests/release.test.mjs) */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,21 +17,20 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const REF = process.env.PXK_RELEASE_REF || 'HEAD';
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
-/* Freigegebene öffentliche Website-Medien (eigenes 360°Pixelkiez-Material) mit SHA-256. Eine neue Fassung braucht eine
-   eigene Freigabe und eine bewusste Änderung dieser Liste. Fassung vom 03.11.2026 (Freigabe des Auftraggebers): eingebettete
-   Metadaten (Titel, Beschreibung, Urheber, Copyright); Video- und Bilddaten bitgleich zur vorigen Fassung. */
+/* Freigegebene öffentliche Website-Medien im Commit (eigenes 360°Pixelkiez-Material) mit SHA-256. Eine neue Fassung braucht eine
+   eigene Freigabe und eine bewusste Änderung dieser Liste. Fassung vom 03.11.2026 (PXK-159, Entscheidung des Auftraggebers: Bericht-
+   und Befund-Video aus R2 eingebunden): die zwei Poster dieser Videos mit eingebetteten Metadaten (Titel, Beschreibung, Urheber,
+   Copyright); Bilddaten bitgleich zu den lokalen Postern vom 31.10.2026. */
 const MEDIA = {
-  'media/360-pixelkiez-video-1080p.mp4': '593d8ebaa2b9915fe3294cde395b126f6763fd80b81e940d92e77b78b9ee3a50',
-  'media/360-pixelkiez-video-poster.jpg': 'ed00b1672e93f78e005f246817e6c098a15daddc651c0ed4ac74a7b12a7faef6',
-  'media/report-pdf-de-1x1.mp4': 'e05ebeb36d2cdbeab20a3ada9e33a615fd3aafc3e4985433ba98c80011e7fdc9',
-  'media/report-pdf-poster.jpg': 'a45494725853ee2acadf0e47ae4aff871531034f1d0a29397389cda7b6b9ceb2',
+  'media/report-pdf-lavendel-poster.jpg': '0195793804dfa08e5415e816121c1067d48c77c5ebc5d3a8a659ff1eac103932',
+  'media/section-bericht-peach-poster.jpg': '593e8ad3318a426408bc511d97f78d9c37d0f1772f9f7e6e8e14d496f59eff52',
 };
 /* Titelbilder (og:image) je Seite und Icons gehören zur Website */
 const OG = ['start', 'wissen', 'analyse',
   ...['agent-readiness', 'answerability', 'entity-trust', 'seo-geo-ai-visibility', 'wie-ki-websites-liest', 'wie-websites-ausgeliefert-werden'].map(s => `wissen-${s}`),
   ...['auffindbarkeit-seo', 'barrierefreiheit', 'ki-crawler-agenten', 'ki-verstaendlichkeit', 'methodik', 'nutzerfuehrung-conversion', 'performance-technik', 'vertrauen-datenschutz', 'warum-website-analyse'].map(s => `analyse-${s}`)];
 const SITE = ['404.html', '_headers', '_routes.json', 'agb.html', 'assets/anfrage.css', 'assets/app.js', 'assets/donut.css', 'assets/donut.js', 'assets/inhalt.css', 'assets/styles.css',
-  'assets/apple-touch-icon.png', 'assets/favicon.svg', 'favicon.ico', ...OG.map(n => `assets/og/${n}.jpg`), 'datenschutz.html', 'impressum.html', 'index.html',
+  'assets/apple-touch-icon.png', 'assets/favicon.svg', 'favicon.ico', ...OG.map(n => `assets/og/${n}.jpg`), 'assets/partner/dyai-studio.svg', 'assets/partner/pixelkiez.png', 'datenschutz.html', 'impressum.html', 'index.html',
   ...['agent-readiness', 'answerability', 'entity-trust', 'index', 'seo-geo-ai-visibility', 'wie-ki-websites-liest', 'wie-websites-ausgeliefert-werden'].map(s => `wissen/${s}.html`),
   ...['auffindbarkeit-seo', 'barrierefreiheit', 'index', 'ki-crawler-agenten', 'ki-verstaendlichkeit', 'methodik', 'nutzerfuehrung-conversion', 'performance-technik', 'vertrauen-datenschutz', 'warum-website-analyse'].map(s => `analyse/${s}.html`)];
 
@@ -46,10 +46,11 @@ after(() => { if (dir) rmSync(dir, { recursive: true, force: true }); });
 
 const pub = f => join(dir, 'public', f);
 
-test('Frischer Checkout: public/ enthält genau die Website-Dateien und die vier freigegebenen Medien (versioniert, bytegleich)', t => {
+test('Frischer Checkout: public/ enthält genau die Website-Dateien und die zwei freigegebenen Poster (versioniert, bytegleich), keine Videos', t => {
   t.diagnostic(`geprüfter Commit: ${sha}`);
   const files = git(dir, 'ls-files', 'public').split('\n').filter(Boolean).map(f => f.slice('public/'.length)).sort();
   assert.deepEqual(files, [...SITE, ...Object.keys(MEDIA)].sort(), 'Medien fehlen im Commit oder unerwartete Dateien in public/');
+  assert.deepEqual(git(dir, 'ls-files').split('\n').filter(f => /\.(mp4|webm|mov|m4v)$/i.test(f)), [], 'keine Videos im Repository (sie liegen in R2)');
   for (const [f, hash] of Object.entries(MEDIA)) {
     assert.ok(existsSync(pub(f)), `${f} fehlt im frischen Checkout`);
     const buf = readFileSync(pub(f));
@@ -61,8 +62,12 @@ test('Frischer Checkout: public/ enthält genau die Website-Dateien und die vier
   }
 });
 
-test('Frischer Checkout: jede in den Seiten referenzierte lokale Datei (src, poster, href, Titelbild) und jede feste Function-Route liegt vor', () => {
+test('Frischer Checkout: jede in den Seiten referenzierte lokale Datei (src, poster, href, Titelbild) liegt vor oder ist ein Video-Pfad der R2-Function; jede feste Route ist gedeckt', () => {
   const missing = [];
+  /* Feste Video-Pfade: in _routes.json und in der Allowlist der Function (Pfad → R2-Schlüssel), nicht als Datei im Checkout */
+  const routes = JSON.parse(readFileSync(pub('_routes.json'), 'utf8'));
+  const r2 = new Set([...readFileSync(join(dir, 'functions/media/[file].ts'), 'utf8').matchAll(/\['(\/media\/[^']+)', '[^']+'\]/g)].map(m => m[1]));
+  const videoRoute = path => routes.include.includes('/' + path) && r2.has('/' + path);
   for (const page of SITE.filter(f => f.endsWith('.html'))) {
     for (const e of H.elements(H.parse(readFileSync(pub(page), 'utf8')).root)) {
       /* Titelbilder werden absolut angegeben (og:image, twitter:image) und müssen im Checkout liegen */
@@ -75,12 +80,12 @@ test('Frischer Checkout: jede in den Seiten referenzierte lokale Datei (src, pos
         if (!v || /^(https?:|mailto:|data:|#)/.test(v) || v.startsWith('/api/')) continue;
         /* relativ zur Seite auflösen (Wissensseiten liegen in wissen/); ein Verzeichnis meint dessen index.html */
         const path = decodeURI(new URL(v, `https://360.pixelkiez.de/${page}`).pathname.slice(1)).replace(/(^|\/)$/, '$1index.html');
-        if (!existsSync(pub(path))) missing.push(`${page}: ${a}="${v}"`);
+        if (!existsSync(pub(path)) && !videoRoute(path)) missing.push(`${page}: ${a}="${v}"`);
       }
     }
   }
-  const routes = JSON.parse(readFileSync(pub('_routes.json'), 'utf8'));
-  for (const r of routes.include.filter(r => !r.includes('*'))) if (!existsSync(pub(r.slice(1)))) missing.push(`_routes.json: ${r}`);
+  for (const r of routes.include.filter(r => !r.includes('*'))) if (!existsSync(pub(r.slice(1))) && !r2.has(r)) missing.push(`_routes.json: ${r}`);
+  assert.deepEqual([...r2].sort(), routes.include.filter(r => r.startsWith('/media/')).sort(), 'Allowlist der Function = Video-Routen');
   assert.deepEqual(missing, []);
 });
 

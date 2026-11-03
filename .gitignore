@@ -8,9 +8,8 @@ node_modules/
 !.dev.vars.example
 # Video-Quelldateien im Repository-Root (nicht versioniert)
 /*.mp4
-# public/media/: versioniert sind genau die vier freigegebenen Website-Medien; alles andere dort bleibt ignoriert
+# public/media/: versioniert sind genau die zwei Poster der eingebundenen Videos; die Videos selbst liegen im R2-Bucket
+# 360pixelkiez (functions/media/[file].ts). Alles andere dort bleibt ignoriert
 public/media/*
-!public/media/360-pixelkiez-video-1080p.mp4
-!public/media/360-pixelkiez-video-poster.jpg
-!public/media/report-pdf-de-1x1.mp4
-!public/media/report-pdf-poster.jpg
+!public/media/report-pdf-lavendel-poster.jpg
+!public/media/section-bericht-peach-poster.jpg
