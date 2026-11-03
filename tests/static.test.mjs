@@ -275,7 +275,8 @@ test('Wahrheitsgemäße Aussagen: kein Premium/Checkout/Abo/Dashboard/Score, kei
 test('JSON-LD entspricht den sichtbaren FAQ, ohne Angebot oder Preis-Markup', () => {
   const { root } = H.parse(read('public/index.html'));
   const ld = JSON.parse(H.byTag(root, 'script').find(s => s.attrs.get('type') === 'application/ld+json').raw);
-  const visible = H.byTag(root, 'details').map(d => [H.norm(H.textOf(H.byTag(d, 'summary')[0])), H.norm(H.textOf(H.byTag(d, 'p')[0]))]);
+  /* Nur der FAQ-Abschnitt: die Menüs im Kopf sind ebenfalls <details> */
+  const visible = H.byTag(H.byId(root, 'faq'), 'details').map(d => [H.norm(H.textOf(H.byTag(d, 'summary')[0])), H.norm(H.textOf(H.byTag(d, 'p')[0]))]);
   assert.deepEqual(ld.mainEntity.map(q => [q.name, q.acceptedAnswer.text]), visible);
   assert.ok(!/offers|price|Offer/.test(JSON.stringify(ld)));
 });
