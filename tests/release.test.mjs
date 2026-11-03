@@ -29,7 +29,10 @@ const MEDIA = {
 const OG = ['start', 'wissen', 'analyse',
   ...['agent-readiness', 'answerability', 'entity-trust', 'seo-geo-ai-visibility', 'wie-ki-websites-liest', 'wie-websites-ausgeliefert-werden'].map(s => `wissen-${s}`),
   ...['auffindbarkeit-seo', 'barrierefreiheit', 'ki-crawler-agenten', 'ki-verstaendlichkeit', 'methodik', 'nutzerfuehrung-conversion', 'performance-technik', 'vertrauen-datenschutz', 'warum-website-analyse'].map(s => `analyse-${s}`)];
-const SITE = ['404.html', '_headers', '_routes.json', 'agb.html', 'assets/anfrage.css', 'assets/app.js', 'assets/donut.css', 'assets/donut.js', 'assets/inhalt.css', 'assets/styles.css',
+/* Selbst ausgelieferte Schriften (Datenschutz-Fix 94f0b18): Stylesheet, WOFF2-Dateien und OFL-Lizenzen */
+const FONTS = ['assets/fonts.css', ...['OFL-Archivo.txt', 'OFL-IBM-Plex-Mono.txt', 'archivo-latin-ext.woff2', 'archivo-latin.woff2', 'ibm-plex-mono-400-latin-ext.woff2',
+  'ibm-plex-mono-400-latin.woff2', 'ibm-plex-mono-500-latin-ext.woff2', 'ibm-plex-mono-500-latin.woff2'].map(f => 'assets/fonts/' + f)];
+const SITE = ['404.html', '_headers', '_routes.json', 'agb.html', 'assets/anfrage.css', 'assets/app.js', 'assets/donut.css', 'assets/donut.js', 'assets/inhalt.css', 'assets/styles.css', ...FONTS,
   'assets/apple-touch-icon.png', 'assets/favicon.svg', 'favicon.ico', ...OG.map(n => `assets/og/${n}.jpg`), 'assets/partner/dyai-studio.svg', 'assets/partner/pixelkiez.png', 'datenschutz.html', 'impressum.html', 'index.html',
   ...['agent-readiness', 'answerability', 'entity-trust', 'index', 'seo-geo-ai-visibility', 'wie-ki-websites-liest', 'wie-websites-ausgeliefert-werden'].map(s => `wissen/${s}.html`),
   ...['auffindbarkeit-seo', 'barrierefreiheit', 'index', 'ki-crawler-agenten', 'ki-verstaendlichkeit', 'methodik', 'nutzerfuehrung-conversion', 'performance-technik', 'vertrauen-datenschutz', 'warum-website-analyse'].map(s => `analyse/${s}.html`)];
