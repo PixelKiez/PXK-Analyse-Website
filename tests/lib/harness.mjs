@@ -371,8 +371,8 @@ export async function startPagesFunction({ api = null, assets, media = null } = 
   return { fetch: (url, init) => mf.dispatchFetch(url, init), stop: () => mf.dispose(), bucket: () => bucket };
 }
 
-/* Lokales Cloudflare Pages (`wrangler pages dev` mit wrangler.toml aus dem Root). worker: true startet den API-Worker aus
-   worker/wrangler.toml in derselben Sitzung (-c … -c …), erreichbar nur über das Service Binding API. Seine [vars] werden
+/* Lokales Cloudflare Pages (`wrangler pages dev` mit wrangler.toml aus dem Root). worker: true ergänzt ein rein lokales
+   API-Service-Binding in einer temporären Konfiguration und startet den API-Worker in derselben Sitzung (-c … -c …). Seine [vars] werden
    durch Testwerte ersetzt (lokaler Modus, Mock-Google, Mock-Resend); D1 ist lokal, mit `wrangler d1 migrations apply --local`.
    worker: false: nur die Website, das Binding ist dann nicht verbunden.
    media: Objekte für das lokale R2 (Binding MEDIA aus wrangler.toml) als { Schlüssel: Pfad einer Datei }; ohne Angabe bleibt es leer */
@@ -397,7 +397,8 @@ export async function startPages({ google, mail, worker = true, env = {}, media 
     writeFileSync(join(dir, 'worker.toml'), toml);
     const m = spawnSync(WRANGLER, ['d1', 'migrations', 'apply', 'pxwa', '--local', '--persist-to', state, '-c', join(dir, 'worker.toml')], { cwd: ROOT, env: wranglerEnv(), encoding: 'utf8' });
     if (m.status !== 0) throw new Error('wrangler d1 migrations apply: ' + m.stdout + m.stderr);
-    args.push('-c', 'wrangler.toml', '-c', join(dir, 'worker.toml'));
+    /* Nur der lokale Integrationstest verbindet den Worker; Produktion bleibt ohne API-Binding. */
+    args.push('-c', 'wrangler.toml', '-c', join(dir, 'worker.toml'), '--service', 'API=pxwa-api');
     google.setRedirectUri(`${base}/api/auth/callback`);
   }
   for (const [key, file] of Object.entries(media)) {

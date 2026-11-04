@@ -253,7 +253,7 @@ test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen n
   /* Partner-Logos unter dem Video und Pixelkiez-Logo in der Footer-Leiste (Entscheidung des Auftraggebers 03.11.2026), geprüft im Test „Partner“ */
   const PARTNER_NEU = [/  <section class="partner-band"[\s\S]*?<\/section>\n\n/, `      ${PARTNER_LINK}<img class="footer-partner" src="assets/partner/pixelkiez.png" alt="Pixelkiez" width="87" height="20"></a>\n`];
   /* Logo-Zusatz oben „Website-Analyse“ statt „Analyse“ (Entscheidung des Auftraggebers 03.11.2026), geprüft im Test „Hauptnavigation“ */
-  const ohneNeues = html => [...MENUES, ...PARTNER_NEU].reduce((s, re) => s.replace(re, ''), html).replace(KOPF, '\n')
+  const ohneNeues = html => [...MENUES, ...PARTNER_NEU].reduce((s, re) => s.replace(re, ''), html).replace('content="index,follow"', 'content="noindex,nofollow"').replace(KOPF, '\n')
     .replace('    <a class="logo" href="#top">360°Pixelkiez<span>Website-Analyse</span></a>', '    <a class="logo" href="#top">360°Pixelkiez<span>Analyse</span></a>').replace('<link rel="stylesheet" href="assets/donut.css">\n', '')
     .replace(/\n<script type="application\/ld\+json">\{"@context":"https:\/\/schema\.org","@graph":\[\{"@type":"VideoObject".*?<\/script>/, '')
     .replace('\n<script src="assets/donut.js"></script>', '').replace(SCORE_ABSCHNITT, '');
@@ -628,18 +628,19 @@ test('Design: styles.css unverändert gegenüber vision.html; alle verwendeten K
 });
 
 test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, Functions nur unter /api/* und für drei Videos aus R2, Sicherheits-Header, keine Railway- oder PHP-Reste', () => {
-  assert.deepEqual(artifactFiles(), ['404.html', '_headers', '_routes.json', 'agb.html', ...ASSETS, ...FONT_FILES, ...BILDER, 'datenschutz.html', 'impressum.html', 'index.html', ...MEDIA, ...INHALT.map(p => p.slice(7))].sort());
+  assert.deepEqual(artifactFiles(), ['404.html', '_headers', '_routes.json', 'agb.html', ...ASSETS, ...FONT_FILES, ...BILDER, 'datenschutz.html', 'impressum.html', 'index.html', 'sitemap.xml', ...MEDIA, ...INHALT.map(p => p.slice(7))].sort());
   assert.deepEqual(repoFiles().filter(f => /\.(php|phtml)$|(^|\/)\.htaccess$|^(server|bin)\/|railway|Dockerfile|Caddyfile|\.dockerignore/i.test(f)), [], 'keine PHP-, Railway- oder Docker-Bestandteile');
   const pages = read('wrangler.toml');
   const active = pages.split('\n').filter(l => !l.trim().startsWith('#')).join('\n');
   assert.match(active, /^name = "pxwa"$/m);
   assert.match(active, /^pages_build_output_dir = "\.\/public"$/m);
   assert.ok(!/^\s*main\s*=/m.test(active), 'kein Worker-Einstiegspunkt in der Pages-Konfiguration');
-  assert.match(active, /^\[\[services\]\]\nbinding = "API"\nservice = "pxwa-api"$/m, 'Produktion: internes Service Binding zum privaten Worker');
-  /* Einziger Speicher: R2-Bucket 360pixelkiez als MEDIA (nur Produktion), für die drei Videos; Vorschau ohne Bindings */
-  assert.match(active, /^\[\[r2_buckets\]\]\nbinding = "MEDIA"\nbucket_name = "360pixelkiez"$/m, 'Produktion: R2-Binding MEDIA wie in den Pages-Projekteinstellungen');
-  assert.equal((active.match(/r2_buckets/g) || []).length, 2, 'genau ein R2-Binding (plus die leere Liste der Vorschau)');
-  assert.match(active, /^\[env\.preview\]\nservices = \[\]\nr2_buckets = \[\]$/m, 'Vorschau-Deployments ohne Binding');
+  assert.ok(!/^\[\[services\]\]/m.test(active), 'Soft-Launch: kein API-Service-Binding');
+  assert.match(active, /^compatibility_date = "2026-07-30"$/m, 'Vorschau: bisheriges Kompatibilitätsdatum');
+  assert.match(active, /^\[env\.production\]\ncompatibility_date = "2026-11-01"$/m, 'Produktion: bisheriges Kompatibilitätsdatum');
+  assert.match(active, /^\[\[r2_buckets\]\]\nbinding = "MEDIA"\nbucket_name = "360pixelkiez"$/m, 'bestehendes R2-Binding für Vorschau');
+  assert.match(active, /^\[\[env\.production\.r2_buckets\]\]\nbinding = "MEDIA"\nbucket_name = "360pixelkiez"$/m, 'bestehendes R2-Binding für Produktion');
+  assert.equal((active.match(/r2_buckets/g) || []).length, 2, 'genau die beiden bestehenden R2-Bindings');
   assert.ok(!/\[vars\]|d1_databases|kv_namespaces|SECRET|TOKEN|remote\s*=|preview_bucket_name|jurisdiction/i.test(active), 'Website ohne Variablen, Secrets oder weiteren Speicher');
   assert.equal(read('worker/wrangler.toml').match(/^compatibility_date = .*$/m)[0], active.match(/^compatibility_date = .*$/m)[0], 'gleiches Kompatibilitätsdatum');
   const headers = read('public/_headers');
@@ -648,7 +649,15 @@ test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, F
     assert.ok(headers.includes(`\n  ${h}\n`), `_headers: ${h}`);
   }
   assert.match(headers, /^https:\/\/:project\.pages\.dev\/\*\n {2}X-Robots-Tag: noindex$/m, '*.pages.dev wird nicht indexiert');
-  for (const page of PAGES) assert.match(read(page), /<meta name="robots" content="noindex,nofollow">/, `${page}: noindex bis zur Launch-Freigabe`);
+  assert.match(read('public/404.html'), /<meta name="robots" content="noindex,nofollow">/, 'Fehlerseite bleibt ausgeschlossen');
+  const indexable = PAGES.filter(page => page !== 'public/404.html');
+  for (const page of indexable) assert.match(read(page), /<meta name="robots" content="index,follow">/, `${page}: Indexierung erlaubt`);
+  const canonicals = indexable.map(page => read(page).match(/<link rel="canonical" href="([^"]+)">/)?.[1]).sort();
+  const sitemap = read('public/sitemap.xml');
+  assert.match(sitemap, /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/);
+  const locations = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m => m[1]).sort();
+  assert.equal(new Set(locations).size, locations.length, 'Sitemap ohne Duplikate');
+  assert.deepEqual(locations, canonicals, 'Sitemap enthält genau die kanonischen öffentlichen Seiten');
   const fn = read(FUNCTION);
   assert.match(fn, /return await env\.API\.fetch\(new Request\(request, \{ redirect: 'manual' \}\)\);/, 'Weitergabe der Original-Anfrage ohne Verfolgen von Weiterleitungen');
   assert.match(fn, /if \(!env\.API\) return unavailable\(\);/);
@@ -677,7 +686,7 @@ test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, F
 
 test('Release-Scan des Pages-Uploads (public/ wie `wrangler pages deploy`): nur Website-Dateien, keine Quellen, kein PHP/Railway, keine Secrets, höchstens 25 MiB je Datei', () => {
   const files = uploadFiles();
-  assert.deepEqual(files.filter(f => !f.startsWith('media/')), ['404.html', 'agb.html', ...ASSETS, ...FONT_FILES, ...BILDER, 'datenschutz.html', 'impressum.html', 'index.html',
+  assert.deepEqual(files.filter(f => !f.startsWith('media/')), ['404.html', 'agb.html', ...ASSETS, ...FONT_FILES, ...BILDER, 'datenschutz.html', 'impressum.html', 'index.html', 'sitemap.xml',
     ...INHALT.map(p => p.slice(7))].sort());
   assert.ok(files.filter(f => f.startsWith('media/')).every(f => /^media\/[\w-]+\.(mp4|jpg)$/.test(f)), 'in media/ nur Videos und Poster');
   assert.ok(files.length < 20000);
