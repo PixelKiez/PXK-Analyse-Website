@@ -1,8 +1,7 @@
 /* PXWA – Soft-Launch (statisch, vor der Freigabe der Google-Anmeldung). Ausführen im Repo-Root: node --test tests/softlaunch.test.mjs
    Prüft das Pages-Artefakt (public/): keine Anfragewege (Formular, Eingabe, POST, Google-Login), keine Schaltfläche, die eine
    funktionierende Anfrage nahelegt, sichtbarer Hinweis „Kostenlose Analyse-Anfragen in Kürze verfügbar“, nur die freigegebenen
-   Videos aus R2 (PXK-159), noindex, Entwurfskennzeichnung der Rechtstexte, keine Secrets, Startseite gegenüber main nur mit den
-   freigegebenen Änderungen. Gilt nur für die Branches release/pxwa-soft-launch*. */
+   Videos aus R2 (PXK-159), Indexierungsregeln, Rechtstexte, keine Secrets und die Startseite gegenüber dem letzten Live-Stand. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
@@ -88,11 +87,15 @@ test('Videos nur wie entschieden: Hero-Video, Berichtsvideo und Befund-Video auf
   }
 });
 
-test('noindex bleibt: jede Seite mit robots-Meta, zusätzlich X-Robots-Tag für alle Pfade auf 360.pixelkiez.de', () => {
-  for (const p of PAGES) assert.match(read(p), /<meta name="robots" content="noindex,nofollow">/, p);
-  assert.match(read('_headers'), /^https:\/\/360\.pixelkiez\.de\/\*\n {2}X-Robots-Tag: noindex$/m);
-  assert.equal((read('_headers').match(/^\/\*$/gm) || []).length, 1, 'genau ein „/*“-Block (Sicherheits-Header)');
-  assert.ok(!FILES.includes('robots.txt') && !FILES.includes('sitemap.xml'), 'keine Freigabe für Suchmaschinen');
+test('Indexierung: reguläre Seiten freigegeben, Fehlerseite und Vorschau ausgeschlossen', () => {
+  for (const p of PAGES.filter(p => p !== '404.html')) assert.match(read(p), /<meta name="robots" content="index,follow">/, p);
+  assert.match(read('404.html'), /<meta name="robots" content="noindex,nofollow">/);
+  const headers = read('_headers');
+  assert.doesNotMatch(headers, /^https:\/\/360\.pixelkiez\.de\/\*\n {2}X-Robots-Tag: noindex$/m);
+  assert.match(headers, /^https:\/\/:project\.pages\.dev\/\*\n {2}X-Robots-Tag: noindex$/m);
+  assert.match(headers, /^https:\/\/:version\.:project\.pages\.dev\/\*\n {2}X-Robots-Tag: noindex$/m);
+  assert.equal((headers.match(/^\/\*$/gm) || []).length, 1, 'Sicherheits-Header bleiben erhalten');
+  assert.ok(FILES.includes('sitemap.xml'), 'Sitemap vorhanden');
 });
 
 test('Rechtstexte: Fassung 2026-11-04 (Entscheidung des Auftraggebers) ohne Entwurfsvermerk und ohne offene Platzhalter, keine behauptete Freigabe', () => {
@@ -161,6 +164,7 @@ const MAIN_SHA = 'c69cd1b3cb7dba1426df5006890fec3417841c9f';
 test('Startseite gegenüber main: nur Soft-Launch, Schriften-Fix, Partner, Logo, Favicon, Videos und Hintergrundbild aus R2 – sonst unverändert', () => {
   const main = execFileSync('git', ['show', `${MAIN_SHA}:public/index.html`], { cwd: ROOT, encoding: 'utf8' });
   const ERLAUBT = [
+    ['<meta name="robots" content="noindex,nofollow">', '<meta name="robots" content="index,follow">'],
     /* Soft-Launch (c528d96): kein Formularziel, Hinweis statt Formular, Schaltflächen ohne Anfrage, Ablauf „sobald Anfragen möglich sind“ */
     ["form-action 'self' https://accounts.google.com\">", "form-action 'none'\">"],
     [/    <form class="analyze" id="analyze"[\s\S]*?<p class="hero-note">[^\n]*\n/, '    <!-- Soft-Launch: kein Anfrageformular, bis die Google-Anmeldung freigegeben ist (keine Eingabe, kein POST, kein Google-Login) -->\n    <div class="analyze">\n      <p class="bald"><svg class="i"><use href="#i-globe"/></svg><span><b>Kostenlose Analyse-Anfragen in Kürze verfügbar.</b> Bis dahin nimmt diese Website noch keine Anfragen an.</span></p>\n'],
