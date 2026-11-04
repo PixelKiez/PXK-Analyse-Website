@@ -20,10 +20,10 @@ const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8',
 /* Freigegebene öffentliche Website-Medien im Commit (eigenes 360°Pixelkiez-Material) mit SHA-256. Eine neue Fassung braucht eine
    eigene Freigabe und eine bewusste Änderung dieser Liste. Fassung vom 03.11.2026 (PXK-159, Entscheidung des Auftraggebers: Bericht-
    und Befund-Video aus R2 eingebunden): die zwei Poster dieser Videos mit eingebetteten Metadaten (Titel, Beschreibung, Urheber,
-   Copyright); Bilddaten bitgleich zu den lokalen Postern vom 31.10.2026. P0-Hotfix (PXK-159): Poster der historischen Demo unter dem
-   Hero, Bild bei 31,5 s aus dem R2-Objekt 360-pixelkiez-video-1080p.mp4 (neutrale Fahrplan-Ansicht), mit denselben Metadaten-Feldern. */
+   Copyright); Bilddaten bitgleich zu den lokalen Postern vom 31.10.2026. P0-Hotfix (PXK-159): Poster des Videos unter dem Hero
+   (Metadaten ohne Kennzeichnung als alte Fassung, 04.11.2026), Bild bei 31,5 s aus dem R2-Objekt 360-pixelkiez-video-1080p.mp4 (neutrale Fahrplan-Ansicht), mit denselben Metadaten-Feldern. */
 const MEDIA = {
-  'media/360-pixelkiez-video-historisch-poster.jpg': 'b6b6b79178e669d46b2b5f803c9ae5ce71f81d27cd99a31bc6c8b24d31bd0fb7',
+  'media/360-pixelkiez-ablauf-poster.jpg': '7990c57c749dbd3723c2a41c35e9424428df1efbe8f29645cda9fa39269adba1',
   'media/report-pdf-lavendel-poster.jpg': '0195793804dfa08e5415e816121c1067d48c77c5ebc5d3a8a659ff1eac103932',
   'media/section-bericht-peach-poster.jpg': '593e8ad3318a426408bc511d97f78d9c37d0f1772f9f7e6e8e14d496f59eff52',
 };

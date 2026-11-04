@@ -119,7 +119,7 @@ test('Routing: Functions laufen nur für /api/* und genau die drei Videos aus R2
 /* ---------- Video-Function (functions/media/[file].ts) kompiliert in workerd, mit Miniflare-R2 als Binding MEDIA ---------- */
 
 const VIDEOS = R2_VIDEOS.map(k => `/media/${k}`);
-const POSTERS = ['/media/360-pixelkiez-video-historisch-poster.jpg', '/media/report-pdf-lavendel-poster.jpg', '/media/section-bericht-peach-poster.jpg'];
+const POSTERS = ['/media/360-pixelkiez-ablauf-poster.jpg', '/media/report-pdf-lavendel-poster.jpg', '/media/section-bericht-peach-poster.jpg'];
 const FILE = Uint8Array.from({ length: 1000 }, (_, i) => (i * 7) % 251);
 /* Je Schlüssel ein anderer Inhalt: so fällt auf, wenn ein Pfad das falsche Objekt liefert */
 const content = key => FILE.map(b => (b + R2_VIDEOS.indexOf(key) + 1) % 256);

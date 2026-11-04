@@ -178,7 +178,7 @@ test('Hero beim Öffnen: Überschrift, Text, Website-Eingabe und AGB-Häkchen im
 });
 
 test('Befund-Video bei „Jeder Befund verständlich erklärt“: links neben den Punkten (mobil darunter), 5:4, abgerundet, startet von selbst erst im Bild, stumm, Schleife, ohne Bedienelemente (Range-Antworten 206)', { skip: videoSkip }, async () => {
-  /* An der Stelle der früheren Beispielkarte (Entscheidung des Auftraggebers 03.11.2026, PXK-159); unter dem Hero die historische Demo (P0-Hotfix) */
+  /* An der Stelle der früheren Beispielkarte (Entscheidung des Auftraggebers 03.11.2026, PXK-159); unter dem Hero das Ablauf-Video (P0-Hotfix) */
   for (const [width, height] of [[1440, 900], [390, 844]]) {
     const { context, page, errors, blocked, videos } = await open('/index.html', { width, height, reducedMotion: 'no-preference', videos: true });
     const state = () => page.evaluate(() => {
@@ -268,7 +268,7 @@ test('Safari-Engine (WebKit): alle drei Videos laufen – Range-Anfragen bekomme
       assert.deepEqual(shown.map(e => e.tag), ['VIDEO', 'VIDEO', 'VIDEO'], `${width}: alle drei Videos spielen, kein Standbild`);
       for (const e of shown) {
         assert.ok(e.fills, `${width}: füllt den abgerundeten Rahmen`);
-        assert.match(e.label, /^(Animierte|Historische Demo)/, `${width}: Alternativtext bleibt`);
+        assert.match(e.label, /^Animierte/, `${width}: Alternativtext bleibt`);
       }
       const list = await videos();
       assertRanges(list, ['/media/360-pixelkiez-video-1080p.mp4', '/media/report-pdf-de-1x1-lavendel.mp4', '/media/section-bericht-peach-5x4.mp4'], `WebKit ${width}`);

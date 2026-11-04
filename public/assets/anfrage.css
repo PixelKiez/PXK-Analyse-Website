@@ -36,6 +36,17 @@
 .hero .url-field input { color: var(--ink); }
 .hero .url-field input::placeholder { color: var(--ink-70); }
 .hero .facts { color: var(--ink-70); }
+/* Verwaschene Farbflächen im Hero (Entscheidung des Auftraggebers 04.11.2026): Pfirsich, Orange und Lila aus den Pixelkiez-Farben,
+   weich ineinander verlaufend hinter Überschrift und Text; Orange und Lila nur in geringer Deckkraft, damit der Text kontrastreich bleibt */
+.hero::before {
+  background:
+    radial-gradient(34% 40% at 16% 34%, rgb(254 91 42 / .20), transparent 70%),
+    radial-gradient(48% 58% at 30% 10%, rgb(255 214 199 / .95), transparent 72%),
+    radial-gradient(36% 44% at 84% 38%, rgb(123 92 214 / .18), transparent 70%),
+    radial-gradient(48% 58% at 70% 8%, rgb(235 226 252 / .95), transparent 72%),
+    radial-gradient(40% 36% at 50% 92%, rgb(255 230 221 / .70), transparent 75%);
+  filter: blur(18px);
+}
 @media (max-width: 620px) {
   .hero .h1 { font-size: clamp(34px, min(12vw, 6.2svh), 46px); }
   .hero .lead { font-size: clamp(16px, 2.3svh, 18px); }
@@ -60,14 +71,11 @@
    und Button und Menü-Button in der Pille bleiben (Umbruch gemessen bis 473 px in Chromium und WebKit) */
 @media (max-width: 489px) { .nav .logo span { display: none; } }
 
-/* Video unter dem Hero (historische Demo, deutlich gekennzeichnet): zentriertes Widget mit abgerundeten Ecken, 16:9, nicht über die ganze Breite */
+/* Video unter dem Hero: zentriertes Widget mit abgerundeten Ecken, 16:9, nicht über die ganze Breite (ohne Bildunterschrift) */
 .showcase { padding: 0 var(--gutter) clamp(56px, 8vw, 104px); }
 .showcase-media { width: min(100%, 960px); margin: 0 auto; }
 .showcase-frame { position: relative; overflow: hidden; isolation: isolate; border-radius: clamp(14px, 2vw, 24px); background: #0E1416; box-shadow: 0 24px 60px rgb(12 12 12 / .16); }
 .showcase-video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; }
-.showcase-note { margin-top: 14px; text-align: center; font: 400 12px var(--font-mono); color: var(--ink-45); }
-.showcase-note b { font-weight: 500; color: var(--ink); }
-.showcase-badge { position: absolute; top: clamp(10px, 1.6vw, 16px); left: clamp(10px, 1.6vw, 16px); z-index: 1; padding: 6px 10px; border-radius: var(--r-pill); background: rgb(255 255 255 / .94); color: var(--ink); font: 500 12px/1 var(--font-mono); letter-spacing: .04em; text-transform: uppercase; pointer-events: none; }
 /* Zweites Video rechts neben dem Text im Abschnitt „Ihr Bericht“ (Spalte aus .split); quadratisch, höchstens 560 px */
 .report-media { width: 100%; max-width: 560px; min-width: 0; margin: 0; justify-self: center; }
 .showcase-video--square { aspect-ratio: 1 / 1; }

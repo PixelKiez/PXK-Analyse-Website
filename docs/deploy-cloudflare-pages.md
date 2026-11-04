@@ -189,12 +189,13 @@ per API gelesen, Größe und SHA-256 in `tests/pages.test.mjs`): `360-pixelkiez-
 
 Eingebunden sind seit PXK-159 (Entscheidung des Auftraggebers 03.11.2026) das Berichtsvideo (Lavendel) bei
 „Ein PDF. Sieben Seiten.“ und das Befund-Video (Peach) bei „Jeder Befund verständlich erklärt.“, seit dem P0-Hotfix außerdem
-das Hero-Video direkt unter dem Hero (vor den Partner-Logos, 16:9). Es nennt noch „vier Metriken“, simuliert eine laufende
-Analyse, zeigt „Jetzt analysieren“ und im Abspann kontakt@pixelkiez.de; deshalb ist es sichtbar als „Historische Demo“
-gekennzeichnet (Plakette im Video, Bildunterschrift, Alternativtext). Das R2-Objekt ist unverändert; eine inhaltsrichtige
-Fassung wäre ein neues Objekt mit eigener Freigabe. Auch das Berichtsvideo zeigt noch „Die 4 wichtigsten Metriken“
+das Hero-Video direkt unter dem Hero (vor den Partner-Logos, 16:9). Unter den Videos stehen keine Bildunterschriften und keine
+Kennzeichnung als alte Fassung (Entscheidung des Auftraggebers 04.11.2026); dass alle gezeigten Werte Beispieldaten sind, steht im
+Alternativtext und in den Metadaten der Poster. Das Hero-Video nennt noch „vier Metriken“, simuliert eine laufende Analyse, zeigt
+„Jetzt analysieren“ und im Abspann kontakt@pixelkiez.de; überarbeitete Fassungen lädt der Auftraggeber als neue R2-Objekte hoch.
+Auch das Berichtsvideo zeigt noch „Die 4 wichtigsten Metriken“
 und „Jetzt analysieren“; so freigegeben. Versioniert in `public/media/` sind nur die drei Poster
-(`360-pixelkiez-video-historisch-poster.jpg` – Bild bei 31,5 s aus dem R2-Objekt, neutrale Fahrplan-Ansicht –,
+(`360-pixelkiez-ablauf-poster.jpg` – Bild bei 31,5 s aus dem R2-Objekt, neutrale Fahrplan-Ansicht –,
 `report-pdf-lavendel-poster.jpg`, `section-bericht-peach-poster.jpg`, mit XMP-Metadaten, SHA-256 in
 `tests/release.test.mjs`). Die Titelbilder für soziale Netzwerke liegen unter `public/assets/og/` (1200×630).
 
