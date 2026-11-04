@@ -119,7 +119,7 @@ test('Routing: Functions laufen nur für /api/* und genau die drei Videos aus R2
 /* ---------- Video-Function (functions/media/[file].ts) kompiliert in workerd, mit Miniflare-R2 als Binding MEDIA ---------- */
 
 const VIDEOS = R2_VIDEOS.map(k => `/media/${k}`);
-const POSTERS = ['/media/report-pdf-lavendel-poster.jpg', '/media/section-bericht-peach-poster.jpg'];
+const POSTERS = ['/media/360-pixelkiez-video-historisch-poster.jpg', '/media/report-pdf-lavendel-poster.jpg', '/media/section-bericht-peach-poster.jpg'];
 const FILE = Uint8Array.from({ length: 1000 }, (_, i) => (i * 7) % 251);
 /* Je Schlüssel ein anderer Inhalt: so fällt auf, wenn ein Pfad das falsche Objekt liefert */
 const content = key => FILE.map(b => (b + R2_VIDEOS.indexOf(key) + 1) % 256);
@@ -438,7 +438,7 @@ const R2_OBJECTS = {
   'section-bericht-peach-5x4.mp4': [1230026, '81499189cf8a2968705b2ba4c13caccec312d4131481855f55b39300ce0c1130'],
 };
 
-test('Medien: nur die zwei Poster sind versioniert und statisch (unter 25 MiB); Videos liegen nicht im Repository oder Pages-Upload, sondern in R2', async t => {
+test('Medien: nur die drei Poster sind versioniert und statisch (unter 25 MiB); Videos liegen nicht im Repository oder Pages-Upload, sondern in R2', async t => {
   const POSTER_FILES = POSTERS.map(p => p.slice(1)).sort();
   assert.ok(POSTER_FILES.every(f => existsSync(join(ROOT, 'public', f))), 'Poster fehlen in public/media/ – Release-Blocker');
   assert.deepEqual(uploadFiles().filter(f => f.startsWith('media/')), POSTER_FILES);

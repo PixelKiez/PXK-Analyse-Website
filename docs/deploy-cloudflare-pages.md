@@ -72,7 +72,7 @@ Zwei getrennte Konfigurationen, damit nie das Falsche deployt wird:
 ## 2. Cloudflare Pages (Website und Gateway)
 
 **Empfohlen: kontrollierter Direct Upload aus einem frischen Git-Checkout** statt GitHub-Integration. Alles, was
-ausgeliefert wird, ist versioniert (auch die zwei Poster in `public/media/`; die Videos liegen in R2, Abschnitt 7); der Upload entsteht deshalb aus genau
+ausgeliefert wird, ist versioniert (auch die drei Poster in `public/media/`; die Videos liegen in R2, Abschnitt 7); der Upload entsteht deshalb aus genau
 dem freigegebenen Commit, nie aus einem Arbeitsverzeichnis mit lokalen Dateien. Die GitHub-Integration bleibt
 unverbunden, weil sie bei jedem Push automatisch deployt (auch Feature-Branches als Vorschau).
 
@@ -187,12 +187,15 @@ per API gelesen, Größe und SHA-256 in `tests/pages.test.mjs`): `360-pixelkiez-
 `report-pdf-de-1x1-lavendel.mp4` (3,4 MiB), `section-bericht-peach-5x4.mp4` (1,2 MiB); H.264 (High), yuv420p, ohne Ton,
 `moov` vor `mdat` (Faststart), ohne eingebettete Copyright-Metadaten.
 
-Eingebunden sind seit PXK-159 (Entscheidung des Auftraggebers 03.11.2026) nur das Berichtsvideo (Lavendel) bei
-„Ein PDF. Sieben Seiten.“ und das Befund-Video (Peach) bei „Jeder Befund verständlich erklärt.“. Das Hero-Video ist über
-seine Adresse abrufbar, aber nicht eingebunden: Es nennt noch „vier Metriken“, simuliert eine laufende Analyse, zeigt
-„Jetzt analysieren“ und im Abspann kontakt@pixelkiez.de. Auch das Berichtsvideo zeigt noch „Die 4 wichtigsten Metriken“
-und „Jetzt analysieren“; so freigegeben. Versioniert in `public/media/` sind nur die zwei Poster
-(`report-pdf-lavendel-poster.jpg`, `section-bericht-peach-poster.jpg`, mit XMP-Metadaten, SHA-256 in
+Eingebunden sind seit PXK-159 (Entscheidung des Auftraggebers 03.11.2026) das Berichtsvideo (Lavendel) bei
+„Ein PDF. Sieben Seiten.“ und das Befund-Video (Peach) bei „Jeder Befund verständlich erklärt.“, seit dem P0-Hotfix außerdem
+das Hero-Video direkt unter dem Hero (vor den Partner-Logos, 16:9). Es nennt noch „vier Metriken“, simuliert eine laufende
+Analyse, zeigt „Jetzt analysieren“ und im Abspann kontakt@pixelkiez.de; deshalb ist es sichtbar als „Historische Demo“
+gekennzeichnet (Plakette im Video, Bildunterschrift, Alternativtext). Das R2-Objekt ist unverändert; eine inhaltsrichtige
+Fassung wäre ein neues Objekt mit eigener Freigabe. Auch das Berichtsvideo zeigt noch „Die 4 wichtigsten Metriken“
+und „Jetzt analysieren“; so freigegeben. Versioniert in `public/media/` sind nur die drei Poster
+(`360-pixelkiez-video-historisch-poster.jpg` – Bild bei 31,5 s aus dem R2-Objekt, neutrale Fahrplan-Ansicht –,
+`report-pdf-lavendel-poster.jpg`, `section-bericht-peach-poster.jpg`, mit XMP-Metadaten, SHA-256 in
 `tests/release.test.mjs`). Die Titelbilder für soziale Netzwerke liegen unter `public/assets/og/` (1200×630).
 
 Pages beantwortet Range-Anfragen statischer Dateien mit 200 statt 206; Safari/iOS spielt Videos dann nicht ab. Die Pages
@@ -203,14 +206,28 @@ Function `functions/media/[file].ts` (`public/_routes.json` nennt genau die drei
 R2-Fehler). `Content-Type: video/mp4` ist fest, unabhängig von den Metadaten im Bucket. Andere Pfade unter `/media/`
 (Poster, unbekannte Dateien) bleiben statisch. Die Sicherheits-Header setzt die Function selbst (`_headers` gilt nicht für
 Functions; ein Test vergleicht beide), dazu `Cross-Origin-Resource-Policy: same-origin` und `X-Robots-Tag: noindex`.
-Lokal geprüft (`wrangler pages dev` mit lokalem R2, Playwright): Chromium und WebKit spielen beide eingebundenen Videos mit 206.
+Lokal geprüft (`wrangler pages dev` mit lokalem R2, Playwright): Chromium und WebKit spielen alle drei eingebundenen Videos mit 206.
+
+Wiedergabe (Entscheidung des Auftraggebers 04.11.2026: keine Play-/Pause-Schaltflächen, keine Bedienelemente): `<video autoplay
+muted loop playsinline preload="metadata">`. `app.js` sichert stumm/inline/Schleife ab, startet ein Video, sobald es zu mindestens
+20 % im Bild ist (WebKit mobil lehnt `play()` für ein Video am Bildschirmrand ab), hält es erst ganz außerhalb an und versucht es nach
+Tabwechsel (`visibilitychange`), Zurück-Navigation (`pageshow`) und wiederkehrendem Netz (`online`) erneut. Der Zustand steht zur
+Diagnose in `data-wiedergabe` (läuft, angehalten, `abgelehnt: <Grund>`, Ladefehler, Bewegung reduziert). Browser-Regeln werden nicht
+umgangen: Lehnt der Browser ab (iOS-Stromsparmodus, Autoplay-Sperre) oder ist „Bewegung reduzieren“ eingestellt, bleibt das Standbild.
+Bekannte Systemgrenze: WebKit erzwingt im Stromsparmodus (iOS, macOS) für `autoplay`-Videos, die nicht laufen, eigene native
+Bedienelemente (lokal mit Playwright-WebKit auf macOS im Stromsparmodus beobachtet: Leiste mit Play, Zeit, AirPlay, Ton); deren
+Symbole lädt WebKit aus `blob:`-Adressen, die die CSP (`img-src 'self'`) sperrt (Konsolenmeldung „Button failed to load …“). Die
+Seite blendet diese Systemelemente nicht aus. Ersatz durch animierte Bilder (WebP, 640 px, 12 Bilder/s: 1,1 / 3,1 / 1,7 MB) wurde
+geprüft und nicht eingebaut: sichtbar unschärfer (kleine Schrift), ruckeliger, Verhalten im iOS-Stromsparmodus unbelegt.
 
 Kosten und Grenzen (Free-Plan): Jede Video-Anfrage ist ein Function-Aufruf (Workers-Kontingent, 100 000 Anfragen pro
 Tag; Safari stellt je Video etwa zwei Anfragen) und zwei R2-Lesevorgänge (`head`, `get`). Ist das Kontingent erschöpft
-oder R2 gestört, ersetzt `app.js` das Video durch sein Standbild (gleiche Größe, gleicher Alternativtext). Nach dem Deploy
+oder R2 gestört, bleibt das Standbild (Poster) ohne Schaltfläche stehen (nie eine schwarze Fläche); kommt das Netz zurück oder
+wird das Video wieder sichtbar, startet es von selbst. Nach dem Deploy
 prüfen: `curl -s -D - -o /dev/null -H 'Range: bytes=0-1' https://360.pixelkiez.de/media/report-pdf-de-1x1-lavendel.mp4`
 (erwartet 206, `Content-Range: bytes 0-1/3519956`), dieselbe Anfrage mit `-X POST` (405) und mit `bytes=9999999-` (416),
-im Workers-Log die CPU-Zeit der Function, und auf einem echten iPhone beide eingebundenen Videos.
+im Workers-Log die CPU-Zeit der Function, und auf einem echten iPhone (auch im Stromsparmodus) und Android-Gerät alle drei
+eingebundenen Videos.
 
 ## 8. Daten, Backup, Aufbewahrung
 
@@ -243,8 +260,8 @@ curl -s -o /dev/null -w "%{http_code}\n" "https://<projekt>.pages.dev/api/anfrag
 Im Browser mit einem Test-Google-Konto und einer eigenen Website: URL eingeben → Google → bestätigen.
 Erwartet: Referenz `PXA-…`, genau eine Zeile in `orders`, `notifications.status = 'sent'`, **genau eine** Mail in
 360@pixelkiez.de (Absender @notify.pixelkiez.de, SPF/DKIM „pass“ im Mail-Header). Zurück + erneut senden und
-dieselbe URL erneut anfragen: keine zweite Mail. Auf einem iPhone: beide Videos laufen (sonst Standbild, nie eine
-schwarze Fläche). Danach Testdaten löschen:
+dieselbe URL erneut anfragen: keine zweite Mail. Auf einem iPhone: alle drei Videos laufen von selbst, stumm und
+inline (im Stromsparmodus: Standbild bzw. die Systemsteuerung von iOS, siehe Abschnitt 7). Danach Testdaten löschen:
 `DELETE FROM notifications WHERE order_id IN (SELECT id FROM orders WHERE reference = 'PXA-…'); DELETE FROM orders WHERE reference = 'PXA-…'`.
 
 ## 10. Release und Rollback

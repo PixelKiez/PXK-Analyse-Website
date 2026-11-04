@@ -43,34 +43,60 @@
     });
   }
 
-  /* Videos (bei „Ein PDF. Sieben Seiten.“ und „Jeder Befund verständlich erklärt.“): starten, sobald sie ins Bild scrollen, und laufen dann in Schleife.
-     Außerhalb des Bildes angehalten (spart Akku und Daten); bei „Bewegung reduzieren“ bleibt das Standbild. */
-  const videos = document.querySelectorAll('.showcase-video');
-  /* Kann der Browser ein Video nicht laden (z. B. Safari/iOS, wenn der Server Range-Anfragen nicht mit 206 beantwortet),
-     steht statt einer schwarzen Fläche das Standbild (Poster) da: gleiche Klasse, gleiche Größe, gleicher Alternativtext. */
+  /* Videos (historische Demo unter dem Hero, „Ein PDF. Sieben Seiten.“, „Jeder Befund verständlich erklärt.“): stumm, inline, in
+     Endlosschleife, ohne Bedienelemente (Entscheidung des Auftraggebers 04.11.2026: keine Play-/Pause-Schaltflächen). Im HTML steht
+     autoplay muted loop playsinline; hier wird das nur abgesichert: Start, sobald ein Video zu mindestens 20 % im Bild ist (WebKit
+     mobil lehnt play() für ein Video ab, das nur an den Bildschirmrand stößt), Halt erst ganz außerhalb (Akku, Daten), neuer Versuch
+     nach Tabwechsel (visibilitychange), Zurück-Navigation (pageshow) und wiederkehrendem Netz (online). Browser-Regeln werden nicht
+     umgangen: Lehnt der Browser ab (iOS-Stromsparmodus, Autoplay-Sperre) oder scheitert das Laden, bleibt das Standbild (Poster)
+     ohne Schaltfläche. Der Zustand steht zur Diagnose in data-wiedergabe (läuft, angehalten, abgelehnt: <Grund>, Ladefehler,
+     Bewegung reduziert). Bei „Bewegung reduzieren“ kein automatischer Start (Systemeinstellung des Nutzers). */
+  const videos = [...document.querySelectorAll('.showcase-video')];
+  const sichtbar = new Set(), bekannt = new Set();
+  const zustand = (v, z) => { v.dataset.wiedergabe = z; };
+  const start = v => {
+    if (reduce || !sichtbar.has(v) || document.visibilityState !== 'visible' || !v.paused) return;
+    /* Nach einem Ladefehler die Quelle neu wählen (z. B. wieder online) */
+    if (v.error || v.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) v.load();
+    const run = v.play();
+    /* Abgelehnt (NotAllowedError: Stromsparmodus, Autoplay-Sperre) festhalten; abgebrochen (pause() kam dazwischen) ist kein Fehler,
+       ein Ladefehler bleibt als solcher stehen */
+    if (run) run.catch(err => {
+      const grund = err ? err.name : 'unbekannt';
+      if (v.paused && grund !== 'AbortError' && v.dataset.wiedergabe !== 'Ladefehler') zustand(v, `abgelehnt: ${grund}`);
+    });
+  };
   videos.forEach(v => {
-    const toStill = () => {
-      if (!v.isConnected || !v.poster) return;
-      const still = new Image(v.width, v.height);
-      still.src = v.poster;
-      still.alt = v.getAttribute('aria-label') || '';
-      still.className = v.className;
-      v.pause();
-      v.replaceWith(still);
-    };
+    v.muted = v.defaultMuted = true;
+    v.playsInline = true;
+    v.loop = true;
+    v.controls = false;
+    v.addEventListener('playing', () => zustand(v, 'läuft'));
+    /* Ein Video, das außerhalb des Bildes von selbst startet (autoplay), wieder anhalten; es startet beim Hineinscrollen */
+    v.addEventListener('play', () => { if (bekannt.has(v) && !sichtbar.has(v)) v.pause(); });
+    v.addEventListener('pause', () => { if (!v.error && v.dataset.wiedergabe === 'läuft') zustand(v, 'angehalten'); });
+    const fehler = () => zustand(v, 'Ladefehler');
+    v.addEventListener('error', fehler);
     const source = v.querySelector('source');
-    if (source) source.addEventListener('error', toStill);
+    if (source) source.addEventListener('error', fehler);
+    if (reduce) { v.autoplay = false; v.pause(); zustand(v, 'Bewegung reduziert'); return; }
     /* Ist das Laden schon gescheitert, bevor dieses Skript lief, kam das error-Ereignis zu früh. NETWORK_NO_SOURCE allein beweist
        das nicht: Während der Quellenauswahl steht der Wert kurz ebenfalls dort (WebKit unter Last). load() startet die Auswahl neu;
-       scheitert sie wirklich, kommt das error-Ereignis jetzt beim Listener an (bei preload="none" ohne Download). */
+       scheitert sie wirklich, kommt das error-Ereignis jetzt beim Listener an. */
     if (v.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) v.load();
   });
   if (videos.length && !reduce && 'IntersectionObserver' in window) {
-    /* intersectionRatio > 0: Ein Video, das nur an den Bildschirmrand stößt, gilt noch nicht als sichtbar */
     const io = new IntersectionObserver(entries => entries.forEach(e => {
-      if (e.intersectionRatio > 0) e.target.play().catch(() => {}); else e.target.pause();
-    }), { threshold: [0, 0.01] });
+      const v = e.target;
+      bekannt.add(v);
+      if (e.intersectionRatio >= 0.2) { sichtbar.add(v); start(v); }
+      else if (e.intersectionRatio === 0) { sichtbar.delete(v); if (!v.paused) v.pause(); }
+    }), { threshold: [0, 0.2, 0.6] });
     videos.forEach(v => io.observe(v));
+    const alle = () => videos.forEach(start);
+    document.addEventListener('visibilitychange', alle);
+    addEventListener('pageshow', alle);
+    addEventListener('online', alle);
   }
 
   const form = $('#analyze'), input = $('#url');
