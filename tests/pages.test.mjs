@@ -127,7 +127,7 @@ const seeded = (extra = {}) => ({ ...Object.fromEntries(R2_MEDIEN.map(([, k]) =>
 /* Sicherheits-Header des Blocks /* in public/_headers */
 const headersFile = () => Object.fromEntries(readFileSync(join(ROOT, 'public/_headers'), 'utf8').split(/\n(?=\S)/).find(b => b.startsWith('/*\n'))
   .split('\n').slice(1).map(l => l.trim()).filter(l => l && !l.startsWith('!') && !l.startsWith('#')).map(l => [l.slice(0, l.indexOf(':')).toLowerCase(), l.slice(l.indexOf(':') + 1).trim()]));
-/* noindex laut _headers für eine Adresse (Host-Regeln für *.pages.dev und, im Soft-Launch, 360.pixelkiez.de) */
+/* noindex laut _headers für eine Adresse; die Medien-Function setzt darüber hinaus ihre eigene noindex-Regel. */
 const noindexIn = host => {
   const h = readFileSync(join(ROOT, 'public/_headers'), 'utf8');
   return host.endsWith('.pages.dev') ? /^https:\/\/:project\.pages\.dev\/\*\n {2}X-Robots-Tag: noindex$/m.test(h) : new RegExp(`^https://${host.replace(/\./g, '\\.')}/\\*\\n {2}X-Robots-Tag: noindex$`, 'm').test(h);
@@ -212,7 +212,7 @@ test('Video-Function (R2): HEAD, ETag (If-None-Match → 304, If-Range), nur GET
       assert.equal(r.headers.get('access-control-allow-origin'), null);
       assert.equal(r.headers.get('cross-origin-resource-policy'), 'same-origin', 'Video nicht auf fremden Seiten einbindbar');
       assert.deepEqual(r.headers.getSetCookie(), []);
-      assert.equal(r.headers.get('x-robots-tag') === 'noindex', noindexIn('360.pixelkiez.de'), 'noindex wie in _headers für 360.pixelkiez.de');
+      assert.equal(r.headers.get('x-robots-tag'), 'noindex', 'R2-Medien bleiben gemäß Function-Regel ausgeschlossen');
     }
     const preview = await fn.fetch('https://pxwa.pages.dev' + VIDEOS[0], { headers: { range: 'bytes=0-1' } });
     await preview.arrayBuffer();
