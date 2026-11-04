@@ -37,8 +37,9 @@
 .hero .url-field input::placeholder { color: var(--ink-70); }
 .hero .facts { color: var(--ink-70); }
 /* Startseite im verwaschenen Look der Unterseiten (Entscheidung des Auftraggebers 04.11.2026; gleicher Verlauf wie .inhalt in
-   inhalt.css): über die ganze Breite Lila am oberen Rand, darunter Pfirsich, dann weich ins Papiergrau; ersetzt die Farbflecken im Hero */
-body:has(.hero) { background: linear-gradient(180deg, #EBE2FC 0%, #EFE2F6 9%, #F8E3E6 20%, #FFE6DD 34%, rgb(255 230 221 / .6) 58%, rgb(255 230 221 / 0) 100%) no-repeat, var(--paper); background-size: 100% 1150px, auto; }
+   inhalt.css): Lila am oberen Rand, darunter Pfirsich, dann weich ins Papiergrau. Nur innerhalb des Seitenrahmens (main.frame,
+   bis 1280 px mit Rahmenlinien) – der Verlauf ragt nicht links und rechts über die Linien hinaus. Ersetzt die Farbflecken im Hero. */
+main.frame:has(> .hero) { background: linear-gradient(180deg, #EBE2FC 0%, #EFE2F6 9%, #F8E3E6 20%, #FFE6DD 34%, rgb(255 230 221 / .6) 58%, rgb(255 230 221 / 0) 100%) no-repeat; background-size: 100% 1150px; }
 .hero::before { content: none; }
 @media (max-width: 620px) {
   .hero .h1 { font-size: clamp(34px, min(12vw, 6.2svh), 46px); }
