@@ -635,11 +635,12 @@ test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, F
   assert.match(active, /^name = "pxwa"$/m);
   assert.match(active, /^pages_build_output_dir = "\.\/public"$/m);
   assert.ok(!/^\s*main\s*=/m.test(active), 'kein Worker-Einstiegspunkt in der Pages-Konfiguration');
-  assert.match(active, /^\[\[services\]\]\nbinding = "API"\nservice = "pxwa-api"$/m, 'Produktion: internes Service Binding zum privaten Worker');
-  /* Einziger Speicher: R2-Bucket 360pixelkiez als MEDIA (nur Produktion), für die drei Videos; Vorschau ohne Bindings */
-  assert.match(active, /^\[\[r2_buckets\]\]\nbinding = "MEDIA"\nbucket_name = "360pixelkiez"$/m, 'Produktion: R2-Binding MEDIA wie in den Pages-Projekteinstellungen');
-  assert.equal((active.match(/r2_buckets/g) || []).length, 2, 'genau ein R2-Binding (plus die leere Liste der Vorschau)');
-  assert.match(active, /^\[env\.preview\]\nservices = \[\]\nr2_buckets = \[\]$/m, 'Vorschau-Deployments ohne Binding');
+  assert.ok(!/^\[\[services\]\]/m.test(active), 'Soft-Launch: kein API-Service-Binding');
+  assert.match(active, /^compatibility_date = "2026-07-30"$/m, 'Vorschau: bisheriges Kompatibilitätsdatum');
+  assert.match(active, /^\[env\.production\]\ncompatibility_date = "2026-11-01"$/m, 'Produktion: bisheriges Kompatibilitätsdatum');
+  assert.match(active, /^\[\[r2_buckets\]\]\nbinding = "MEDIA"\nbucket_name = "360pixelkiez"$/m, 'bestehendes R2-Binding für Vorschau');
+  assert.match(active, /^\[\[env\.production\.r2_buckets\]\]\nbinding = "MEDIA"\nbucket_name = "360pixelkiez"$/m, 'bestehendes R2-Binding für Produktion');
+  assert.equal((active.match(/r2_buckets/g) || []).length, 2, 'genau die beiden bestehenden R2-Bindings');
   assert.ok(!/\[vars\]|d1_databases|kv_namespaces|SECRET|TOKEN|remote\s*=|preview_bucket_name|jurisdiction/i.test(active), 'Website ohne Variablen, Secrets oder weiteren Speicher');
   assert.equal(read('worker/wrangler.toml').match(/^compatibility_date = .*$/m)[0], active.match(/^compatibility_date = .*$/m)[0], 'gleiches Kompatibilitätsdatum');
   const headers = read('public/_headers');

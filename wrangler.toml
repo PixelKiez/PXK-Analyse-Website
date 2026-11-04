@@ -1,30 +1,17 @@
-# 360°Pixelkiez – Cloudflare Pages: statische Website aus public/, eine Pages Function unter /api/* (functions/api/) und
-# eine für die drei Videos aus R2 (functions/media/).
-# Gilt nur für `wrangler pages …` im Repository-Root. Der API-Worker hat eine eigene Konfiguration (worker/wrangler.toml);
-# `wrangler deploy` im Root warnt („Pages project“) und bricht ohne Worker-Einstiegspunkt ab.
-# Keine Secrets, keine Variablen: Die Website enthält keine Logik außer der Weiterleitung von /api/* an den Worker und dem
-# Lesen der drei Videos aus R2.
+# Cloudflare Pages pxwa – abgeglichen mit dem bestehenden Live-Projekt.
+# Der Soft-Launch hat kein API-Service-Binding. MEDIA ist für die ausgelieferten R2-Medien eingerichtet.
 # Deploy nur mit eigener Freigabe für genau einen Commit-SHA (docs/deploy-cloudflare-pages.md).
 name = "pxwa"
 pages_build_output_dir = "./public"
 compatibility_date = "2026-07-30"
 
-# Produktion (und lokale Entwicklung): /api/* geht über ein internes Service Binding an den privaten Worker pxwa-api.
-# Der Worker hat keine öffentliche Adresse (workers_dev = false, keine Route).
-[[services]]
-binding = "API"
-service = "pxwa-api"
-
-# Produktion: die drei Videos liegen im privaten R2-Bucket 360pixelkiez (kein öffentlicher Zugriff, keine r2.dev-Adresse).
-# Dasselbe Binding MEDIA ist in den Projekteinstellungen von Pages hinterlegt; die Function liest nur drei feste Schlüssel.
 [[r2_buckets]]
 binding = "MEDIA"
 bucket_name = "360pixelkiez"
 
-# Vorschau-Deployments (andere Branches, *.pxwa.pages.dev) bekommen bewusst kein Binding: /api/* antwortet dort mit 503,
-# Vorschau-Code erreicht den produktiven Worker und die D1-Daten nicht. Wranglers Hinweis „services … not inherited“ ist gewollt.
-# Ebenso kein R2-Binding: Videos antworten in einer so deployten Vorschau mit 503, Vorschau-Code erreicht den Bucket nicht.
-# (Deploys ohne diese Datei nutzen die Projekteinstellungen; dort hat am 03.11.2026 auch die Vorschau MEDIA.)
-[env.preview]
-services = []
-r2_buckets = []
+[env.production]
+compatibility_date = "2026-11-01"
+
+[[env.production.r2_buckets]]
+binding = "MEDIA"
+bucket_name = "360pixelkiez"
