@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { join, relative } from 'node:path';
 import * as H from './lib/html.mjs';
@@ -20,7 +21,17 @@ const INHALT = [...WISSEN, ...ANALYSE];
 const OG = ['start', 'wissen', 'analyse', ...WISSEN.slice(1).map(s => 'wissen-' + s.split('/').pop().slice(0, -5)), ...ANALYSE.slice(1).map(s => 'analyse-' + s.split('/').pop().slice(0, -5))];
 /* Partner-Logos unter dem Hero (Entscheidung des Auftraggebers 03.11.2026), lokal ausgeliefert (CSP img-src 'self') */
 const PARTNER_LOGOS = ['assets/partner/dyai-studio.svg', 'assets/partner/pixelkiez.png'];
-const BILDER = ['assets/apple-touch-icon.png', 'assets/favicon.svg', 'favicon.ico', ...OG.map(n => `assets/og/${n}.jpg`), ...PARTNER_LOGOS];
+/* Favicon-Satz des Auftraggebers (favicon.io, Ordner favicon_io, 05.11.2026) bitgleich im Wurzelverzeichnis; ersetzt das „P°“-Favicon */
+const FAVICONS = {
+  'android-chrome-192x192.png': '027b16d97e75774dee695476b1e1e738841e33a6b292cd44b20597931a45239c',
+  'android-chrome-512x512.png': '60841043b8c16d8080a018ce8f4d959a060042b2342072807d3a268331bdbf3d',
+  'apple-touch-icon.png': '0c1933c736ba5a0f46edb84c854f00ca61432639ad27bbf57b8b9b2912e4b9a3',
+  'favicon-16x16.png': '8995cb13c31447b5eab7d0d5667d7fbc68df18ffcebce72caa0c9684bb8e5e60',
+  'favicon-32x32.png': '56302ce2233f98c194eaa01c44898c5395b9cf79f7016923e11aaf65771acaf4',
+  'favicon.ico': 'e80c78ef4d0a2ff1a945ba8456064e6be22c4b0f1d219aa8cc5ea3ec302590b7',
+  'site.webmanifest': '7a9e07ce1f7386689917602ddc5a75750ad842e605ff764f67173529c181bf04',
+};
+const BILDER = [...Object.keys(FAVICONS), ...OG.map(n => `assets/og/${n}.jpg`), ...PARTNER_LOGOS];
 const ASSETS = ['assets/anfrage.css', 'assets/app.js', 'assets/donut.css', 'assets/donut.js', 'assets/inhalt.css', 'assets/styles.css'];
 /* Selbst ausgelieferte Schriften (Soft-Launch-Datenschutz-Fix 03.11.2026): Stylesheet, WOFF2-Dateien und OFL-Lizenzen */
 const FONT_FILES = ['assets/fonts.css', ...['OFL-Archivo.txt', 'OFL-IBM-Plex-Mono.txt', 'archivo-latin-ext.woff2', 'archivo-latin.woff2', 'ibm-plex-mono-400-latin-ext.woff2',
@@ -246,7 +257,7 @@ test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen n
   /* Entscheidungen des Auftraggebers 02.11.2026 (zweite Runde): „Alle Prüfpunkte nachlesen“ entfällt, dafür der Abschnitt
      „Pixelkiez Score“ in der Mitte; AI-08 (beobachtete KI-Antwort-Stichproben) gestrichen; Bild-Metadaten im Kopf (Canonical,
      Open Graph, Twitter, Icons), Video-Metadaten (JSON-LD) sowie Stylesheet und Skript des Diagramms. Sonst nichts. */
-  const KOPF = /\n((?:<link rel="canonical" href="[^"]+">|<meta (?:property="og:[a-z_:]+"|name="twitter:[a-z:]+") content="[^"]*">|<link rel="(?:icon|apple-touch-icon)" href="[^"]+"(?: sizes="32x32"| type="image\/svg\+xml")?>)\n)+(?=<link rel="preconnect")/;
+  const KOPF = /\n((?:<link rel="canonical" href="[^"]+">|<meta (?:property="og:[a-z_:]+"|name="twitter:[a-z:]+") content="[^"]*">|<link rel="(?:icon|apple-touch-icon|manifest)" href="[^"]+"(?: type="image\/png")?(?: sizes="[0-9x ]+")?>)\n)+(?=<link rel="preconnect")/;
   assert.match(now, KOPF, 'Kopfdaten für Bilder');
   /* Neu im Kopf: Beiträge zu Wissen (Mega-Menü) und mobiles Menü, beide geprüft im Test „Hauptnavigation“ */
   const MENUES = [/\n      <details class="mega">\n[\s\S]*?\n      <\/details>/, /\n    <details class="nav-menu">\n[\s\S]*?\n    <\/details>/];
@@ -408,18 +419,18 @@ test('Partner: unter dem Hero Pixelkiez und DYAI Studio nebeneinander, ohne Besc
   assert.ok(!read(VIEW).includes('>pixelkiez.de</a>'), 'Anfrageseiten: kein Text „pixelkiez.de“');
 });
 
-test('Favicon „P°“: weißer Hintergrund, P orange (Archivo 600 als Pfad, wie die Wortmarke), ° als kleiner lila Ring; ICO 16/32/48 px, Apple-Icon 180 px', () => {
-  /* Entscheidung des Auftraggebers 03.11.2026 (Farben, Ring) und 03.11.2026 abends: „P°“ statt des großen Rings */
-  const svg = H.parse(read('public/assets/favicon.svg')).root;
-  assert.equal(H.byTag(svg, 'rect')[0].attrs.get('fill'), '#FFFFFF');
-  assert.deepEqual(H.byTag(svg, 'path').map(p => p.attrs.get('fill')), ['#FE5B2A'], 'P als Pfad (keine Schrift im Favicon)');
-  assert.equal(H.byTag(svg, 'text').length, 0);
-  assert.deepEqual(H.byTag(svg, 'circle').map(c => [c.attrs.get('r'), c.attrs.get('stroke')]), [['5.5', '#7B5CD6']]);
+test('Favicon: exakt der Satz des Auftraggebers (favicon.io) – bitgleich, ICO 16/32/48 px, PNGs in ihren Größen, Manifest mit beiden Android-Icons; altes „P°“-Favicon entfernt', () => {
+  /* Entscheidung des Auftraggebers 05.11.2026: „exakt dieses Favicon“ aus dem Ordner favicon_io */
+  for (const [f, sha] of Object.entries(FAVICONS)) assert.equal(createHash('sha256').update(readFileSync(join(ROOT, 'public', f))).digest('hex'), sha, `${f}: bitgleich zum Ordner favicon_io`);
   const ico = readFileSync(join(ROOT, 'public/favicon.ico'));
   assert.equal(ico.readUInt16LE(4), 3, 'drei Größen im ICO');
   assert.deepEqual([0, 1, 2].map(i => ico[6 + i * 16]), [16, 32, 48]);
-  const apple = readFileSync(join(ROOT, 'public/assets/apple-touch-icon.png'));
-  assert.deepEqual([apple.readUInt32BE(16), apple.readUInt32BE(20), apple[25]], [180, 180, 2], 'Apple-Icon 180×180, RGB ohne Transparenz');
+  const png = f => { const b = readFileSync(join(ROOT, 'public', f)); return [b.readUInt32BE(16), b.readUInt32BE(20)]; };
+  assert.deepEqual(['favicon-16x16.png', 'favicon-32x32.png', 'apple-touch-icon.png', 'android-chrome-192x192.png', 'android-chrome-512x512.png'].map(png), [[16, 16], [32, 32], [180, 180], [192, 192], [512, 512]]);
+  const manifest = JSON.parse(read('public/site.webmanifest'));
+  assert.deepEqual(manifest.icons.map(i => [i.src, i.sizes]), [['/android-chrome-192x192.png', '192x192'], ['/android-chrome-512x512.png', '512x512']]);
+  for (const i of manifest.icons) assert.ok(existsSync(join(ROOT, 'public', i.src)), `${i.src} liegt im Wurzelverzeichnis`);
+  for (const f of ['public/assets/favicon.svg', 'public/assets/apple-touch-icon.png']) assert.ok(!existsSync(join(ROOT, f)), `${f}: altes Favicon entfernt`);
 });
 
 test('Seitenende: jede Seite lädt anfrage.css; dort kein Überfedern über das Ende (overscroll-behavior-y: none) und Footer über der Home-Leiste', () => {
@@ -549,9 +560,10 @@ test('Bild-Metadaten: Titelbild je Seite (Open Graph, Twitter, JSON-LD), Icons, 
     const meta = k => H.byTag(head, 'meta').find(m => m.attrs.get('property') === k || m.attrs.get('name') === k)?.attrs.get('content');
     const links = H.byTag(head, 'link');
     /* Icons auf jeder Seite, auch 404 (dort absolut) */
-    const icons = links.filter(l => ['icon', 'apple-touch-icon'].includes(l.attrs.get('rel'))).map(l => l.attrs.get('href'));
+    const icons = links.filter(l => ['icon', 'apple-touch-icon', 'manifest'].includes(l.attrs.get('rel'))).map(l => ['rel', 'href', 'type', 'sizes'].map(a => l.attrs.get(a)));
     const pre = page === 'public/404.html' ? '/' : page.split('/').length > 2 ? '../' : '';
-    assert.deepEqual(icons, [`${pre}favicon.ico`, `${pre}assets/favicon.svg`, `${pre}assets/apple-touch-icon.png`], `${page}: Icons`);
+    assert.deepEqual(icons, [['icon', `${pre}favicon.ico`, undefined, '16x16 32x32 48x48'], ['icon', `${pre}favicon-32x32.png`, 'image/png', '32x32'], ['icon', `${pre}favicon-16x16.png`, 'image/png', '16x16'],
+      ['apple-touch-icon', `${pre}apple-touch-icon.png`, undefined, '180x180'], ['manifest', `${pre}site.webmanifest`, undefined, undefined]], `${page}: Favicon-Satz`);
     if (page === 'public/404.html') { assert.equal(meta('og:image'), undefined, '404 ohne Titelbild'); continue; }
     /* Canonical und Open Graph passen zusammen; Titelbild existiert, ist 1200×630 und trägt Beschreibung und Copyright */
     const canonical = links.find(l => l.attrs.get('rel') === 'canonical')?.attrs.get('href');
@@ -581,7 +593,7 @@ test('Bild-Metadaten: Titelbild je Seite (Open Graph, Twitter, JSON-LD), Icons, 
       }
     }
   }
-  for (const f of ['favicon.ico', 'assets/favicon.svg', 'assets/apple-touch-icon.png']) assert.ok(statSync(join(ROOT, 'public', f)).size > 200, f);
+  for (const f of Object.keys(FAVICONS)) assert.ok(statSync(join(ROOT, 'public', f)).size > 200, f);
   /* Alle JPEGs (Titelbilder, Poster) mit XMP-Block (Titel, Beschreibung, Urheber, Copyright). Die Videos liegen in R2 (nicht im Repository);
      ihre Dateien prüft tests/pages.test.mjs (Größe, SHA-256, Faststart) */
   for (const f of [...OG.map(n => `assets/og/${n}.jpg`), ...MEDIA.filter(m => m.endsWith('.jpg'))]) {

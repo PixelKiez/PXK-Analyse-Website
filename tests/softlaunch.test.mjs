@@ -158,7 +158,7 @@ test('Schriften selbst ausgeliefert: keine externen Ressourcen, CSP nur eigene H
 /* Startseite gegenüber main (c69cd1b, letzter Stand vor dem Soft-Launch): ersetzt im Soft-Launch den Hero-Schutz aus tests/static.test.mjs.
    Jede Zeile ist eine einzeln freigegebene Änderung; alles andere muss gleich bleiben. */
 const MAIN_SHA = 'c69cd1b3cb7dba1426df5006890fec3417841c9f';
-test('Startseite gegenüber main: nur Soft-Launch, Schriften-Fix, Partner, Logo, Videos und Hintergrundbild aus R2 – sonst unverändert', () => {
+test('Startseite gegenüber main: nur Soft-Launch, Schriften-Fix, Partner, Logo, Favicon, Videos und Hintergrundbild aus R2 – sonst unverändert', () => {
   const main = execFileSync('git', ['show', `${MAIN_SHA}:public/index.html`], { cwd: ROOT, encoding: 'utf8' });
   const ERLAUBT = [
     /* Soft-Launch (c528d96): kein Formularziel, Hinweis statt Formular, Schaltflächen ohne Anfrage, Ablauf „sobald Anfragen möglich sind“ */
@@ -190,6 +190,9 @@ test('Startseite gegenüber main: nur Soft-Launch, Schriften-Fix, Partner, Logo,
     ['      <span>© 2026 360°Pixelkiez</span>\n', '      <span>© 2026 360°Pixelkiez</span>\n      <a href="https://pixelkiez.de/" target="_blank" rel="noopener"><img class="footer-partner" src="assets/partner/pixelkiez.png" alt="Pixelkiez" width="87" height="20"></a>\n'],
     /* Hintergrundbild im Abschnitt „Für alle …“ aus R2 mit ImageObject im JSON-LD oben (Entscheidung des Auftraggebers 04.11.2026) */
     ['  <section class="section" id="fuer-wen">\n', '  <section class="section section--bild" id="fuer-wen">\n    <img class="section-bild" src="media/360-pixelkiez-designrunde-am-tisch.webp" width="1672" height="941" alt="" loading="lazy" decoding="async">\n'],
+    /* Favicon-Satz des Auftraggebers (favicon.io, 05.11.2026) statt des „P°“-Favicons */
+    ['<link rel="icon" href="favicon.ico" sizes="32x32">\n<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">\n<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">\n',
+      '<link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">\n<link rel="icon" href="favicon-32x32.png" type="image/png" sizes="32x32">\n<link rel="icon" href="favicon-16x16.png" type="image/png" sizes="16x16">\n<link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">\n<link rel="manifest" href="site.webmanifest">\n'],
     /* Rechtstexte (Entscheidung des Auftraggebers 04.11.2026): AGB-Link in der Footer-Leiste */
     ['<a href="datenschutz.html">Datenschutz</a></nav>', '<a href="datenschutz.html">Datenschutz</a><a href="agb.html">AGB</a></nav>'],
   ];
