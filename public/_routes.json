@@ -2,7 +2,7 @@
   "version": 1,
   "include": [
     "/api/*",
-    "/media/360-pixelkiez-video-1080p.mp4",
+    "/media/360-pixelkiez-video-1080p-website-look.mp4",
     "/media/report-pdf-de-1x1-lavendel.mp4",
     "/media/section-bericht-peach-5x4.mp4"
   ],

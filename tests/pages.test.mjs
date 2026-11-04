@@ -119,7 +119,7 @@ test('Routing: Functions laufen nur für /api/* und genau die drei Videos aus R2
 /* ---------- Video-Function (functions/media/[file].ts) kompiliert in workerd, mit Miniflare-R2 als Binding MEDIA ---------- */
 
 const VIDEOS = R2_VIDEOS.map(k => `/media/${k}`);
-const POSTERS = ['/media/360-pixelkiez-ablauf-poster.jpg', '/media/report-pdf-lavendel-poster.jpg', '/media/section-bericht-peach-poster.jpg'];
+const POSTERS = ['/media/360-pixelkiez-website-analyse-poster.jpg', '/media/report-pdf-lavendel-poster.jpg', '/media/section-bericht-peach-poster.jpg'];
 const FILE = Uint8Array.from({ length: 1000 }, (_, i) => (i * 7) % 251);
 /* Je Schlüssel ein anderer Inhalt: so fällt auf, wenn ein Pfad das falsche Objekt liefert */
 const content = key => FILE.map(b => (b + R2_VIDEOS.indexOf(key) + 1) % 256);
@@ -224,7 +224,7 @@ test('Video-Function (R2): HEAD, ETag (If-None-Match → 304, If-Range), nur GET
     /* Andere Pfade (Poster, alte oder unbekannte Videos, Objekte außerhalb der Allowlist, Umgehungsversuche, das Verzeichnis selbst)
        bedient die Function nicht selbst: weiter an die statischen Dateien – nie ein anderes R2-Objekt, nie ein Listing */
     for (const p of [...POSTERS, '/media/', '/media/geheim.mp4', '/media/kunden/auftraege.json', '/media/report-pdf-de-1x1.mp4', '/media/gibt-es-nicht.mp4',
-      '/media/360-pixelkiez-video-1080p.mp4.bak', '/media/%2e%2e%2fapi%2fanfrage', '/media/360-PIXELKIEZ-VIDEO-1080P.MP4', '/media/__proto__', '/media/constructor', '/media/360-pixelkiez-video-1080p.mp4/']) {
+      '/media/360-pixelkiez-video-1080p.mp4', '/media/360-pixelkiez-video-1080p.mp4.bak', '/media/%2e%2e%2fapi%2fanfrage', '/media/360-PIXELKIEZ-VIDEO-1080P.MP4', '/media/__proto__', '/media/constructor', '/media/360-pixelkiez-video-1080p.mp4/']) {
       const r = await fn.fetch(SITE + p, { headers: { range: 'bytes=0-1' } });
       assert.deepEqual([r.status, await r.text()], [200, 'statische Datei'], p);
     }
@@ -433,7 +433,7 @@ test('Lokales Pages mit Worker über das Service Binding: Website + AGB → Func
 
 /* Stand der Videos im R2-Bucket 360pixelkiez (per API gelesen am 03.11.2026; bitgleich mit den lokalen Dateien im Originalarbeitsbaum) */
 const R2_OBJECTS = {
-  '360-pixelkiez-video-1080p.mp4': [3544147, '3c34886c0bfa8130ca08b64c496813d6e199cae218d57016539a765584a073f3'],
+  '360-pixelkiez-video-1080p-website-look.mp4': [9065852, '0e9bc84320c4b491af4aa01f3ded8923e0b1a53454d8a8209abbc9c007be5a70'],
   'report-pdf-de-1x1-lavendel.mp4': [3519956, 'ce5ca6ec4596fc45261bb09d644bb18d95ea38f780c8bb0dbf4ecc67e540b496'],
   'section-bericht-peach-5x4.mp4': [1230026, '81499189cf8a2968705b2ba4c13caccec312d4131481855f55b39300ce0c1130'],
 };

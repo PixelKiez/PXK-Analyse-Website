@@ -10,9 +10,9 @@ interface Env {
   MEDIA?: R2Bucket;
 }
 
-/* Pfad → R2-Schlüssel (Stand der Objekte im Bucket am 03.11.2026; tests/pages.test.mjs prüft Größe und SHA-256) */
+/* Pfad → R2-Schlüssel (Stand der Objekte im Bucket am 04.11.2026; tests/pages.test.mjs prüft Größe und SHA-256) */
 const VIDEOS: ReadonlyMap<string, string> = new Map([
-  ['/media/360-pixelkiez-video-1080p.mp4', '360-pixelkiez-video-1080p.mp4'],
+  ['/media/360-pixelkiez-video-1080p-website-look.mp4', '360-pixelkiez-video-1080p-website-look.mp4'],
   ['/media/report-pdf-de-1x1-lavendel.mp4', 'report-pdf-de-1x1-lavendel.mp4'],
   ['/media/section-bericht-peach-5x4.mp4', 'section-bericht-peach-5x4.mp4'],
 ]);

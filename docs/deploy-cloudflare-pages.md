@@ -183,7 +183,8 @@ Custom Domain; am 03.11.2026 per API gelesen). Pages liest sie über das Binding
 von Pages hinterlegt ist und in `wrangler.toml` dokumentiert steht. In den Projekteinstellungen hat derzeit auch die
 Vorschau `MEDIA` (R2-Bindings erlauben Lesen und Schreiben); `wrangler.toml` sieht für die Vorschau kein Binding vor.
 Ob die Vorschau den Bucket behalten soll, ist eine offene Entscheidung. Im Bucket (Stand 03.11.2026,
-per API gelesen, Größe und SHA-256 in `tests/pages.test.mjs`): `360-pixelkiez-video-1080p.mp4` (3,4 MiB),
+per API gelesen, Größe und SHA-256 in `tests/pages.test.mjs`; Stand 04.11.2026): `360-pixelkiez-video-1080p-website-look.mp4`
+(8,6 MiB, 1920 × 1080, 60 Bilder/s, 48 s; vom Auftraggeber am 04.11.2026 hochgeladen, ersetzt `360-pixelkiez-video-1080p.mp4`),
 `report-pdf-de-1x1-lavendel.mp4` (3,4 MiB), `section-bericht-peach-5x4.mp4` (1,2 MiB); H.264 (High), yuv420p, ohne Ton,
 `moov` vor `mdat` (Faststart), ohne eingebettete Copyright-Metadaten.
 
@@ -192,10 +193,11 @@ Eingebunden sind seit PXK-159 (Entscheidung des Auftraggebers 03.11.2026) das Be
 das Hero-Video direkt unter dem Hero (vor den Partner-Logos, 16:9). Unter den Videos stehen keine Bildunterschriften und keine
 Kennzeichnung als alte Fassung (Entscheidung des Auftraggebers 04.11.2026); dass alle gezeigten Werte Beispieldaten sind, steht im
 Alternativtext und in den Metadaten der Poster. Das Hero-Video nennt noch „vier Metriken“, simuliert eine laufende Analyse, zeigt
-„Jetzt analysieren“ und im Abspann kontakt@pixelkiez.de; überarbeitete Fassungen lädt der Auftraggeber als neue R2-Objekte hoch.
+„Jetzt analysieren“ und im Abspann kontakt@pixelkiez.de. Video-Metadaten: `VideoObject` (JSON-LD) je Video auf der Startseite
+(Name, Beschreibung gleich Alternativtext, Poster, Video-Adresse unter /media/, Dauer, Maße, Upload-Datum aus R2, Herausgeber).
 Auch das Berichtsvideo zeigt noch „Die 4 wichtigsten Metriken“
 und „Jetzt analysieren“; so freigegeben. Versioniert in `public/media/` sind nur die drei Poster
-(`360-pixelkiez-ablauf-poster.jpg` – Bild bei 31,5 s aus dem R2-Objekt, neutrale Fahrplan-Ansicht –,
+(`360-pixelkiez-website-analyse-poster.jpg` – Titelbild bei 3,2 s aus dem R2-Objekt –,
 `report-pdf-lavendel-poster.jpg`, `section-bericht-peach-poster.jpg`, mit XMP-Metadaten, SHA-256 in
 `tests/release.test.mjs`). Die Titelbilder für soziale Netzwerke liegen unter `public/assets/og/` (1200×630).
 

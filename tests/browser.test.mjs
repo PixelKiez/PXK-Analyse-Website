@@ -271,7 +271,7 @@ test('Safari-Engine (WebKit): alle drei Videos laufen – Range-Anfragen bekomme
         assert.match(e.label, /^Animierte/, `${width}: Alternativtext bleibt`);
       }
       const list = await videos();
-      assertRanges(list, ['/media/360-pixelkiez-video-1080p.mp4', '/media/report-pdf-de-1x1-lavendel.mp4', '/media/section-bericht-peach-5x4.mp4'], `WebKit ${width}`);
+      assertRanges(list, ['/media/360-pixelkiez-video-1080p-website-look.mp4', '/media/report-pdf-de-1x1-lavendel.mp4', '/media/section-bericht-peach-5x4.mp4'], `WebKit ${width}`);
       assert.deepEqual(errors, [], `${width}: Skriptfehler`);
       if (SHOTS) await page.screenshot({ path: join(SHOTS, `webkit-${width}.png`) });
       t.diagnostic(`WebKit ${width}: alle drei Videos spielen; MP4-Antworten: ${list.map(x => `${x.path.slice(7)} ${x.range ?? 'ohne Range'} → ${x.status}`).join(', ')}`);
@@ -385,7 +385,7 @@ test('Videos ohne Bedienelemente: alle drei starten stumm, inline und in Schleif
           /* Zurück-Navigation aus dem Cache (pageshow, persisted) */
           await page.evaluate(() => { document.querySelector('#bericht .showcase-video').pause(); dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })); });
           await laeuft(page, '#bericht', 0);
-          assertRanges(await videos(), ['/media/360-pixelkiez-video-1080p.mp4', '/media/report-pdf-de-1x1-lavendel.mp4', '/media/section-bericht-peach-5x4.mp4'], was);
+          assertRanges(await videos(), ['/media/360-pixelkiez-video-1080p-website-look.mp4', '/media/report-pdf-de-1x1-lavendel.mp4', '/media/section-bericht-peach-5x4.mp4'], was);
           assert.deepEqual(errors.filter(e => !systemMeldung(e)), [], `${was}: Konsolenfehler`);
           await ctx.close();
         }

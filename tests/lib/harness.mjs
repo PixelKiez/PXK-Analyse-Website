@@ -37,7 +37,7 @@ export const SOFT_LAUNCH = /<p class="bald">/.test(readFileSync(join(ROOT, 'publ
 export const SOFT_LAUNCH_SKIP = SOFT_LAUNCH && 'SOFT_LAUNCH: Hero ohne Anfrageformular bis zur Freigabe der Google-Anmeldung (tests/softlaunch.test.mjs)';
 /* Die drei Videos im R2-Bucket 360pixelkiez (Binding MEDIA): Schlüssel wie in functions/media/[file].ts */
 export const R2_BUCKET = '360pixelkiez';
-export const R2_VIDEOS = ['360-pixelkiez-video-1080p.mp4', 'report-pdf-de-1x1-lavendel.mp4', 'section-bericht-peach-5x4.mp4'];
+export const R2_VIDEOS = ['360-pixelkiez-video-1080p-website-look.mp4', 'report-pdf-de-1x1-lavendel.mp4', 'section-bericht-peach-5x4.mp4'];
 
 const load = async name => { try { return await import(name); } catch { return null; } };
 const miniflare = await load('miniflare');

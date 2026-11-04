@@ -33,8 +33,8 @@ const MEDIA_FUNCTION = 'functions/media/[file].ts';
 /* Versioniert sind nur die Poster der eingebundenen Videos; die Videos liegen im R2-Bucket 360pixelkiez (functions/media/[file].ts).
    Eingebunden: das Hero-Video direkt unter dem Hero (P0-Hotfix PXK-159), das Berichtsvideo
    bei „Ein PDF. Sieben Seiten.“ und das Befund-Video bei „Jeder Befund verständlich erklärt.“ (Entscheidung des Auftraggebers 03.11.2026) */
-const MEDIA = ['media/360-pixelkiez-ablauf-poster.jpg', 'media/report-pdf-lavendel-poster.jpg', 'media/section-bericht-peach-poster.jpg'];
-const VIDEOS_EINGEBUNDEN = [['demo', 'media/360-pixelkiez-video-1080p.mp4', 'media/360-pixelkiez-ablauf-poster.jpg'], ['bericht', 'media/report-pdf-de-1x1-lavendel.mp4', 'media/report-pdf-lavendel-poster.jpg'], ['nutzen', 'media/section-bericht-peach-5x4.mp4', 'media/section-bericht-peach-poster.jpg']];
+const MEDIA = ['media/360-pixelkiez-website-analyse-poster.jpg', 'media/report-pdf-lavendel-poster.jpg', 'media/section-bericht-peach-poster.jpg'];
+const VIDEOS_EINGEBUNDEN = [['demo', 'media/360-pixelkiez-video-1080p-website-look.mp4', 'media/360-pixelkiez-website-analyse-poster.jpg'], ['bericht', 'media/report-pdf-de-1x1-lavendel.mp4', 'media/report-pdf-lavendel-poster.jpg'], ['nutzen', 'media/section-bericht-peach-5x4.mp4', 'media/section-bericht-peach-poster.jpg']];
 const VIEW = 'worker/src/view.ts';
 const WORKER_SRC = readdirSync(join(ROOT, 'worker/src')).filter(f => f.endsWith('.ts')).map(f => 'worker/src/' + f);
 /* Alle Dateien, die committet würden (versioniert oder neu, nicht ignoriert) */
@@ -587,8 +587,7 @@ test('Bild-Metadaten: Titelbild je Seite (Open Graph, Twitter, JSON-LD), Icons, 
     assert.ok(MEDIA.includes(v.attrs.get('poster')), `Poster ${v.attrs.get('poster')} versioniert`);
     assert.equal(jpegSize(readFileSync(join(ROOT, 'public', v.attrs.get('poster')))).join('x'), `${v.attrs.get('width')}x${v.attrs.get('height')}`, 'Poster so groß wie das Video');
   }
-  /* Soft-Launch: keine Video-Metadaten (JSON-LD), solange die Seite nicht indexiert wird und Videoinhalte offen sind (PXK-159) */
-  if (SOFT_LAUNCH) { assert.equal(vids.length, 0, 'Soft-Launch: kein VideoObject'); return; }
+  /* Video-Metadaten (VideoObject) für jedes eingebundene Video, auch im Soft-Launch (Entscheidung des Auftraggebers 04.11.2026) */
   assert.equal(vids.length, videos.length);
   videos.forEach((v, i) => {
     assert.ok(v.attrs.get('aria-label') && v.attrs.get('width') && v.attrs.get('height'), 'Video beschriftet und mit Maßen');
@@ -596,6 +595,8 @@ test('Bild-Metadaten: Titelbild je Seite (Open Graph, Twitter, JSON-LD), Icons, 
     assert.equal(vids[i].contentUrl, `${BASE}/${H.byTag(v, 'source')[0].attrs.get('src')}`);
     assert.deepEqual([String(vids[i].width), String(vids[i].height)], [v.attrs.get('width'), v.attrs.get('height')]);
     assert.ok(vids[i].name && vids[i].description && /^PT\d+S$/.test(vids[i].duration) && vids[i].uploadDate, 'Name, Beschreibung, Dauer, Datum');
+    assert.equal(vids[i].description, v.attrs.get('aria-label'), 'Beschreibung gleich dem Alternativtext');
+    assert.deepEqual([vids[i].inLanguage, vids[i].publisher?.name], ['de-DE', '360°Pixelkiez']);
   });
 });
 
@@ -638,7 +639,7 @@ test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, F
   assert.match(fn, /if \(!env\.API\) return unavailable\(\);/);
   const code = fn.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
   assert.ok(!/console\.|\bfetch\(|env\.ASSETS|next\(/.test(code.replace('env.API.fetch(', '')), 'keine Logs, keine weiteren Aufrufe, kein Rückfall auf statische Dateien');
-  for (const f of ['.dev.vars', 'worker/.dev.vars', '.wrangler/state/v3/d1/x.sqlite', 'node_modules/x', '360-pixelkiez-video-1080p.mp4', 'public/media/anderes-video.mp4', 'public/media/entwurf.jpg',
+  for (const f of ['.dev.vars', 'worker/.dev.vars', '.wrangler/state/v3/d1/x.sqlite', 'node_modules/x', '360-pixelkiez-video-1080p-website-look.mp4', 'public/media/anderes-video.mp4', 'public/media/entwurf.jpg',
     ...R2_VIDEOS.map(k => `public/media/${k}`), 'public/media/360-pixelkiez-video-poster.jpg', 'public/media/report-pdf-de-1x1.mp4']) {
     assert.equal(spawnSync('git', ['check-ignore', '-q', f], { cwd: ROOT }).status, 0, `${f} ist ignoriert`);
   }
