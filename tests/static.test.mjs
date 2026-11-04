@@ -7,7 +7,7 @@ import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { join, relative } from 'node:path';
 import * as H from './lib/html.mjs';
-import { ROOT, artifactFiles, uploadFiles, MIGRATIONS, SOFT_LAUNCH, SOFT_LAUNCH_SKIP, R2_VIDEOS } from './lib/harness.mjs';
+import { ROOT, artifactFiles, uploadFiles, MIGRATIONS, SOFT_LAUNCH, SOFT_LAUNCH_SKIP, R2_VIDEOS, R2_BILDER, R2_MEDIEN } from './lib/harness.mjs';
 
 const read = p => readFileSync(join(ROOT, p), 'utf8');
 const git = (...a) => execFileSync('git', a, { cwd: ROOT, encoding: 'utf8' });
@@ -598,6 +598,21 @@ test('Bild-Metadaten: Titelbild je Seite (Open Graph, Twitter, JSON-LD), Icons, 
     assert.equal(vids[i].description, v.attrs.get('aria-label'), 'Beschreibung gleich dem Alternativtext');
     assert.deepEqual([vids[i].inLanguage, vids[i].publisher?.name], ['de-DE', '360°Pixelkiez']);
   });
+  /* Hintergrundbild „Für alle, die eine Website verantworten.“ (Auftraggeber 04.11.2026): WebP aus R2 (pictures/), dekorativ
+     (alt=""), mit Maßen, lazy; ImageObject mit Beschreibung, Maßen und der KI-Herkunft (schema.org digitalSourceType) */
+  const bilder = H.byTag(root, 'img').filter(i => i.attrs.get('class') === 'section-bild');
+  assert.equal(bilder.length, 1, 'genau ein Hintergrundbild');
+  const bild = bilder[0];
+  assert.deepEqual(['src', 'width', 'height', 'alt', 'loading', 'decoding'].map(a => bild.attrs.get(a)),
+    ['media/360-pixelkiez-designrunde-am-tisch.webp', '1672', '941', '', 'lazy', 'async'], 'Bild: Quelle, Maße, dekorativ, lazy');
+  assert.equal(H.find(root, e => e.tag === 'section' && H.find(e, x => x === bild).length)[0].attrs.get('id'), 'fuer-wen', 'Bild im Abschnitt „Für alle …“');
+  assert.ok(R2_MEDIEN.some(([p, k]) => p === '/' + bild.attrs.get('src') && R2_BILDER.includes(k)), 'Bild kommt aus R2 (Allowlist der Function)');
+  const imgs = ld.flatMap(x => x['@graph'] || []).filter(n => n['@type'] === 'ImageObject');
+  assert.equal(imgs.length, 1, 'ImageObject für das Hintergrundbild');
+  assert.deepEqual([imgs[0].contentUrl, String(imgs[0].width), String(imgs[0].height), imgs[0].encodingFormat, imgs[0].inLanguage, imgs[0].creditText, imgs[0].creator?.name],
+    [`${BASE}/${bild.attrs.get('src')}`, '1672', '941', 'image/webp', 'de-DE', '360°Pixelkiez', '360°Pixelkiez']);
+  assert.equal(imgs[0].digitalSourceType, 'https://schema.org/TrainedAlgorithmicMediaDigitalSource', 'KI-Herkunft maschinenlesbar');
+  assert.ok(imgs[0].name && imgs[0].description && imgs[0].uploadDate, 'Name, Beschreibung, Datum');
 });
 
 test('Design: styles.css unverändert gegenüber vision.html; alle verwendeten Klassen sind definiert', () => {
@@ -640,7 +655,7 @@ test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, F
   const code = fn.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
   assert.ok(!/console\.|\bfetch\(|env\.ASSETS|next\(/.test(code.replace('env.API.fetch(', '')), 'keine Logs, keine weiteren Aufrufe, kein Rückfall auf statische Dateien');
   for (const f of ['.dev.vars', 'worker/.dev.vars', '.wrangler/state/v3/d1/x.sqlite', 'node_modules/x', '360-pixelkiez-video-1080p-website-look.mp4', 'public/media/anderes-video.mp4', 'public/media/entwurf.jpg',
-    ...R2_VIDEOS.map(k => `public/media/${k}`), 'public/media/360-pixelkiez-video-poster.jpg', 'public/media/report-pdf-de-1x1.mp4']) {
+    ...R2_MEDIEN.map(([p]) => `public${p}`), 'public/media/360-pixelkiez-video-poster.jpg', 'public/media/report-pdf-de-1x1.mp4']) {
     assert.equal(spawnSync('git', ['check-ignore', '-q', f], { cwd: ROOT }).status, 0, `${f} ist ignoriert`);
   }
   /* Genau die drei Poster sind versioniert, die Videos nie (sie liegen in R2; frischer Checkout: tests/release.test.mjs) */
@@ -648,15 +663,16 @@ test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, F
   /* Video-Function: nur drei feste Pfade → feste R2-Schlüssel, nur das Binding MEDIA, nur lesen (head/get), keine Logs, kein Abruf */
   const media = read(MEDIA_FUNCTION);
   const mediaCode = media.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
-  assert.deepEqual([...mediaCode.matchAll(/\['(\/media\/[^']*)', '([^']*)'\]/g)].map(m => [m[1], m[2]]), R2_VIDEOS.map(k => [`/media/${k}`, k]), 'Allowlist: Pfad → R2-Schlüssel');
-  assert.match(mediaCode, /const key = VIDEOS\.get\(url\.pathname\);\n\s*if \(key === undefined\) return next\(\);/, 'Schlüssel nur aus der Allowlist, sonst statisch');
+  assert.deepEqual([...mediaCode.matchAll(/\['(\/media\/[^']*)', '([^']*)'\]/g)].map(m => [m[1], m[2]]), R2_MEDIEN, 'Allowlist: Pfad → R2-Schlüssel');
+  assert.match(mediaCode, /const key = MEDIEN\.get\(url\.pathname\);\n\s*if \(key === undefined\) return next\(\);/, 'Schlüssel nur aus der Allowlist, sonst statisch');
   assert.deepEqual([...mediaCode.matchAll(/\bbucket\.(\w+)\(/g)].map(m => m[1]), ['head', 'get'], 'R2 nur lesen: head und get, kein list/put/delete');
   assert.deepEqual([...mediaCode.matchAll(/\bbucket\.(?:head|get)\((\w+)[,)]/g)].map(m => m[1]), ['key', 'key'], 'gelesen wird nur der feste Schlüssel');
   assert.ok(!/\bfetch\(|console\.|caches\.|Set-Cookie|env\.(?!MEDIA\b)\w+|createMultipartUpload/i.test(mediaCode), 'kein Abruf, keine Logs, kein Cache, keine Cookies, keine weiteren Bindings');
   assert.deepEqual(mediaCode.match(/.*\benv\.MEDIA\b.*/g).map(l => l.trim()), ['const bucket = env.MEDIA;'], 'R2 nur über bucket (head/get, siehe oben), nie direkt');
-  assert.match(mediaCode, /headers\.set\('Content-Type', 'video\/mp4'\);/, 'fester Content-Type, nicht aus den R2-Metadaten');
+  assert.match(mediaCode, /const TYPEN: Readonly<Record<string, string>> = \{ mp4: 'video\/mp4', webp: 'image\/webp' \};/, 'feste Content-Types je Endung');
+  assert.match(mediaCode, /headers\.set\('Content-Type', TYPEN\[key\.slice\(key\.lastIndexOf\('\.'\) \+ 1\)\] \?\? 'application\/octet-stream'\);/, 'fester Content-Type nach Endung, nicht aus den R2-Metadaten');
   assert.ok(!/httpMetadata|writeHttpMetadata|customMetadata/.test(mediaCode), 'keine Metadaten aus dem Bucket in der Antwort');
-  assert.deepEqual(JSON.parse(read('public/_routes.json')).include, ['/api/*', ...R2_VIDEOS.map(k => `/media/${k}`)], 'Poster bleiben statisch');
+  assert.deepEqual(JSON.parse(read('public/_routes.json')).include, ['/api/*', ...R2_MEDIEN.map(([p]) => p)], 'Poster bleiben statisch');
 });
 
 test('Release-Scan des Pages-Uploads (public/ wie `wrangler pages deploy`): nur Website-Dateien, keine Quellen, kein PHP/Railway, keine Secrets, höchstens 25 MiB je Datei', () => {

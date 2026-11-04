@@ -24,7 +24,7 @@ const NOTICE = 'Kostenlose Analyse-Anfragen in Kürze verfügbar';
    „Die 4 wichtigsten Metriken“, „Pro Metrik eine Seite“ und eine Schaltfläche „Jetzt analysieren“ – vom Auftraggeber so freigegeben.
    Das Hero-Video steht seit dem P0-Hotfix wieder unter dem Hero. Entscheidung des Auftraggebers 04.11.2026: keine Kennzeichnung als
    alte Fassung und keine Sätze unter den Videos; neue Fassungen der Videos lädt der Auftraggeber in R2 hoch. */
-const R2_PFADE = ['/media/360-pixelkiez-video-1080p-website-look.mp4', '/media/report-pdf-de-1x1-lavendel.mp4', '/media/section-bericht-peach-5x4.mp4'];
+const R2_PFADE = ['/media/360-pixelkiez-video-1080p-website-look.mp4', '/media/report-pdf-de-1x1-lavendel.mp4', '/media/section-bericht-peach-5x4.mp4', '/media/360-pixelkiez-designrunde-am-tisch.webp'];
 const EINGEBUNDEN = [['demo', 'media/360-pixelkiez-video-1080p-website-look.mp4', 'media/360-pixelkiez-website-analyse-poster.jpg'], ['bericht', 'media/report-pdf-de-1x1-lavendel.mp4', 'media/report-pdf-lavendel-poster.jpg'], ['nutzen', 'media/section-bericht-peach-5x4.mp4', 'media/section-bericht-peach-poster.jpg']];
 
 test('Artefakt: alle 22 Seiten vorhanden, in media/ nur die drei Poster, Functions nur unter /api/* und für die drei R2-Videos', () => {

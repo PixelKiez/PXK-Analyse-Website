@@ -12,10 +12,11 @@
    Ohne Playwright, Wrangler oder Worker-Abhängigkeiten: NOT_RUN statt bestanden. */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { mockGoogle, mockResend, startPages, waitFor, sleep, workerAvailable, wranglerAvailable, ROOT, TERMS_VERSION, SOFT_LAUNCH, SOFT_LAUNCH_SKIP, R2_VIDEOS } from './lib/harness.mjs';
+import { mockGoogle, mockResend, startPages, waitFor, sleep, workerAvailable, wranglerAvailable, ROOT, TERMS_VERSION, SOFT_LAUNCH, SOFT_LAUNCH_SKIP, R2_VIDEOS, R2_BILDER, R2_MEDIEN } from './lib/harness.mjs';
 
 const SHOTS = process.env.PXK_SCREENSHOT_DIR || '';
 const AXE = process.env.PXK_AXE || '';
@@ -50,7 +51,13 @@ before(async () => {
   if (skip) return;
   google = await mockGoogle().start();
   mail = await mockResend().start();
-  const media = MEDIA_DIR ? Object.fromEntries(R2_VIDEOS.map(k => [k, join(MEDIA_DIR, k)])) : {};
+  /* Lokales R2: mit PXK_MEDIA_DIR die echten Objekte; ohne nur das Hintergrundbild als WebP-Platzhalter (1 × 1 px), damit die
+     Startseite keine 404 in der Konsole hat – die Video-Tests melden dann NOT_RUN */
+  const platzhalter = () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pxwa-bild-'));
+    return Object.fromEntries(R2_BILDER.map((k, i) => { const f = join(dir, `${i}.webp`); writeFileSync(f, Buffer.from('UklGRh4AAABXRUJQVlA4TBEAAAAvAAAAAAdQ+L43vv+BiOh/AAA=', 'base64')); return [k, f]; }));
+  };
+  const media = MEDIA_DIR ? Object.fromEntries(R2_MEDIEN.map(([, k]) => [k, join(MEDIA_DIR, k)])) : platzhalter();
   app = await startPages(SOFT_LAUNCH ? { worker: false, media } : { google, mail, media });
   browser = await pw.chromium.launch();
   if (SHOTS) mkdirSync(SHOTS, { recursive: true });
@@ -124,11 +131,13 @@ test('Mobile Hauptansicht: kein horizontaler Überlauf, Formular (im Soft-Launch
         return [m.width > 0, m.right <= n.right && m.left >= n.left];
       });
       assert.deepEqual(menu, width <= 760 ? [true, true] : [false, menu[1]], `${path} ${width}: Menü-Button nur mobil und in der Pille`);
-      /* Verwaschener Verlauf der Startseite (Auftraggeber 04.11.2026): ohne Rahmenlinien (bis 1320 px) ab dem oberen Bildschirmrand
-         hinter der Menüleiste, mit Rahmenlinien nur innerhalb des Rahmens (ragt nicht links und rechts hinaus) */
+      /* Verwaschener Verlauf der Startseite (Auftraggeber 04.11.2026): auf body ab dem oberen Bildschirmrand hinter der Menüleiste,
+         so breit wie der Rahmen; ab 1321 px setzt die erste Ebene die Rahmenlinien bis oben fort. Hintergrundfarbe Lila (Statusleiste
+         in Safari ab iOS 26), sichtbar bleibt die Papiergrau-Ebene; main ohne eigenen Verlauf */
       if (path === '/index.html') {
-        const verlauf = await page.evaluate(() => [document.body, document.querySelector('main.frame')].map(e => getComputedStyle(e).backgroundImage.startsWith('linear-gradient')));
-        assert.deepEqual(verlauf, width <= 1320 ? [true, false] : [false, true], `${path} ${width}: Verlauf ${width <= 1320 ? 'ab Bildschirmrand (body)' : 'nur im Rahmen (main)'}`);
+        const verlauf = await page.evaluate(() => { const b = getComputedStyle(document.body);
+          return [b.backgroundColor, b.backgroundImage.startsWith('linear-gradient'), b.backgroundSize.split(', ')[0] !== '0px 0px', getComputedStyle(document.querySelector('main.frame')).backgroundImage]; });
+        assert.deepEqual(verlauf, ['rgb(235, 226, 252)', true, width > 1320, 'none'], `${path} ${width}: Verlauf ab Bildschirmrand, Rahmenlinien bis oben nur mit Rahmen`);
       }
       if (SOFT_LAUNCH && path === '/index.html') {
         const hinweis = await page.evaluate(() => { const r = document.querySelector('.hero .bald').getBoundingClientRect(); return r.width > 0 && r.left >= 0 && r.right <= innerWidth; });
@@ -490,6 +499,38 @@ test('Stromsparmodus (nachgestellt, Chromium und WebKit mobil): Tippen auf das V
         assert.deepEqual(await ohneKnoepfe(page), { knoepfe: 0, controls: 0, vollbild: false }, `${name}: keine Schaltflächen, kein Vollbild`);
         assert.deepEqual(errors.filter(e => !systemMeldung(e)), [], `${name}: Konsolenfehler`);
         await ctx.close();
+      });
+    }
+  } finally {
+    if (wk) await wk.close();
+  }
+});
+
+test('Hintergrundbild „Für alle, die eine Website verantworten.“: lädt aus R2 als WebP, füllt den Abschnitt innerhalb des Rahmens hinter den Karten; Karten (Farbe, Text) unverändert und anklickbar obenauf (Chromium und WebKit, 390/1440)', { skip }, async t => {
+  let wk = null;
+  try { wk = await pw.webkit.launch(); } catch { /* unten als NOT_RUN gemeldet */ }
+  try {
+    for (const [name, engine] of [['Chromium', browser], ['WebKit', wk]]) {
+      await t.test(name, { skip: !engine && 'NOT_RUN: Playwright-WebKit nicht installiert (playwright install webkit)' }, async () => {
+        for (const width of [390, 1440]) {
+          const { context, page, errors, blocked } = await open('/index.html', { width, engine });
+          await page.evaluate(() => document.querySelector('#fuer-wen').scrollIntoView({ block: 'start', behavior: 'instant' }));
+          await page.waitForFunction(() => { const i = document.querySelector('#fuer-wen .section-bild'); return i.complete && i.naturalWidth > 0; }, null, { timeout: 10000 });
+          const m = await page.evaluate(() => {
+            const s = document.querySelector('#fuer-wen'), i = s.querySelector('.section-bild'), sr = s.getBoundingClientRect(), ir = i.getBoundingClientRect();
+            const karten = [...s.querySelectorAll('.step')];
+            /* Mitte jeder Karte: der oberste Treffer gehört zur Karte, nicht zum Bild oder Schleier */
+            const oben = karten.every(k => { const r = k.getBoundingClientRect(); return k.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)); });
+            return { url: new URL(i.currentSrc).pathname, deckt: Math.abs(ir.left - sr.left) < 2 && Math.abs(ir.right - sr.right) < 2 && Math.abs(ir.bottom - sr.bottom) < 2,
+              imRahmen: ir.left >= document.querySelector('main.frame').getBoundingClientRect().left - 0.5, fit: getComputedStyle(i).objectFit,
+              farben: [...new Set(karten.map(k => getComputedStyle(k).backgroundColor))], texte: karten.map(k => k.querySelector('h3').textContent), oben };
+          });
+          assert.deepEqual(m, { url: '/media/360-pixelkiez-designrunde-am-tisch.webp', deckt: true, imRahmen: true, fit: 'cover', farben: ['rgb(235, 226, 252)'],
+            texte: ['Unternehmen & Selbstständige', 'Marketing-Teams', 'Geschäftsführung'], oben: true }, `${name} ${width}`);
+          assert.ok(await overflow(page) <= 0, `${name} ${width}: Überlauf`);
+          assert.deepEqual([errors, blocked], [[], []], `${name} ${width}: Konsolenfehler, Fremd-Requests`);
+          await context.close();
+        }
       });
     }
   } finally {

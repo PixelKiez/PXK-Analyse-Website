@@ -21,7 +21,7 @@ Browser ──HTTPS──► 360.pixelkiez.de  (CNAME bei Hostinger → <projekt
                 Cloudflare Pages „pxwa“ ── /, *.html, /assets/*, Poster ──► statische Dateien aus public/
                      │
                      ├─ drei Videos (public/_routes.json) ──► Pages Function functions/media/[file].ts (Byte-Ranges, 206)
-                     │                                          └─ liest nur drei feste Schlüssel aus R2 „360pixelkiez“ (Binding MEDIA)
+                     │                                          └─ liest nur vier feste Schlüssel aus R2 „360pixelkiez“ (Binding MEDIA)
                      └─ /api/* (public/_routes.json) ──► Pages Function functions/api/[[path]].ts
                                                             │ Service Binding „API“ (intern, keine öffentliche Adresse)
                                                             ▼
@@ -201,12 +201,21 @@ und „Jetzt analysieren“; so freigegeben. Versioniert in `public/media/` sind
 `report-pdf-lavendel-poster.jpg`, `section-bericht-peach-poster.jpg`, mit XMP-Metadaten, SHA-256 in
 `tests/release.test.mjs`). Die Titelbilder für soziale Netzwerke liegen unter `public/assets/og/` (1200×630).
 
+Hintergrundbild „Für alle, die eine Website verantworten.“ (Entscheidung des Auftraggebers 04.11.2026): Der Auftraggeber hat
+`pictures/Sonnige Designrunde am Tisch.png` (1672×941, 2,6 MB) in den Bucket geladen; laut eingebetteten Content Credentials
+(C2PA) mit ChatGPT (gpt-image) erzeugt. Ausgeliefert wird nur die WebP-Fassung `pictures/360-pixelkiez-designrunde-am-tisch.webp`
+(q78, 169 KiB, neues Objekt; das Original bleibt unverändert und ist über die Website nicht erreichbar) unter
+`/media/360-pixelkiez-designrunde-am-tisch.webp`. XMP: Titel, Beschreibung, Urheber/Credit 360°Pixelkiez, Erstellungswerkzeug und
+die KI-Herkunft als IPTC `DigitalSourceType` (trainedAlgorithmicMedia), kein Copyright-Vermerk (rein KI-erzeugt). Auf der Seite
+dekorativ (`alt=""`, lazy) mit `ImageObject` im JSON-LD (`digitalSourceType`: TrainedAlgorithmicMediaDigitalSource). Kein
+sichtbarer KI-Hinweis (Entscheidung des Auftraggebers); ob Art. 50 KI-VO einen verlangt, gehört zur anwaltlichen Prüfung.
+
 Pages beantwortet Range-Anfragen statischer Dateien mit 200 statt 206; Safari/iOS spielt Videos dann nicht ab. Die Pages
-Function `functions/media/[file].ts` (`public/_routes.json` nennt genau die drei Pfade) liest nur drei feste Schlüssel aus
+Function `functions/media/[file].ts` (`public/_routes.json` nennt genau die vier Pfade) liest nur vier feste Schlüssel aus
 `MEDIA` (`head` und `get`, nie `list`, `put` oder `delete`) und antwortet mit 200 (ohne Range), 206 mit
 `Content-Range`/`Content-Length`/`Accept-Ranges` (gültiger Bereich), 416 (ungültiger oder nicht erfüllbarer Bereich),
 304 (`If-None-Match`), 404 (Objekt fehlt im Bucket), 405 (andere Methoden als GET/HEAD) und 503 (kein Binding,
-R2-Fehler). `Content-Type: video/mp4` ist fest, unabhängig von den Metadaten im Bucket. Andere Pfade unter `/media/`
+R2-Fehler). `Content-Type` ist fest nach Dateiendung (`video/mp4`, `image/webp`), unabhängig von den Metadaten im Bucket. Andere Pfade unter `/media/`
 (Poster, unbekannte Dateien) bleiben statisch. Die Sicherheits-Header setzt die Function selbst (`_headers` gilt nicht für
 Functions; ein Test vergleicht beide), dazu `Cross-Origin-Resource-Policy: same-origin` und `X-Robots-Tag: noindex`.
 Lokal geprüft (`wrangler pages dev` mit lokalem R2, Playwright): Chromium und WebKit spielen alle drei eingebundenen Videos mit 206.

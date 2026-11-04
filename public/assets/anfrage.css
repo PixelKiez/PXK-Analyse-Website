@@ -36,17 +36,24 @@
 .hero .url-field input { color: var(--ink); }
 .hero .url-field input::placeholder { color: var(--ink-70); }
 .hero .facts { color: var(--ink-70); }
-/* Startseite im verwaschenen Look der Unterseiten (Entscheidung des Auftraggebers 04.11.2026; gleicher Verlauf wie .inhalt in
-   inhalt.css): Lila am oberen Rand, darunter Pfirsich, dann weich ins Papiergrau. Nur innerhalb des Seitenrahmens (main.frame,
-   bis 1280 px mit Rahmenlinien) – der Verlauf ragt nicht links und rechts über die Linien hinaus. Ersetzt die Farbflecken im Hero. */
-main.frame:has(> .hero) { background: linear-gradient(180deg, #EBE2FC 0%, #EFE2F6 9%, #F8E3E6 20%, #FFE6DD 34%, rgb(255 230 221 / .6) 58%, rgb(255 230 221 / 0) 100%) no-repeat; background-size: 100% 1150px; }
-.hero::before { content: none; }
-/* Ohne Rahmenlinien (bis 1320 px, v. a. Handy und Tablet) beginnt der Verlauf ganz oben am Bildschirmrand, hinter der Menüleiste
-   (Rückmeldung des Auftraggebers 04.11.2026); Safari färbt den Bereich der Statusleiste danach. Darunter wie oben. */
-@media (max-width: 1320px) {
-  body:has(main.frame > .hero) { background: linear-gradient(180deg, #EBE2FC 0%, #EFE2F6 9%, #F8E3E6 20%, #FFE6DD 34%, rgb(255 230 221 / .6) 58%, rgb(255 230 221 / 0) 100%) no-repeat, var(--paper); background-size: 100% 1150px, auto; }
-  main.frame:has(> .hero) { background: none; }
+/* Startseite im verwaschenen Look der Unterseiten (Entscheidungen des Auftraggebers 04.11.2026; gleicher Verlauf wie .inhalt in
+   inhalt.css): Lila ganz oben am Bildschirmrand – die Menüleiste liegt über der Farbe, oben keine Kante –, darunter Pfirsich, dann
+   weich ins Papiergrau. So breit wie der Seitenrahmen (bis 1280 px): ragt nicht links und rechts über die Rahmenlinien hinaus; die
+   erste Ebene führt die Rahmenlinien neben der Menüleiste bis zum oberen Rand fort (nur mit Rahmenlinien, ab 1321 px). Lila als
+   Hintergrundfarbe unter einer Papiergrau-Ebene über die ganze Seite: Zu sehen bleibt Papiergrau, aber Safari ab iOS 26 färbt die
+   Statusleiste nach der Hintergrundfarbe der Seite (theme-color gilt dort nicht mehr) – sonst stünde dort ein grauer Streifen über
+   dem Lila. Ersetzt die Farbflecken im Hero. */
+body:has(main.frame > .hero) {
+  background-color: #EBE2FC;
+  background-image: linear-gradient(90deg, var(--line-soft) 1px, transparent 1px calc(100% - 1px), var(--line-soft) calc(100% - 1px)),
+    linear-gradient(180deg, #EBE2FC 0%, #EFE2F6 9%, #F8E3E6 20%, #FFE6DD 34%, rgb(255 230 221 / .6) 58%, rgb(255 230 221 / 0) 100%),
+    linear-gradient(var(--paper), var(--paper));
+  background-size: min(100%, var(--frame)) 80px, min(100%, var(--frame)) 1150px, 100% 100%;
+  background-position: center top;
+  background-repeat: no-repeat;
 }
+@media (max-width: 1320px) { body:has(main.frame > .hero) { background-size: 0 0, 100% 1150px, 100% 100%; } }
+.hero::before { content: none; }
 @media (max-width: 620px) {
   .hero .h1 { font-size: clamp(34px, min(12vw, 6.2svh), 46px); }
   .hero .lead { font-size: clamp(16px, 2.3svh, 18px); }
@@ -108,6 +115,12 @@ html, body { overscroll-behavior-y: none; }
 .steps--cards { gap: clamp(12px, 1.6vw, 20px); }
 .steps--cards .step, .steps--cards .step:first-child { padding: clamp(22px, 2.6vw, 32px); border: 1px solid var(--line-soft); border-radius: clamp(14px, 2vw, 24px); }
 .steps--cards .step p, .spec--cards .spec-row p { color: var(--ink-70); }
+/* „Für alle, die eine Website verantworten.“ mit Foto als Hintergrund (Auftraggeber 04.11.2026; WebP aus R2 über functions/media,
+   dekorativ, alt=""): füllt den Abschnitt innerhalb des Seitenrahmens, die Karten bleiben in Text und Farbe unverändert darüber.
+   Ein heller Papiergrau-Schleier, hinter der Überschrift dichter, hält die Überschrift lesbar. */
+.section--bild { position: relative; isolation: isolate; overflow: hidden; }
+.section-bild { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; }
+.section--bild::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgb(239 240 241 / .86) 0%, rgb(239 240 241 / .62) 40%, rgb(239 240 241 / .4) 100%); pointer-events: none; }
 .spec--cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(12px, 1.6vw, 20px); border-bottom: 0; }
 .spec--cards .spec-row { grid-template-columns: minmax(0, 1fr); gap: 14px; align-content: start; padding: clamp(22px, 2.6vw, 32px); border: 1px solid var(--line-soft); border-radius: clamp(14px, 2vw, 24px); }
 @media (max-width: 860px) { .spec--cards { grid-template-columns: minmax(0, 1fr); } }
