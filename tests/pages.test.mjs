@@ -467,7 +467,11 @@ const R2_OBJECTS = {
   'section-bericht-peach-5x4.mp4': [1230026, '81499189cf8a2968705b2ba4c13caccec312d4131481855f55b39300ce0c1130'],
   /* WebP-Fassung (q78, XMP) des am 04.11.2026 hochgeladenen pictures/Sonnige Designrunde am Tisch.png, hochgeladen 04.11.2026 */
   'pictures/360-pixelkiez-designrunde-am-tisch.webp': [172666, '00d5b6b198e208e3ec143a25504f1f96cd70201826016838ee8436a00ccb9c5f'],
+  /* Logo: zugeschnittene WebP-Fassung (518 × 120, verlustfrei, XMP) des am 04.11.2026 hochgeladenen pictures/PK_TRS_logo.png */
+  'pictures/pixelkiez-logo.webp': [13840, '89a2ca04a49e00447fed873139b39b38d91f14d6dcb152d7c27449aabefb337a'],
 };
+/* Urheber und Credit im XMP der Bilder: das Logo gehört Pixelkiez, das Hintergrundbild 360°Pixelkiez */
+const URHEBER = { 'pictures/360-pixelkiez-designrunde-am-tisch.webp': '360°Pixelkiez', 'pictures/pixelkiez-logo.webp': 'Pixelkiez' };
 
 test('Medien: nur die drei Poster sind versioniert und statisch (unter 25 MiB); Videos liegen nicht im Repository oder Pages-Upload, sondern in R2', async t => {
   const POSTER_FILES = POSTERS.map(p => p.slice(1)).sort();
@@ -493,7 +497,7 @@ test('R2-Videos und -Bild (lokale Kopie in PXK_MEDIA_DIR): Größe und SHA-256 w
          Auftraggebers 04.11.2026); kein Copyright-Vermerk (rein KI-erzeugt) */
       assert.deepEqual([buf.toString('latin1', 0, 4), buf.toString('latin1', 8, 12)], ['RIFF', 'WEBP'], key);
       const xmp = buf.toString('utf8');
-      for (const s of ['<dc:title>', '<dc:description>', '<dc:creator><rdf:Seq><rdf:li>360°Pixelkiez</rdf:li>', '<photoshop:Credit>360°Pixelkiez</photoshop:Credit>',
+      for (const s of ['<dc:title>', '<dc:description>', `<dc:creator><rdf:Seq><rdf:li>${URHEBER[key]}</rdf:li>`, `<photoshop:Credit>${URHEBER[key]}</photoshop:Credit>`,
         '<Iptc4xmpExt:DigitalSourceType>http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia</Iptc4xmpExt:DigitalSourceType>']) assert.ok(xmp.includes(s), `${key}: ${s}`);
       assert.ok(!xmp.includes('<dc:rights>'), `${key}: kein Copyright-Vermerk`);
       t.diagnostic(`${key}: ${(buf.length / 1024).toFixed(1)} KiB, WebP mit XMP`);

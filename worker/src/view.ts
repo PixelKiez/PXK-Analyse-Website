@@ -92,7 +92,7 @@ export class View {
 <body>
 <header class="nav-wrap" id="nav">
   <nav class="nav" aria-label="Hauptnavigation">
-    <a class="logo" href="${b}/index.html#top">360°Pixelkiez<span>Website-Analyse</span></a>
+    <a class="logo" href="${b}/index.html#top">360°<img class="logo-bild" src="${b}/media/pixelkiez-logo.webp" alt="Pixelkiez" width="518" height="120" decoding="async"><span>Website-Analyse</span></a>
     <div class="nav-links">
       <a href="${b}/index.html#bericht">Bericht</a>
       <a href="${b}/index.html#bereiche">Bereiche</a>

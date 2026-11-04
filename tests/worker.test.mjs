@@ -633,8 +633,8 @@ test('Routen: Worker beantwortet nur /api/anfrage und /api/auth/callback; falsch
 
 test('Hauptnavigation: Anfrageseiten haben denselben Kopf wie die übrigen Seiten (Menüpunkte, Wissen-Beiträge, Button „Analyse“, mobiles Menü)', { skip }, async () => {
   const { readFileSync } = await import('node:fs');
-  /* Kopf bis auf die Basisadresse identisch: view.ts verlinkt absolut, impressum.html relativ */
-  const kopf = html => (html.match(/<header class="nav-wrap" id="nav">[\s\S]*?<\/header>/) || [''])[0].replace(/href="(?:https?:\/\/[^/"]+)?\//g, 'href="');
+  /* Kopf bis auf die Basisadresse identisch: view.ts verlinkt absolut, impressum.html relativ (Links und Logo-Bild) */
+  const kopf = html => (html.match(/<header class="nav-wrap" id="nav">[\s\S]*?<\/header>/) || [''])[0].replace(/(href|src)="(?:https?:\/\/[^/"]+)?\//g, '$1="');
   const statisch = kopf(readFileSync(new URL('../public/impressum.html', import.meta.url), 'utf8'));
   assert.match(statisch, /<details class="mega">[\s\S]*<details class="nav-menu">/);
   assert.equal(kopf((await new Client(app).req('GET', '/api/anfrage')).text), statisch);

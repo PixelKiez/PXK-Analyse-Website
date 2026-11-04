@@ -1,7 +1,7 @@
-/* 360°Pixelkiez – Pages Function nur für die drei Videos und das Hintergrundbild aus Cloudflare R2 (Bucket 360pixelkiez,
+/* 360°Pixelkiez – Pages Function nur für die drei Videos, das Hintergrundbild und das Logo aus Cloudflare R2 (Bucket 360pixelkiez,
    Pages-Binding MEDIA). public/_routes.json listet genau diese Pfade; Poster und alle anderen Dateien bleiben statisch. Der
    R2-Schlüssel kommt aus der festen Liste unten, nie aus der Anfrage: kein Listing, kein öffentlicher Bucket, keine anderen Objekte
-   (auch nicht das Original-PNG im Ordner pictures/). Content-Type ist fest nach Dateiendung (video/mp4, image/webp), unabhängig von
+   (auch nicht die Original-PNGs im Ordner pictures/). Content-Type ist fest nach Dateiendung (video/mp4, image/webp), unabhängig von
    den Metadaten im Bucket. Gültige Range-Anfragen bekommen 206 (RFC 9110), sonst 200 oder 416 –
    Safari/iOS spielt Videos nur mit 206 ab. Nur GET und HEAD, kein Logging, keine Cookies. _headers gilt nicht für
    Function-Antworten: Die Sicherheits-Header stehen deshalb hier und müssen denen in public/_headers entsprechen
@@ -11,13 +11,15 @@ interface Env {
   MEDIA?: R2Bucket;
 }
 
-/* Pfad → R2-Schlüssel (Stand der Objekte im Bucket am 04.11.2026; tests/pages.test.mjs prüft Größe und SHA-256). Das Bild ist die
-   optimierte WebP-Fassung (mit XMP-Metadaten) des hochgeladenen Originals pictures/Sonnige Designrunde am Tisch.png */
+/* Pfad → R2-Schlüssel (Stand der Objekte im Bucket am 04.11.2026; tests/pages.test.mjs prüft Größe und SHA-256). Bild und Logo sind
+   optimierte WebP-Fassungen (mit XMP-Metadaten) der hochgeladenen Originale pictures/Sonnige Designrunde am Tisch.png und
+   pictures/PK_TRS_logo.png */
 const MEDIEN: ReadonlyMap<string, string> = new Map([
   ['/media/360-pixelkiez-video-1080p-website-look.mp4', '360-pixelkiez-video-1080p-website-look.mp4'],
   ['/media/report-pdf-de-1x1-lavendel.mp4', 'report-pdf-de-1x1-lavendel.mp4'],
   ['/media/section-bericht-peach-5x4.mp4', 'section-bericht-peach-5x4.mp4'],
   ['/media/360-pixelkiez-designrunde-am-tisch.webp', 'pictures/360-pixelkiez-designrunde-am-tisch.webp'],
+  ['/media/pixelkiez-logo.webp', 'pictures/pixelkiez-logo.webp'],
 ]);
 
 const TYPEN: Readonly<Record<string, string>> = { mp4: 'video/mp4', webp: 'image/webp' };
@@ -30,7 +32,7 @@ const SECURITY_HEADERS: Record<string, string> = {
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
-  /* Videos und Bild nur für die eigene Website (kein Einbinden auf fremden Seiten) und nicht indexieren */
+  /* Videos und Bilder nur für die eigene Website (kein Einbinden auf fremden Seiten) und nicht indexieren */
   'Cross-Origin-Resource-Policy': 'same-origin',
   'X-Robots-Tag': 'noindex',
 };

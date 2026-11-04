@@ -24,7 +24,7 @@ const NOTICE = 'Kostenlose Analyse-Anfragen in Kürze verfügbar';
    „Die 4 wichtigsten Metriken“, „Pro Metrik eine Seite“ und eine Schaltfläche „Jetzt analysieren“ – vom Auftraggeber so freigegeben.
    Das Hero-Video steht seit dem P0-Hotfix wieder unter dem Hero. Entscheidung des Auftraggebers 04.11.2026: keine Kennzeichnung als
    alte Fassung und keine Sätze unter den Videos; neue Fassungen der Videos lädt der Auftraggeber in R2 hoch. */
-const R2_PFADE = ['/media/360-pixelkiez-video-1080p-website-look.mp4', '/media/report-pdf-de-1x1-lavendel.mp4', '/media/section-bericht-peach-5x4.mp4', '/media/360-pixelkiez-designrunde-am-tisch.webp'];
+const R2_PFADE = ['/media/360-pixelkiez-video-1080p-website-look.mp4', '/media/report-pdf-de-1x1-lavendel.mp4', '/media/section-bericht-peach-5x4.mp4', '/media/360-pixelkiez-designrunde-am-tisch.webp', '/media/pixelkiez-logo.webp'];
 const EINGEBUNDEN = [['demo', 'media/360-pixelkiez-video-1080p-website-look.mp4', 'media/360-pixelkiez-website-analyse-poster.jpg'], ['bericht', 'media/report-pdf-de-1x1-lavendel.mp4', 'media/report-pdf-lavendel-poster.jpg'], ['nutzen', 'media/section-bericht-peach-5x4.mp4', 'media/section-bericht-peach-poster.jpg']];
 
 test('Artefakt: alle 22 Seiten vorhanden, in media/ nur die drei Poster, Functions nur unter /api/* und für die drei R2-Videos', () => {
@@ -179,13 +179,13 @@ test('Startseite gegenüber main: nur Soft-Launch, Schriften-Fix, Partner, Logo-
     /* Keine Sätze unter den Videos (Entscheidung des Auftraggebers 04.11.2026); „Beispieldaten“ steht im Alternativtext */
     ['\n        <figcaption class="showcase-note">Beispielbericht. Alle gezeigten Werte sind Beispieldaten.</figcaption>', ''],
     ['und ein Fahrplan mit den nächsten Schritten."', 'und ein Fahrplan mit den nächsten Schritten. Beispielbericht, alle gezeigten Werte sind Beispieldaten."'],
-    ['<div class="footer-brand"><a class="logo" href="#top">360°Pixelkiez<span>Analyse</span></a>', '<div class="footer-brand"><a class="logo" href="#top">360°Pixelkiez<span>Website-Analyse</span></a>'],
+    ['<div class="footer-brand"><a class="logo" href="#top">360°Pixelkiez<span>Analyse</span></a>', '<div class="footer-brand"><a class="logo" href="#top">360°<img class="logo-bild" src="media/pixelkiez-logo.webp" alt="Pixelkiez" width="518" height="120" loading="lazy" decoding="async"><span>Website-Analyse</span></a>'],
     /* Videos ohne Bedienelemente, Start per Skript (Entscheidungen des Auftraggebers 04.11.2026) */
     ['<video class="showcase-video showcase-video--square" muted loop playsinline preload="none"', '<video class="showcase-video showcase-video--square" muted loop playsinline preload="metadata"'],
     ['<source src="media/report-pdf-de-1x1.mp4" type="video/mp4">', '<source src="media/report-pdf-de-1x1-lavendel.mp4" type="video/mp4">'],
     [/      <article class="card detail" aria-label="Fiktives Beispiel eines Befunds im Bericht">\n[\s\S]*?\n      <\/article>\n/, '      <figure class="report-media report-media--wide">\n        <div class="showcase-frame">\n          <video class="showcase-video showcase-video--5x4" muted loop playsinline preload="metadata" width="1350" height="1080" poster="media/section-bericht-peach-poster.jpg" aria-label="Animiertes fiktives Beispiel eines Befunds aus dem Bericht: Die Startseite nennt nur Schlagworte, dazu Befund, warum er wichtig ist, und die Empfehlung. Danach die nächsten Schritte, das Weitergeben des PDFs an Team, Agentur oder IT und der Hinweis: 0 €, kein Abo.">\n            <source src="media/section-bericht-peach-5x4.mp4" type="video/mp4">\n          </video>\n        </div>\n      </figure>\n'],
     /* Logo-Zusatz „Website-Analyse“ und Pixelkiez-Logo in der Footer-Leiste (Entscheidung des Auftraggebers 03.11.2026) */
-    ['<a class="logo" href="#top">360°Pixelkiez<span>Analyse</span></a>\n    <div class="nav-links">', '<a class="logo" href="#top">360°Pixelkiez<span>Website-Analyse</span></a>\n    <div class="nav-links">'],
+    ['<a class="logo" href="#top">360°Pixelkiez<span>Analyse</span></a>\n    <div class="nav-links">', '<a class="logo" href="#top">360°<img class="logo-bild" src="media/pixelkiez-logo.webp" alt="Pixelkiez" width="518" height="120" decoding="async"><span>Website-Analyse</span></a>\n    <div class="nav-links">'],
     ['      <span>© 2026 360°Pixelkiez</span>\n', '      <span>© 2026 360°Pixelkiez</span>\n      <a href="https://pixelkiez.de/" target="_blank" rel="noopener"><img class="footer-partner" src="assets/partner/pixelkiez.png" alt="Pixelkiez" width="87" height="20"></a>\n'],
     /* Rechtstexte (Entscheidung des Auftraggebers 04.11.2026): AGB-Link in der Footer-Leiste */
     ['<a href="datenschutz.html">Datenschutz</a></nav>', '<a href="datenschutz.html">Datenschutz</a><a href="agb.html">AGB</a></nav>'],

@@ -254,7 +254,7 @@ test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen n
   const PARTNER_NEU = [/  <section class="partner-band"[\s\S]*?<\/section>\n\n/, `      ${PARTNER_LINK}<img class="footer-partner" src="assets/partner/pixelkiez.png" alt="Pixelkiez" width="87" height="20"></a>\n`];
   /* Logo-Zusatz oben „Website-Analyse“ statt „Analyse“ (Entscheidung des Auftraggebers 03.11.2026), geprüft im Test „Hauptnavigation“ */
   const ohneNeues = html => [...MENUES, ...PARTNER_NEU].reduce((s, re) => s.replace(re, ''), html).replace(KOPF, '\n')
-    .replace('    <a class="logo" href="#top">360°Pixelkiez<span>Website-Analyse</span></a>', '    <a class="logo" href="#top">360°Pixelkiez<span>Analyse</span></a>').replace('<link rel="stylesheet" href="assets/donut.css">\n', '')
+    .replace('    <a class="logo" href="#top">360°<img class="logo-bild" src="media/pixelkiez-logo.webp" alt="Pixelkiez" width="518" height="120" decoding="async"><span>Website-Analyse</span></a>', '    <a class="logo" href="#top">360°Pixelkiez<span>Analyse</span></a>').replace('<link rel="stylesheet" href="assets/donut.css">\n', '')
     .replace(/\n<script type="application\/ld\+json">\{"@context":"https:\/\/schema\.org","@graph":\[\{"@type":"VideoObject".*?<\/script>/, '')
     .replace('\n<script src="assets/donut.js"></script>', '').replace(SCORE_ABSCHNITT, '');
   const ohneAlt = html => html.replace(/  <section class="section" id="tools">\n[\s\S]*?\n  <\/section>\n\n/, '').replace(SCORE_ABSCHNITT, '')
@@ -350,6 +350,15 @@ test('Hauptnavigation: „Analyse“ nur als Button, Wissen mit Pfeil zu den sec
     const start = rel === 'index.html' ? '' : `${p}index.html`;
     const nav = H.byTag(H.byTag(H.parse(read(page)).root, 'header')[0], 'nav')[0];
     assert.equal(H.norm(H.textOf(H.byTag(H.byClass(nav, 'logo')[0], 'span')[0])), 'Website-Analyse', `${page}: Logo-Zusatz oben`);
+    /* Logo oben und im Footer (Auftraggeber 04.11.2026): „360°“ und daneben das Pixelkiez-Logo aus R2, gelesen „360°Pixelkiez“ */
+    const logos = H.byClass(H.parse(read(page)).root, 'logo');
+    assert.equal(logos.length, 2, `${page}: Logo oben und im Footer`);
+    logos.forEach((l, i) => {
+      const bild = H.byTag(l, 'img')[0];
+      assert.equal(l.children[0]?.text, '360°', `${page}: „360°“ vor dem Logo`);
+      assert.deepEqual(['class', 'src', 'alt', 'width', 'height', 'loading'].map(a => bild?.attrs.get(a)), ['logo-bild', `${p}media/pixelkiez-logo.webp`, 'Pixelkiez', '518', '120', i ? 'lazy' : undefined], `${page}: Logo ${i ? 'im Footer (lazy)' : 'oben'}`);
+    });
+    assert.ok(R2_MEDIEN.some(([pfad, k]) => pfad === '/media/pixelkiez-logo.webp' && R2_BILDER.includes(k)), 'Logo kommt aus R2 (Allowlist der Function)');
     const links = H.byClass(nav, 'nav-links')[0];
     const abschnitte = [['bericht', 'Bericht'], ['bereiche', 'Bereiche'], ['angebot', 'Angebot'], ['faq', 'FAQ']].map(([id, t]) => [`${start}#${id}`, t]);
     const wissen = [`${p}wissen/index.html`, 'Wissen'];
@@ -456,7 +465,9 @@ test('Eigenständige Website 360°Pixelkiez: Name in Titel, Logo und Footer; Imp
   for (const page of PAGES) {
     const { root } = H.parse(read(page));
     assert.match(H.textOf(H.byTag(root, 'title')[0]), /360°Pixelkiez/, `${page}: Titel`);
-    assert.ok(H.byClass(root, 'logo').every(l => H.norm(H.textOf(l)).startsWith('360°Pixelkiez')), `${page}: Logo`);
+    /* Name des Logos wie vorgelesen: Text „360°“ und Alternativtext des Pixelkiez-Logos (Auftraggeber 04.11.2026) */
+    const name = l => H.norm(l.children.map(c => c.text ?? (c.tag === 'img' ? c.attrs.get('alt') : H.textOf(c))).join(''));
+    assert.ok(H.byClass(root, 'logo').every(l => name(l).startsWith('360°Pixelkiez')), `${page}: Logo`);
     const legal = H.find(root, e => e.tag === 'nav' && e.attrs.get('aria-label') === 'Rechtliches')[0];
     /* relativ zur Seite aufgelöst: auch die Wissensseiten in wissen/ verweisen auf dieselben Rechtsseiten */
     assert.deepEqual(H.byTag(legal, 'a').map(a => new URL(a.attrs.get('href'), `https://360.pixelkiez.de/${page.slice(7)}`).pathname.slice(1)), ['impressum.html', 'datenschutz.html', 'agb.html'], `${page}: Rechtliches (mit AGB, Entscheidung des Auftraggebers 04.11.2026)`);

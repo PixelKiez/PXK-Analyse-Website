@@ -38,8 +38,8 @@ export const SOFT_LAUNCH_SKIP = SOFT_LAUNCH && 'SOFT_LAUNCH: Hero ohne Anfragefo
 /* Die drei Videos im R2-Bucket 360pixelkiez (Binding MEDIA): Schlüssel wie in functions/media/[file].ts */
 export const R2_BUCKET = '360pixelkiez';
 export const R2_VIDEOS = ['360-pixelkiez-video-1080p-website-look.mp4', 'report-pdf-de-1x1-lavendel.mp4', 'section-bericht-peach-5x4.mp4'];
-/* Hintergrundbild aus dem Ordner pictures/ im selben Bucket (Auftraggeber 04.11.2026; WebP-Fassung des hochgeladenen PNG) */
-export const R2_BILDER = ['pictures/360-pixelkiez-designrunde-am-tisch.webp'];
+/* Hintergrundbild und Logo aus dem Ordner pictures/ im selben Bucket (Auftraggeber 04.11.2026; WebP-Fassungen der hochgeladenen PNGs) */
+export const R2_BILDER = ['pictures/360-pixelkiez-designrunde-am-tisch.webp', 'pictures/pixelkiez-logo.webp'];
 /* Alles, was functions/media/[file].ts ausliefert: [Pfad auf der Website, R2-Schlüssel] – Pfad ist /media/<Dateiname> */
 export const R2_MEDIEN = [...R2_VIDEOS, ...R2_BILDER].map(k => [`/media/${k.slice(k.lastIndexOf('/') + 1)}`, k]);
 

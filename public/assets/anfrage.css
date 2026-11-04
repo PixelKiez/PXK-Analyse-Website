@@ -77,6 +77,13 @@ body:has(main.frame > .hero) {
 /* Längerer Name 360°Pixelkiez: auf schmalen Handys entfällt der Zusatz „Website-Analyse“ im Navigationslogo, damit er nicht umbricht
    und Button und Menü-Button in der Pille bleiben (Umbruch gemessen bis 473 px in Chromium und WebKit) */
 @media (max-width: 489px) { .nav .logo span { display: none; } }
+/* Logo (Auftraggeber 04.11.2026): „360°“ als Text, direkt daneben das Pixelkiez-Logo aus R2 (WebP 518 × 120, alt „Pixelkiez“),
+   gelesen „360°Pixelkiez“; der Zusatz „Website-Analyse“ mit demselben Abstand wie bisher */
+.logo:has(.logo-bild) { gap: 0; }
+.logo-bild { display: block; height: 22px; width: auto; margin-left: 4px; }
+.logo:has(.logo-bild) span { margin-left: 10px; }
+/* Sehr schmale Handys (320 px): etwas kleiner, damit „Analyse“ und der Menü-Button in der Pille bleiben */
+@media (max-width: 359px) { .logo-bild { height: 18px; } }
 
 /* Video unter dem Hero: zentriertes Widget mit abgerundeten Ecken, 16:9, nicht über die ganze Breite (ohne Bildunterschrift) */
 .showcase { padding: 0 var(--gutter) clamp(56px, 8vw, 104px); }

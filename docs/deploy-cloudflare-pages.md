@@ -21,7 +21,7 @@ Browser ──HTTPS──► 360.pixelkiez.de  (CNAME bei Hostinger → <projekt
                 Cloudflare Pages „pxwa“ ── /, *.html, /assets/*, Poster ──► statische Dateien aus public/
                      │
                      ├─ drei Videos (public/_routes.json) ──► Pages Function functions/media/[file].ts (Byte-Ranges, 206)
-                     │                                          └─ liest nur vier feste Schlüssel aus R2 „360pixelkiez“ (Binding MEDIA)
+                     │                                          └─ liest nur fünf feste Schlüssel aus R2 „360pixelkiez“ (Binding MEDIA)
                      └─ /api/* (public/_routes.json) ──► Pages Function functions/api/[[path]].ts
                                                             │ Service Binding „API“ (intern, keine öffentliche Adresse)
                                                             ▼
@@ -210,8 +210,15 @@ die KI-Herkunft als IPTC `DigitalSourceType` (trainedAlgorithmicMedia), kein Cop
 dekorativ (`alt=""`, lazy) mit `ImageObject` im JSON-LD (`digitalSourceType`: TrainedAlgorithmicMediaDigitalSource). Kein
 sichtbarer KI-Hinweis (Entscheidung des Auftraggebers); ob Art. 50 KI-VO einen verlangt, gehört zur anwaltlichen Prüfung.
 
+Logo (Entscheidung des Auftraggebers 04.11.2026): „360°“ als Text, daneben das Pixelkiez-Logo, oben und im Footer aller
+22 Seiten (und der Worker-Seiten). Quelle `pictures/PK_TRS_logo.png` (2172×724, 232 KiB, laut C2PA mit ChatGPT erzeugt);
+ausgeliefert wird die zugeschnittene, verlustfreie WebP-Fassung `pictures/pixelkiez-logo.webp` (518×120, 14 KiB, XMP mit
+Urheber/Credit Pixelkiez und KI-Herkunft, kein Copyright-Vermerk) unter `/media/pixelkiez-logo.webp`, `alt="Pixelkiez"`.
+Jeder Seitenaufruf fragt das Logo über die Function an (meist 304 dank ETag) – bei 100 000 Function-Anfragen am Tag im
+kostenlosen Plan für den Soft-Launch unkritisch.
+
 Pages beantwortet Range-Anfragen statischer Dateien mit 200 statt 206; Safari/iOS spielt Videos dann nicht ab. Die Pages
-Function `functions/media/[file].ts` (`public/_routes.json` nennt genau die vier Pfade) liest nur vier feste Schlüssel aus
+Function `functions/media/[file].ts` (`public/_routes.json` nennt genau die fünf Pfade) liest nur fünf feste Schlüssel aus
 `MEDIA` (`head` und `get`, nie `list`, `put` oder `delete`) und antwortet mit 200 (ohne Range), 206 mit
 `Content-Range`/`Content-Length`/`Accept-Ranges` (gültiger Bereich), 416 (ungültiger oder nicht erfüllbarer Bereich),
 304 (`If-None-Match`), 404 (Objekt fehlt im Bucket), 405 (andere Methoden als GET/HEAD) und 503 (kein Binding,
