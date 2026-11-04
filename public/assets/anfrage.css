@@ -41,6 +41,12 @@
    bis 1280 px mit Rahmenlinien) – der Verlauf ragt nicht links und rechts über die Linien hinaus. Ersetzt die Farbflecken im Hero. */
 main.frame:has(> .hero) { background: linear-gradient(180deg, #EBE2FC 0%, #EFE2F6 9%, #F8E3E6 20%, #FFE6DD 34%, rgb(255 230 221 / .6) 58%, rgb(255 230 221 / 0) 100%) no-repeat; background-size: 100% 1150px; }
 .hero::before { content: none; }
+/* Ohne Rahmenlinien (bis 1320 px, v. a. Handy und Tablet) beginnt der Verlauf ganz oben am Bildschirmrand, hinter der Menüleiste
+   (Rückmeldung des Auftraggebers 04.11.2026); Safari färbt den Bereich der Statusleiste danach. Darunter wie oben. */
+@media (max-width: 1320px) {
+  body:has(main.frame > .hero) { background: linear-gradient(180deg, #EBE2FC 0%, #EFE2F6 9%, #F8E3E6 20%, #FFE6DD 34%, rgb(255 230 221 / .6) 58%, rgb(255 230 221 / 0) 100%) no-repeat, var(--paper); background-size: 100% 1150px, auto; }
+  main.frame:has(> .hero) { background: none; }
+}
 @media (max-width: 620px) {
   .hero .h1 { font-size: clamp(34px, min(12vw, 6.2svh), 46px); }
   .hero .lead { font-size: clamp(16px, 2.3svh, 18px); }
@@ -69,7 +75,9 @@ main.frame:has(> .hero) { background: linear-gradient(180deg, #EBE2FC 0%, #EFE2F
 .showcase { padding: 0 var(--gutter) clamp(56px, 8vw, 104px); }
 .showcase-media { width: min(100%, 960px); margin: 0 auto; }
 .showcase-frame { position: relative; overflow: hidden; isolation: isolate; border-radius: clamp(14px, 2vw, 24px); background: #0E1416; box-shadow: 0 24px 60px rgb(12 12 12 / .16); }
-.showcase-video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; }
+.showcase-video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; -webkit-tap-highlight-color: transparent; }
+/* Ein stehendes Video startet per Tipp/Klick (app.js, z. B. iOS-Stromsparmodus) – am Desktop zeigt der Zeiger das an */
+.showcase-video[data-wiedergabe^="abgelehnt"], .showcase-video[data-wiedergabe="Bewegung reduziert"] { cursor: pointer; }
 /* Zweites Video rechts neben dem Text im Abschnitt „Ihr Bericht“ (Spalte aus .split); quadratisch, höchstens 560 px */
 .report-media { width: 100%; max-width: 560px; min-width: 0; margin: 0; justify-self: center; }
 .showcase-video--square { aspect-ratio: 1 / 1; }

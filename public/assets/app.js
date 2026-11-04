@@ -51,12 +51,18 @@
      nach Tabwechsel (visibilitychange), Zurück-Navigation (pageshow) und wiederkehrendem Netz (online). Browser-Regeln werden nicht
      umgangen: Lehnt der Browser ab (iOS-Stromsparmodus, Autoplay-Sperre) oder scheitert das Laden, bleibt das Standbild (Poster)
      ohne Schaltfläche. Der Zustand steht zur Diagnose in data-wiedergabe (läuft, angehalten, abgelehnt: <Grund>, Ladefehler,
-     Bewegung reduziert). Bei „Bewegung reduzieren“ kein automatischer Start (Systemeinstellung des Nutzers). */
+     Bewegung reduziert). Bei „Bewegung reduzieren“ kein automatischer Start (Systemeinstellung des Nutzers). Im iOS-Stromsparmodus
+     startet WebKit ein Video nur nach einer Nutzergeste: Tippen (oder Klicken) auf das Video startet es, ohne Schaltfläche; danach
+     darf WebKit dasselbe Video wieder per Skript starten, es hält also beim Hinausscrollen an und läuft beim Hineinscrollen weiter
+     (Rückmeldung des Auftraggebers 04.11.2026: „Die Videos in der mobilen Ansicht laufen nicht.“). */
   const videos = [...document.querySelectorAll('.showcase-video')];
   const sichtbar = new Set(), bekannt = new Set();
   const zustand = (v, z) => { v.dataset.wiedergabe = z; };
   const start = v => {
     if (reduce || !sichtbar.has(v) || document.visibilityState !== 'visible' || !v.paused) return;
+    abspielen(v);
+  };
+  const abspielen = v => {
     /* Nach einem Ladefehler die Quelle neu wählen (z. B. wieder online) */
     if (v.error || v.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) v.load();
     const run = v.play();
@@ -81,6 +87,9 @@
     v.addEventListener('error', fehler);
     const source = v.querySelector('source');
     if (source) source.addEventListener('error', fehler);
+    /* Tippen auf ein stehendes Video startet es (Nutzergeste, auch bei „Bewegung reduzieren“ als ausdrückliche Wahl). Wer tippt,
+       sieht das Video: als sichtbar führen, damit der play-Listener oben es nicht gleich wieder anhält. */
+    v.addEventListener('click', () => { if (v.paused) { sichtbar.add(v); abspielen(v); } });
     if (reduce) { v.pause(); zustand(v, 'Bewegung reduziert'); return; }
     /* Ist das Laden schon gescheitert, bevor dieses Skript lief, kam das error-Ereignis zu früh. NETWORK_NO_SOURCE allein beweist
        das nicht: Während der Quellenauswahl steht der Wert kurz ebenfalls dort (WebKit unter Last). load() startet die Auswahl neu;

@@ -124,6 +124,12 @@ test('Mobile Hauptansicht: kein horizontaler Überlauf, Formular (im Soft-Launch
         return [m.width > 0, m.right <= n.right && m.left >= n.left];
       });
       assert.deepEqual(menu, width <= 760 ? [true, true] : [false, menu[1]], `${path} ${width}: Menü-Button nur mobil und in der Pille`);
+      /* Verwaschener Verlauf der Startseite (Auftraggeber 04.11.2026): ohne Rahmenlinien (bis 1320 px) ab dem oberen Bildschirmrand
+         hinter der Menüleiste, mit Rahmenlinien nur innerhalb des Rahmens (ragt nicht links und rechts hinaus) */
+      if (path === '/index.html') {
+        const verlauf = await page.evaluate(() => [document.body, document.querySelector('main.frame')].map(e => getComputedStyle(e).backgroundImage.startsWith('linear-gradient')));
+        assert.deepEqual(verlauf, width <= 1320 ? [true, false] : [false, true], `${path} ${width}: Verlauf ${width <= 1320 ? 'ab Bildschirmrand (body)' : 'nur im Rahmen (main)'}`);
+      }
       if (SOFT_LAUNCH && path === '/index.html') {
         const hinweis = await page.evaluate(() => { const r = document.querySelector('.hero .bald').getBoundingClientRect(); return r.width > 0 && r.left >= 0 && r.right <= innerWidth; });
         assert.ok(hinweis, `${path} ${width}: Hinweis „in Kürze verfügbar“ vollständig sichtbar`);
@@ -430,6 +436,60 @@ test('Negativfälle Autoplay: Browser verbietet Autoplay (nachgestellt, Chromium
           assert.deepEqual(errors.filter(e => !systemMeldung(e)), [], `${name} ${fall} ${width}: Konsolenfehler`);
           await ctx.close();
         }
+      });
+    }
+  } finally {
+    if (wk) await wk.close();
+  }
+});
+
+test('Stromsparmodus (nachgestellt, Chromium und WebKit mobil): Tippen auf das Video startet es ohne Schaltfläche; danach hält es beim Hinausscrollen an und läuft beim Hineinscrollen von selbst weiter', { skip: videoSkip }, async t => {
+  /* Rückmeldung des Auftraggebers 04.11.2026: „Die Videos in der mobilen Ansicht laufen nicht.“ Ursache: Im iOS-Stromsparmodus lehnt
+     WebKit jeden Start ohne Nutzergeste ab (RequireUserGestureForVideoDueToLowPowerMode, NotAllowedError). Nachbildung: play() gilt
+     nur während der Verarbeitung eines echten Ereignisses (Tipp, Klick, Taste) als Geste, sonst wird es abgelehnt; nach einem Start
+     durch eine Geste darf dasselbe Video wieder per Skript starten (WebKit hebt die Sperre für das Element nach dem ersten Start
+     durch eine Geste auf). Kein echtes Gerät. */
+  const stromsparmodus = () => {
+    const play = HTMLMediaElement.prototype.play, frei = new WeakSet();
+    let geste = false;
+    for (const typ of ['pointerup', 'touchend', 'click', 'keydown']) addEventListener(typ, e => { if (e.isTrusted) { geste = true; setTimeout(() => { geste = false; }, 0); } }, true);
+    HTMLMediaElement.prototype.play = function () {
+      if (!frei.has(this) && !geste) return Promise.reject(new DOMException('Stromsparmodus (Nachbildung)', 'NotAllowedError'));
+      frei.add(this);
+      return play.call(this);
+    };
+  };
+  let wk = null;
+  try { wk = await pw.webkit.launch(); } catch { /* unten als NOT_RUN gemeldet */ }
+  try {
+    for (const [name, engine] of [['WebKit', wk], ['Chromium', browser]]) {
+      await t.test(name, { skip: !engine && 'NOT_RUN: Playwright-WebKit nicht installiert (playwright install webkit)' }, async () => {
+        const ctx = await engine.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'no-preference' });
+        await ctx.addInitScript(stromsparmodus);
+        await ctx.route('**/*', r => r.request().url().startsWith(app.base + '/') ? r.continue() : r.abort());
+        const page = await ctx.newPage();
+        const errors = [];
+        page.on('pageerror', e => errors.push(String(e)));
+        page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+        await page.goto(app.base + '/', { waitUntil: 'load' });
+        for (const sec of ['#demo', '#bericht', '#nutzen']) {
+          const video = `${sec} .showcase-video`;
+          await zeige(page, sec);
+          await page.waitForTimeout(1200);
+          assert.deepEqual(await page.evaluate(s => { const v = document.querySelector(s); return [v.paused, v.dataset.wiedergabe]; }, video), [true, 'abgelehnt: NotAllowedError'], `${name} ${sec}: ohne Geste abgelehnt, Standbild`);
+          /* Echter Tipp (Playwright prüft, dass er das Video trifft und nichts darüber liegt) */
+          await page.locator(video).tap();
+          await laeuft(page, sec);
+          assert.equal(await page.evaluate(s => document.querySelector(s).dataset.wiedergabe, video), 'läuft', `${name} ${sec}: läuft nach dem Tippen`);
+          /* Ganz hinaus: hält an; wieder hinein: läuft ohne neuen Tipp */
+          await page.evaluate(() => scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }));
+          await page.waitForFunction(s => document.querySelector(s).paused, video, { timeout: 5000 });
+          await zeige(page, sec);
+          await laeuft(page, sec, await page.evaluate(s => document.querySelector(s).currentTime + 0.3, video));
+        }
+        assert.deepEqual(await ohneKnoepfe(page), { knoepfe: 0, controls: 0, vollbild: false }, `${name}: keine Schaltflächen, kein Vollbild`);
+        assert.deepEqual(errors.filter(e => !systemMeldung(e)), [], `${name}: Konsolenfehler`);
+        await ctx.close();
       });
     }
   } finally {
