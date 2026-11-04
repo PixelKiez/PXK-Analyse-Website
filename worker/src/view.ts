@@ -3,35 +3,50 @@ import { displayWebsite } from './url';
 
 /* Serverseitig gerenderte Seiten des Anfrageablaufs. Nutzt das bestehende Design (assets/styles.css, ausgeliefert
    vom statischen Frontend auf derselben Domain) plus assets/anfrage.css. Kein JavaScript. Alle variablen Werte laufen durch h(). */
+/* Wortlaut der Kästchen (Datenschutzerklärung Abschnitte 8 und 12, AGB §§ 3, 4, 6). Diese Texte werden beim Auftrag gespeichert;
+   jede Änderung des Wortlauts ist eine neue Fassung und braucht eine neue AGB- oder Datenschutz-Version. */
+const DATENSCHUTZ_VERWEIS = 'Datenschutzerklärung, Abschnitt 12';
+export const DECLARATIONS = {
+  terms: 'Ich beauftrage die kostenlose Website-Analyse für die angegebene Adresse. Es gelten die AGB. Die Datenschutzerklärung habe ich zur Kenntnis genommen.',
+  business: 'Ich frage die Analyse als Unternehmer an (gewerblich, freiberuflich, Verein oder Organisation, § 14 BGB).',
+  marketing: 'Ja, 360°Pixelkiez darf mir per E-Mail Informationen und Angebote zur Website-Analyse von 360°Pixelkiez, Fachinformationen zu Website-Technik, SEO und KI-Auffindbarkeit sowie Bitten um Feedback zu meinem Bericht senden – auch als Newsletter. Ich kann diese Einwilligung jederzeit widerrufen, z. B. über den Abmeldelink in jeder E-Mail oder per Mail an 360@pixelkiez.de. Details: ' + DATENSCHUTZ_VERWEIS + '.',
+} as const;
+
 export class View {
   constructor(private base = '') {}
 
-  /* Eingabe wie im Hero der Startseite: Website, AGB-Häkchen (nie vorausgewählt), „Analysieren“. Für Fehler ohne JavaScript
-     und nach einer abgebrochenen Anmeldung. Das erste fehlerhafte Feld bekommt den Fokus (autofocus). */
-  input(termsVersion: string, value = '', errors: { url?: string | null; agb?: string | null } = {}, notice: string | null = null): string {
+  /* Eingabe (Ablauf laut AGB § 3): Website, zwei Pflichtkästchen (AGB, Unternehmer) und ein freiwilliges Kästchen für werbliche
+     E-Mails, keins vorausgewählt; dann „Analyse anfragen“ und Google-Anmeldung. Für Fehler ohne JavaScript und nach einer
+     abgebrochenen Anmeldung. Das erste fehlerhafte Feld bekommt den Fokus (autofocus). Die Kästchentexte stehen in DECLARATIONS
+     und werden mit dem Auftrag gespeichert (Nachweis nach Art. 7 Abs. 1 DSGVO). */
+  input(termsVersion: string, value = '', errors: { url?: string | null; agb?: string | null; business?: string | null } = {}, notice: string | null = null): string {
     const base = h(this.base);
     const urlError = errors.url ?? null;
     const agbError = errors.agb ?? null;
-    const first = urlError !== null ? 'url' : agbError !== null ? 'agb' : null;
+    const businessError = errors.business ?? null;
+    const first = urlError !== null ? 'url' : agbError !== null ? 'agb' : businessError !== null ? 'unternehmer' : null;
     const invalid = (id: string, error: string | null): string => (error !== null ? ` aria-invalid="true" aria-describedby="${id}-error"${first === id ? ' autofocus' : ''}` : '');
+    const box = (id: string, required: boolean, error: string | null, html: string): string =>
+      `<label class="consent"><input id="${id}" type="checkbox" name="${id}" value="1"${required ? ' required' : ''}${invalid(id, error)}><span>${html}</span></label>`
+      + (error !== null ? `<p class="form-error" id="${id}-error" role="alert">${h(error)}</p>` : '');
     const body = '<div class="section-head"><p class="eyebrow">Kostenlose Website-Analyse</p><h1 class="h2">Welche Website sollen wir analysieren?</h1>'
-      + '<p class="text">Nach dem Klick auf „Analysieren“ melden Sie sich mit Google an. Danach speichern wir Ihre Anfrage ohne weiteren Klick, und Pixelkiez erstellt die Analyse persönlich.</p></div>'
+      + '<p class="text">Nach dem Klick auf „Analyse anfragen“ melden Sie sich mit Google an. Mit der erfolgreichen Anmeldung ist Ihre Anfrage abgeschickt; bricht die Anmeldung ab, speichern wir keine Anfrage. Pixelkiez erstellt die Analyse persönlich.</p></div>'
       + (notice !== null ? `<p class="request-notice" role="status">${h(notice)}</p>` : '')
       + '<div class="request-grid">'
       + `<form class="analyze request-form" method="post" action="${base}/api/anfrage">`
       + `<input type="hidden" name="action" value="start"><input type="hidden" name="agb_version" value="${h(termsVersion)}">`
       + '<label class="sr-only" for="url">Adresse Ihrer Website</label>'
       + `<div class="url-field"><input id="url" name="website" type="text" inputmode="url" autocomplete="url" maxlength="2048" placeholder="ihre-website.de" value="${h(value)}"${invalid('url', urlError)}>`
-      + '<button class="btn btn--accent" type="submit">Analysieren</button></div>'
+      + '<button class="btn btn--accent" type="submit">Analyse anfragen</button></div>'
       + (urlError !== null ? `<p class="form-error" id="url-error" role="alert">${h(urlError)}</p>` : '')
-      + `<label class="consent"><input id="agb" type="checkbox" name="agb" value="1" required${invalid('agb', agbError)}>`
-      + `<span>Ich akzeptiere die <a class="request-link" href="${base}/agb.html">AGB</a> von 360°Pixelkiez.</span></label>`
-      + (agbError !== null ? `<p class="form-error" id="agb-error" role="alert">${h(agbError)}</p>` : '')
-      + `<p class="request-small">Kostenlose Website-Analyse – 0 €, kein Abo. <a class="request-link" href="${base}/datenschutz.html">Datenschutzerklärung</a></p>`
+      + box('agb', true, agbError, `Ich beauftrage die kostenlose Website-Analyse für die angegebene Adresse. Es gelten die <a class="request-link" href="${base}/agb.html">AGB</a>. Die <a class="request-link" href="${base}/datenschutz.html">Datenschutzerklärung</a> habe ich zur Kenntnis genommen.`)
+      + box('unternehmer', true, businessError, h(DECLARATIONS.business))
+      + box('werbung', false, null, `Freiwillig: ${h(DECLARATIONS.marketing.replace(DATENSCHUTZ_VERWEIS + '.', ''))}<a class="request-link" href="${base}/datenschutz.html#werbung">${DATENSCHUTZ_VERWEIS}</a>.`)
+      + '<p class="request-small">Kostenlose Website-Analyse – 0 €, kein Abo. Die Analyse erhalten Sie auch ohne Einwilligung in werbliche E-Mails.</p>'
       + '</form>'
       + '<div class="request-side"><h2 class="request-h">Hinweise zur Datenverarbeitung</h2><ul class="request-notes">'
-      + '<li>Vor der Google-Anmeldung speichern wir Ihre Website-Adresse sowie Version und Zeitpunkt Ihrer Zustimmung zu den AGB vorübergehend in einer serverseitigen Sitzung. Wird die Anmeldung nicht abgeschlossen, entsteht daraus kein Auftrag, und Pixelkiez erhält keine Benachrichtigung.</li>'
-      + '<li>Erst nach erfolgreicher Google-Anmeldung und mit gültiger Zustimmung entsteht der eigentliche kostenlose Analyseauftrag. Erst dann ordnen wir ihm Ihre von Google bestätigte E-Mail-Adresse und die Kennung Ihres Google-Kontos zu; dazu kommen der Zeitpunkt der Anfrage sowie Version und Zeitpunkt Ihrer Zustimmung zu den AGB.</li>'
+      + '<li>Vor der Google-Anmeldung speichern wir Ihre Website-Adresse und Ihre Angaben aus den Kästchen höchstens zehn Minuten in einer serverseitigen Sitzung. Wird die Anmeldung nicht abgeschlossen, entsteht daraus kein Auftrag, und Pixelkiez erhält keine Benachrichtigung.</li>'
+      + '<li>Erst nach erfolgreicher Google-Anmeldung entsteht der kostenlose Analyseauftrag. Dazu speichern wir Ihre von Google bestätigte E-Mail-Adresse, die Kennung Ihres Google-Kontos, den Zeitpunkt der Anfrage sowie Wortlaut, Version und Zeitpunkt Ihrer Bestätigungen. Die Anfragedaten löschen wir automatisch vier Monate nach Eingang.</li>'
       + '<li>Zweck: Pixelkiez erstellt damit Ihre Analyse und schickt Ihnen den Bericht als PDF mit sieben Seiten an diese E-Mail-Adresse.</li>'
       + '<li>Die Anmeldung läuft über Google. Wir erhalten nur Konto-Kennung und bestätigte E-Mail-Adresse, keinen Zugriff auf Ihr Postfach.</li>'
       + '<li>Pixelkiez wird intern per E-Mail über Ihre Anfrage informiert.</li>'

@@ -371,7 +371,7 @@ test('Parallele Zustellversuche und Cron-Fehler: gleichzeitige Cron-Läufe sende
   assert.equal(mail.state.accepted.length, 2);
 });
 
-test('Löschfrist: ohne ORDER_RETENTION_DAYS löscht der Cron keine Aufträge; mit Frist nur erledigte und alte – offene Aufträge bleiben', { skip }, async () => {
+test('Löschfrist: ohne ORDER_RETENTION_DAYS löscht der Cron keine Aufträge; mit Frist (Produktion 120 Tage) jeden älteren Auftrag samt Benachrichtigung, unabhängig vom Status – Werbeeinwilligungen bleiben', { skip }, async () => {
   const seed = async w => {
     await w.exec('DELETE FROM notifications; DELETE FROM orders');
     for (const [ref, status, created] of [['PXA-AAAA-0001', 'completed', '2000-01-01 00:00:00'], ['PXA-AAAA-0002', 'received', '2000-01-01 00:00:00'], ['PXA-AAAA-0003', 'completed', new Date().toISOString().slice(0, 19).replace('T', ' ')]]) {
@@ -385,9 +385,11 @@ test('Löschfrist: ohne ORDER_RETENTION_DAYS löscht der Cron keine Aufträge; m
   const w = await startWorker({ google, mail, env: { ORDER_RETENTION_DAYS: '30' } });
   try {
     await seed(w);
-    assert.match((await w.cron()).log, /1 erledigte Aufträge gelöscht/);
-    assert.deepEqual((await w.sql('SELECT reference FROM orders ORDER BY id')).map(r => r.reference), ['PXA-AAAA-0002', 'PXA-AAAA-0003'], 'offener alter Auftrag bleibt');
-    assert.equal((await w.sql('SELECT COUNT(*) AS n FROM notifications'))[0].n, 2);
+    await w.run("INSERT INTO marketing_consents (google_sub, email, wording, privacy_version, given_at, order_reference) VALUES ('s', 'k@beispiel-kunde.de', 'Ja …', 'TEST', '2000-01-01 00:00:00', 'PXA-AAAA-0002')");
+    assert.match((await w.cron()).log, /2 Aufträge nach Ablauf der Löschfrist gelöscht/);
+    assert.deepEqual((await w.sql('SELECT reference FROM orders ORDER BY id')).map(r => r.reference), ['PXA-AAAA-0003'], 'alte Aufträge gelöscht, auch der offene');
+    assert.equal((await w.sql('SELECT COUNT(*) AS n FROM notifications'))[0].n, 1);
+    assert.equal((await w.sql('SELECT COUNT(*) AS n FROM marketing_consents'))[0].n, 1, 'Werbeeinwilligung bleibt bis zum Widerruf');
   } finally {
     await w.stop();
   }

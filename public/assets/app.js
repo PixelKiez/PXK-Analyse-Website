@@ -44,8 +44,9 @@
   }
 
   /* Videos (historische Demo unter dem Hero, „Ein PDF. Sieben Seiten.“, „Jeder Befund verständlich erklärt.“): stumm, inline, in
-     Endlosschleife, ohne Bedienelemente (Entscheidung des Auftraggebers 04.11.2026: keine Play-/Pause-Schaltflächen). Im HTML steht
-     autoplay muted loop playsinline; hier wird das nur abgesichert: Start, sobald ein Video zu mindestens 20 % im Bild ist (WebKit
+     Endlosschleife, ohne Bedienelemente – niemals Play-/Pause-Schaltflächen (Entscheidungen des Auftraggebers 04.11.2026). Im HTML
+     steht muted loop playsinline, bewusst ohne autoplay: Für autoplay-Videos, die nicht laufen dürfen (iOS-/macOS-Stromsparmodus),
+     blendet WebKit eigene Play-/Pause-Bedienelemente ein. Gestartet wird nur hier: sobald ein Video zu mindestens 20 % im Bild ist (WebKit
      mobil lehnt play() für ein Video ab, das nur an den Bildschirmrand stößt), Halt erst ganz außerhalb (Akku, Daten), neuer Versuch
      nach Tabwechsel (visibilitychange), Zurück-Navigation (pageshow) und wiederkehrendem Netz (online). Browser-Regeln werden nicht
      umgangen: Lehnt der Browser ab (iOS-Stromsparmodus, Autoplay-Sperre) oder scheitert das Laden, bleibt das Standbild (Poster)
@@ -71,15 +72,16 @@
     v.playsInline = true;
     v.loop = true;
     v.controls = false;
+    v.autoplay = false;
     v.addEventListener('playing', () => zustand(v, 'läuft'));
-    /* Ein Video, das außerhalb des Bildes von selbst startet (autoplay), wieder anhalten; es startet beim Hineinscrollen */
+    /* Ein Video, das außerhalb des Bildes startet, wieder anhalten; es startet beim Hineinscrollen */
     v.addEventListener('play', () => { if (bekannt.has(v) && !sichtbar.has(v)) v.pause(); });
     v.addEventListener('pause', () => { if (!v.error && v.dataset.wiedergabe === 'läuft') zustand(v, 'angehalten'); });
     const fehler = () => zustand(v, 'Ladefehler');
     v.addEventListener('error', fehler);
     const source = v.querySelector('source');
     if (source) source.addEventListener('error', fehler);
-    if (reduce) { v.autoplay = false; v.pause(); zustand(v, 'Bewegung reduziert'); return; }
+    if (reduce) { v.pause(); zustand(v, 'Bewegung reduziert'); return; }
     /* Ist das Laden schon gescheitert, bevor dieses Skript lief, kam das error-Ereignis zu früh. NETWORK_NO_SOURCE allein beweist
        das nicht: Während der Quellenauswahl steht der Wert kurz ebenfalls dort (WebKit unter Last). load() startet die Auswahl neu;
        scheitert sie wirklich, kommt das error-Ereignis jetzt beim Listener an. */

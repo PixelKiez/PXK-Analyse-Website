@@ -288,7 +288,7 @@ export async function startWorker({ google, mail, base, scheme = 'http', authEnd
       if (db) d1 = await mf.getD1Database('DB');
     },
     /* Gesamter gespeicherter Inhalt aller Tabellen */
-    dump: async () => JSON.stringify(await Promise.all(['orders', 'notifications', 'rate_limits', 'sessions'].map(t => app.sql(`SELECT * FROM ${t}`)))),
+    dump: async () => JSON.stringify(await Promise.all(['orders', 'notifications', 'rate_limits', 'sessions', 'marketing_consents'].map(t => app.sql(`SELECT * FROM ${t}`)))),
     /* Cron-Trigger auslösen; liefert Ergebnis und die dabei geschriebenen Log-Zeilen */
     async cron() {
       const before = logs.length;
@@ -461,9 +461,11 @@ export class Client {
 
 export const field = (html, name) => (html.match(new RegExp(`name="${name}" value="([^"]*)"`)) || [])[1];
 
-/* Formular des Hero: Website, AGB-Häkchen (agb: false lässt es weg) und die angezeigte AGB-Version */
-export const startForm = ({ website = 'musterfirma.de', agb = true, agbVersion = TERMS_VERSION, extra = {} } = {}) => ({
-  action: 'start', website, ...(agb === true ? { agb: '1' } : agb === false ? {} : { agb }), ...(agbVersion === null ? {} : { agb_version: agbVersion }), ...extra,
+/* Anfrageformular: Website, AGB-Häkchen und Unternehmer-Häkchen (false lässt sie weg, ein String setzt den Wert), freiwillige
+   Werbeeinwilligung (werbung: true setzt "1") und die angezeigte AGB-Version */
+const box = (name, v) => (v === true ? { [name]: '1' } : v === false ? {} : { [name]: v });
+export const startForm = ({ website = 'musterfirma.de', agb = true, unternehmer = true, werbung = false, agbVersion = TERMS_VERSION, extra = {} } = {}) => ({
+  action: 'start', website, ...box('agb', agb), ...box('unternehmer', unternehmer), ...box('werbung', werbung), ...(agbVersion === null ? {} : { agb_version: agbVersion }), ...extra,
 });
 
 /* Hero absenden („Analysieren“) und – wenn der Worker zu Google weiterleitet – den Google-Teil bis zum Code nachbilden */

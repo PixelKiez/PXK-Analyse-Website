@@ -97,9 +97,14 @@ const CONTENT_EXEMPT = [/Checkout/i, /pro Monat|monatlich/i, /Vorschau/i, /\b\d+
 /* Analyseseiten und der Abschnitt „Pixelkiez Score“ der Startseite zeigen, wie sich der Score zusammensetzt (Entscheidungen des
    Auftraggebers 02.11.2026); überall sonst bleibt „Score“ verboten */
 const SCORE = String(/\bScore\b/i);
+/* Rechtstexte (Impressum, Datenschutz, AGB, Fassung 2026-11-04) nennen Gesetze, Fristen und Zertifizierungen der Dienstleister als
+   Pflichtangaben; dort gelten zusätzlich zu den Ausnahmen der Inhaltsseiten DSGVO, Zertifizierung, Garantie (Haftungsklausel) und
+   Beratung als Sachangabe. Verboten bleiben Premium, Score, Dashboard, Preise, Ranking-Versprechen und Konformitätsbehauptungen. */
+const RECHT = ['public/impressum.html', 'public/datenschutz.html', 'public/agb.html'];
+const RECHT_EXEMPT = [...CONTENT_EXEMPT, String(/Zertifizierung/i), String(/Garantie|garantiert/i), String(/Beratung/i), String(/\bPro\b/)];
 function claimProblems(list, art = false) {
   const p = [];
-  const exempt = art === 'analyse' ? [...CONTENT_EXEMPT, SCORE] : art === 'score' ? [SCORE] : art ? CONTENT_EXEMPT : [];
+  const exempt = art === 'analyse' ? [...CONTENT_EXEMPT, SCORE] : art === 'score' ? [SCORE] : art === 'recht' ? RECHT_EXEMPT : art ? CONTENT_EXEMPT : [];
   const rules = rs => rs.filter(re => !exempt.includes(String(re).replace(/g$/, '')));
   for (const [where, text] of list) {
     for (const re of rules(FORBIDDEN)) for (const m of text.matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g'))) {
@@ -139,10 +144,12 @@ test('Startseite: kostenloses Angebot, sechs Bereiche, sieben PDF-Seiten, GEO & 
   const text = H.norm(H.visibleText(root));
   /* Videos aus R2: Berichtsvideo neben dem Text bei „Ein PDF. Sieben Seiten.“, Befund-Video bei „Jeder Befund verständlich erklärt.“
      (an der Stelle der früheren Beispielkarte); unter dem Hero die historische Demo. Entscheidung des Auftraggebers 04.11.2026: autoplay,
-     stumm, Schleife, inline, preload="metadata", ohne Bedienelemente – weder Browser-Leiste noch eigene Play-/Pause-Schaltflächen */
+     stumm, Schleife, inline, preload="metadata", ohne Bedienelemente – weder Browser-Leiste noch eigene Play-/Pause-Schaltflächen, ohne autoplay */
   const videos = H.byTag(root, 'video');
   assert.deepEqual(videos.map(v => [H.find(root, e => e.tag === 'section' && H.find(e, x => x === v).length)[0].attrs.get('id'), H.byTag(v, 'source')[0].attrs.get('src'), v.attrs.get('poster')]), VIDEOS_EINGEBUNDEN);
-  for (const v of videos) assert.ok(['autoplay', 'muted', 'loop', 'playsinline', 'poster', 'aria-label'].every(a => v.attrs.has(a)) && !v.attrs.has('controls') && v.attrs.get('preload') === 'metadata');
+  /* Ohne autoplay: WebKit blendet für autoplay-Videos, die nicht laufen dürfen (Stromsparmodus), eigene Play-/Pause-Bedienelemente
+     ein – das darf nie sein (Entscheidung des Auftraggebers 04.11.2026). Gestartet wird per Skript (app.js) */
+  for (const v of videos) assert.ok(['muted', 'loop', 'playsinline', 'poster', 'aria-label'].every(a => v.attrs.has(a)) && !v.attrs.has('controls') && !v.attrs.has('autoplay') && v.attrs.get('preload') === 'metadata');
   /* Keine selbst erzeugten Bedienelemente: app.js erzeugt keine Schaltflächen, keine Stile dafür */
   assert.ok(!/createElement\(['"]button|video-toggle|braucht-start|video-hinweis|\.controls = true/.test(read('public/assets/app.js')), 'app.js ohne Video-Schaltflächen');
   assert.ok(!/video-toggle|braucht-start|video-hinweis/.test(read('public/assets/anfrage.css')), 'CSS ohne Video-Schaltflächen');
@@ -264,19 +271,18 @@ test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen n
   assert.match(now, /<span>02<\/span><h3>AGB akzeptieren und anmelden<\/h3>/);
 });
 
-test('AGB-Seite: eindeutig als Entwurf gekennzeichnet, keine erfundenen Vertragsklauseln; Version gleich Hero-Feld und TERMS_VERSION', () => {
+test('AGB-Seite: Fassung 2026-11-04 (Variante A, nur Unternehmer), ohne Platzhalter; der Worker bleibt bis zur Anpassung des Formulars gesperrt', () => {
+  /* Entscheidung des Auftraggebers 04.11.2026: AGB aus 03_agb.md übernommen – Werbeeinwilligung freiwillig (Variante A), nur Unternehmer
+     (§ 14 BGB), daher ohne Widerrufsbelehrung für Verbraucher; § 10 bis § 13 rücken auf */
   const { root } = H.parse(read('public/agb.html'));
   const main = H.norm(H.textOf(H.byTag(root, 'main')[0]));
-  for (const s of ['ENTWURF – nicht rechtlich freigegeben', 'in Vorbereitung', 'keine Vertragsbedingungen', 'Bis dahin nimmt diese Website keine Aufträge an']) assert.ok(main.includes(s), `AGB-Seite: „${s}“`);
-  assert.ok(!/§|Haftung|Gewährleistung|Gerichtsstand|Widerruf|Vertragsschluss|Kündigung|Leistungsumfang|Vergütung/i.test(main), 'keine Vertragsklauseln');
-  assert.deepEqual(H.byClass(root, 'legal-h').map(e => H.norm(H.textOf(e))), ['Version', 'Fragen']);
-  const version = H.norm(H.textOf(H.byId(root, 'agb-version')));
-  const toml = /^TERMS_VERSION = "([^"]+)"$/m.exec(read('worker/wrangler.toml'))[1];
-  /* Soft-Launch: Hero ohne Formular und damit ohne AGB-Feld; dann nur AGB-Seite und Worker-Konfiguration */
-  const hero = SOFT_LAUNCH ? toml : H.find(H.byId(H.parse(read('public/index.html')).root, 'analyze'), e => e.attrs.get('name') === 'agb_version')[0].attrs.get('value');
-  if (SOFT_LAUNCH) assert.ok(!read('public/index.html').includes('agb_version'), 'Soft-Launch: kein AGB-Feld im Hero');
-  assert.deepEqual([hero, toml], [version, version], 'eine AGB-Version in Hero, AGB-Seite und Worker-Konfiguration');
-  assert.match(version, /^ENTWURF-/, 'ohne freigegebene Fassung bleibt die Produktion gesperrt (config.ts lehnt ENTWURF ab)');
+  assert.ok(main.includes('Stand: 4. November 2026 · Version 2026-11-04'), 'Version');
+  assert.ok(!/ENTWURF|in Vorbereitung|Variante|\[|Widerrufsbelehrung|Muster-Widerrufsformular/.test(main), 'keine Entwurfs-, Varianten- oder Verbraucher-Widerrufsreste');
+  for (const s of ['ausschließlich an Unternehmer', 'Verbraucher können die Analyse nicht anfragen', 'Die Einwilligung nach § 6 ist freiwillig', 'keine Rechtsberatung', 'Analyse anfragen', '§ 36 VSBG']) assert.ok(main.includes(s), `AGB: „${s}“`);
+  assert.deepEqual(H.byClass(root, 'legal-h').map(e => H.norm(H.textOf(e)).split(' ').slice(0, 2).join(' ')), Array.from({ length: 13 }, (_, i) => `§ ${i + 1}`), '§ 1 bis § 13');
+  /* Die Anfragefunktion bleibt gesperrt, bis Formular und D1 den Texten entsprechen (eigenes Kästchen für Unternehmer und
+     Werbeeinwilligung, Nachweise): die Worker-Konfiguration trägt weiter ENTWURF, config.ts lehnt das in Produktion ab */
+  assert.match(/^TERMS_VERSION = "([^"]+)"$/m.exec(read('worker/wrangler.toml'))[1], /^ENTWURF-/);
   assert.ok(read('worker/src/config.ts').includes("(production && /^entwurf/i.test(termsVersion))) missing.push('TERMS_VERSION');"), 'Produktion lehnt AGB-Entwürfe ab');
 });
 
@@ -284,7 +290,7 @@ const SCORE_ABSCHNITT = /  <section class="section" id="bereiche">\n[\s\S]*?\n  
 test('Wahrheitsgemäße Aussagen: kein Premium/Checkout/Abo/Dashboard/Score, keine Garantien, keine DSGVO-Behauptung, keine Vorschau-Reste', () => {
   for (const page of PAGES) {
     const html = read(page).replace(SCORE_ABSCHNITT, '');
-    assert.deepEqual(claimProblems(surfaces(html), ANALYSE.includes(page) ? 'analyse' : INHALT.includes(page) ? 'wissen' : false), [], page);
+    assert.deepEqual(claimProblems(surfaces(html), ANALYSE.includes(page) ? 'analyse' : INHALT.includes(page) ? 'wissen' : RECHT.includes(page) ? 'recht' : false), [], page);
   }
   /* Startseite: im Abschnitt „Pixelkiez Score“ ist nur „Score“ erlaubt, alle übrigen Regeln gelten */
   const abschnitt = read('public/index.html').match(SCORE_ABSCHNITT)[0];
@@ -297,7 +303,7 @@ test('Wahrheitsgemäße Aussagen: kein Premium/Checkout/Abo/Dashboard/Score, kei
   assert.ok(analyse.length >= 2 && !analyse.some(x => /Score/.test(x.split('(')[0])), 'Analyseseiten: Score erlaubt, Premium und Garantie bleiben verboten');
   assert.ok(claimProblems([['Probe', 'Ihr Pixelkiez Score.']]).length >= 1, 'Angebotsseiten: Score bleibt verboten');
   assert.deepEqual(claimProblems([['view.ts', viewText()]]), []);
-  for (const s of ['Kostenlose Website-Analyse – 0 €, kein Abo', 'PDF mit sieben Seiten', 'keinen Zugriff auf Ihr Postfach', 'nicht automatisch abgerufen oder gescannt', 'Version und Zeitpunkt Ihrer Zustimmung zu den AGB', 'Analysieren']) {
+  for (const s of ['Kostenlose Website-Analyse – 0 €, kein Abo', 'PDF mit sieben Seiten', 'keinen Zugriff auf Ihr Postfach', 'nicht automatisch abgerufen oder gescannt', 'Wortlaut, Version und Zeitpunkt Ihrer Bestätigungen', 'vier Monate nach Eingang', 'Analyse anfragen']) {
     assert.ok(viewText().includes(s), `view.ts enthält "${s}"`);
   }
   /* Negativprobe: der alte Stand mit Free/Premium wird erkannt */
@@ -437,11 +443,12 @@ test('Links: interne Anker gültig, zu pixelkiez.de nur der Partner-Link, sonst 
   /* Auch serverseitig gerenderte Seiten und Konfigurationsvorlagen: zu pixelkiez.de nur der Partner-Link (Startseite, neuer Tab) */
   for (const f of [...PAGES, VIEW, 'worker/wrangler.toml', 'worker/.dev.vars.example', 'wrangler.toml', 'public/_headers', FUNCTION]) {
     assert.ok(!/https?:\/\/(www\.)?pixelkiez\.de/i.test(read(f).replaceAll(PARTNER_LINK, '')), `${f}: Link zu pixelkiez.de außer dem Partner-Link`);
+    /* Auch Rechtstexte und Einwilligung: Pixelkiez-Webdesign gehört nicht zu 360°Pixelkiez (Entscheidung des Auftraggebers 04.11.2026) */
     assert.ok(!/Webdesign/i.test(read(f)), `${f}: kein Bezug auf Webdesign`);
   }
 });
 
-test('Eigenständige Website 360°Pixelkiez: Name in Titel, Logo und Footer; Impressum und Datenschutz als eigene Seiten', () => {
+test('Eigenständige Website 360°Pixelkiez: Name in Titel, Logo und Footer; Impressum, Datenschutz und AGB als eigene Seiten (Fassung 2026-11-04)', () => {
   const view = read(VIEW);
   for (const page of PAGES) {
     const { root } = H.parse(read(page));
@@ -449,23 +456,27 @@ test('Eigenständige Website 360°Pixelkiez: Name in Titel, Logo und Footer; Imp
     assert.ok(H.byClass(root, 'logo').every(l => H.norm(H.textOf(l)).startsWith('360°Pixelkiez')), `${page}: Logo`);
     const legal = H.find(root, e => e.tag === 'nav' && e.attrs.get('aria-label') === 'Rechtliches')[0];
     /* relativ zur Seite aufgelöst: auch die Wissensseiten in wissen/ verweisen auf dieselben Rechtsseiten */
-    assert.deepEqual(H.byTag(legal, 'a').map(a => new URL(a.attrs.get('href'), `https://360.pixelkiez.de/${page.slice(7)}`).pathname.slice(1)), ['impressum.html', 'datenschutz.html'], `${page}: Rechtliches`);
+    assert.deepEqual(H.byTag(legal, 'a').map(a => new URL(a.attrs.get('href'), `https://360.pixelkiez.de/${page.slice(7)}`).pathname.slice(1)), ['impressum.html', 'datenschutz.html', 'agb.html'], `${page}: Rechtliches (mit AGB, Entscheidung des Auftraggebers 04.11.2026)`);
     assert.match(H.norm(H.textOf(H.byClass(root, 'footer')[0])), /© 2026 360°Pixelkiez/, `${page}: Copyright`);
   }
   assert.match(view, /© 2026 360°Pixelkiez/);
   assert.ok(view.includes('<a href="${b}/impressum.html">Impressum</a><a href="${b}/datenschutz.html">Datenschutz</a>'), 'Anfrageseiten: Impressum und Datenschutz');
   const imprint = H.norm(H.textOf(H.byTag(H.parse(read('public/impressum.html')).root, 'main')[0]));
-  for (const s of ['§ 5 Digitale-Dienste-Gesetz (DDG)', 'Vincent Schnetzer', '360°Pixelkiez', 'Edelhofdamm 74', '13465 Berlin', '360@pixelkiez.de', '§ 18 Abs. 2 MStV', 'Verbraucherschlichtungsstelle']) {
+  for (const s of ['§ 5 Digitale-Dienste-Gesetz (DDG)', 'Vincent Schnetzer', '360°Pixelkiez', 'Edelhofdamm 74', '13465 Berlin', 'Einzelunternehmen', '360@pixelkiez.de', '§ 18 Abs. 2 MStV', 'Verbraucherschlichtungsstelle', 'Stand: 4. November 2026']) {
     assert.ok(imprint.includes(s), `Impressum enthält "${s}"`);
   }
+  /* Entscheidung des Auftraggebers 04.11.2026: keine Umsatzsteuer-ID (noch nicht erteilt), keine Platzhalter */
+  assert.ok(!/Umsatzsteuer|USt-?Id|Wirtschafts-Identifikationsnummer|Telefon|\[/.test(imprint), 'Impressum ohne USt-ID, W-IdNr., Telefon-Platzhalter');
   const privacy = H.norm(H.textOf(H.byTag(H.parse(read('public/datenschutz.html')).root, 'main')[0]));
-  assert.match(privacy, /in Vorbereitung/, 'Datenschutzerklärung als unvollständig gekennzeichnet, bis sie fertiggestellt ist');
-  assert.match(privacy, /ENTWURF – nicht rechtlich freigegeben/);
+  /* Veröffentlichte Fassung (Entscheidung des Auftraggebers 04.11.2026): ohne Entwurfsvermerk, ohne offene Platzhalter */
+  assert.ok(privacy.includes('Version 2026-11-04') && !/ENTWURF|in Vorbereitung|\[/.test(privacy), 'Datenschutzerklärung: Fassung 2026-11-04 ohne Entwurfsvermerk und Platzhalter');
   assert.ok(privacy.includes('Vincent Schnetzer') && privacy.includes('360@pixelkiez.de'), 'Verantwortlicher genannt');
-  /* Entwurf nennt die tatsächlich genutzten Dienste und Datenflüsse; offene Punkte stehen in eckigen Klammern */
-  for (const s of ['Cloudflare Pages', 'Cloudflare Workers', 'Cloudflare-D1-Datenbank mit EU-Jurisdiktion', 'Google Ireland Limited', '„openid“ und „email“', 'Resend', 'Schriftarten', '__Host-pxwa', 'HMAC', '[Frist noch nicht festgelegt']) {
-    assert.ok(privacy.includes(s), `Datenschutz-Entwurf nennt "${s}"`);
+  /* Nennt die tatsächlich genutzten Dienste und Datenflüsse */
+  for (const s of ['Cloudflare Pages', 'Cloudflare Workers', 'Cloudflare-D1-Datenbank', 'Jurisdiktionsbeschränkung „Europäische Union“', 'Google Ireland Limited', '`openid` und `email`'.replaceAll('`', ''), 'Resend', 'Hostinger International Ltd.', '__Host-pxwa', 'HMAC', 'Berliner Beauftragte für Datenschutz']) {
+    assert.ok(privacy.includes(s), `Datenschutzerklärung nennt "${s}"`);
   }
+  /* Schriften kommen von dieser Website; Analysewerkzeuge werden nicht genannt (Entscheidung des Auftraggebers 04.11.2026) */
+  assert.ok(!/Google Fonts|fonts\.googleapis|PageSpeed|Lighthouse|KI-Sprachmodell/.test(privacy), 'keine Google-Fonts-Angabe, keine Werkzeugliste');
   assert.ok(!/Railway|Hostinger-PHP|Supabase/.test(privacy), 'keine verworfenen Dienste');
 });
 
@@ -679,7 +690,10 @@ test('Release-Grenze API (privater Worker): keine Route, keine workers.dev-Adres
   assert.match(active, /^PRIVACY_VERSION = "ENTWURF-/m, 'Datenschutzerklärung nicht freigegeben: Produktion nimmt keine Aufträge an');
   assert.match(active, /^TERMS_VERSION = "ENTWURF-/m, 'AGB nicht freigegeben: Produktion nimmt keine Aufträge an');
   assert.match(active, /^MAIL_NOTIFY_TO = "360@pixelkiez\.de"$/m);
-  assert.ok(!/^ORDER_RETENTION_DAYS\s*=/m.test(active), 'Löschfrist nicht aktiv, solange die Aufbewahrungsfrist offen ist');
+  /* Entscheidung des Auftraggebers 04.11.2026: Anfragedaten vier Monate nach Eingang löschen (Datenschutzerklärung Abschnitte 8 und 16) */
+  assert.match(active, /^ORDER_RETENTION_DAYS = "120"$/m, 'Löschfrist vier Monate');
+  /* Betriebsprotokoll nur mit eigenen Meldungen, ohne automatische Aufrufprotokolle (Datenschutzerklärung Abschnitt 5) */
+  assert.match(active, /^\[observability\.logs\]\ninvocation_logs = false$/m, 'keine Aufrufprotokolle mit Anfrage-Metadaten');
   const config = read('worker/src/config.ts');
   assert.match(config, /export const AUTHORIZED_MAIL_API_HOSTS: readonly string\[\] = \['api\.resend\.com'\];/);
   assert.match(config, /export const AUTHORIZED_MAIL_FROM_DOMAINS: readonly string\[\] = \['notify\.pixelkiez\.de'\];/);
@@ -690,22 +704,28 @@ test('Release-Grenze API (privater Worker): keine Route, keine workers.dev-Adres
   for (const f of [...PAGES, ...WORKER_SRC, 'worker/wrangler.toml', 'worker/.dev.vars.example', 'wrangler.toml', FUNCTION, MEDIA_FUNCTION, 'public/_headers', 'public/assets/app.js']) {
     assert.ok(!/kontakt@pixelkiez\.de/i.test(read(f)), `${f}: keine frühere Adresse kontakt@pixelkiez.de`);
   }
-  assert.deepEqual([...new Set([...PAGES, VIEW].flatMap(f => [...read(f).matchAll(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi)].map(m => m[0])))], ['360@pixelkiez.de'], 'einzige Mailadresse auf der Website');
+  /* Einzige eigene Adresse ist 360@pixelkiez.de; die Datenschutzerklärung nennt zusätzlich die Aufsichtsbehörde (Art. 77 DSGVO) */
+  const adressen = f => [...read(f).matchAll(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi)].map(m => m[0]).filter(a => !(f === 'public/datenschutz.html' && a === 'mailbox@datenschutz-berlin.de'));
+  assert.deepEqual([...new Set([...PAGES, VIEW].flatMap(adressen))], ['360@pixelkiez.de'], 'einzige Mailadresse auf der Website');
 });
 
-test('D1-Schema: nur die nötigen Tabellen und Spalten (Datenminimierung), keine Tokens; Migration 0002 rein additiv', () => {
+test('D1-Schema: nur die nötigen Tabellen und Spalten (Datenminimierung), keine Tokens, keine IP-Adressen; Migrationen 0002 und 0003 rein additiv', () => {
   const sql = MIGRATIONS.join('\n');
   const tables = Object.fromEntries([...sql.matchAll(/CREATE TABLE IF NOT EXISTS (\w+) \(([\s\S]*?)\n\);/g)].map(([, name, body]) => [name,
     body.split('\n').map(l => l.trim().split(/\s+/)[0]).filter(c => c && !['PRIMARY'].includes(c))]));
   for (const [, table, column] of sql.matchAll(/^ALTER TABLE (\w+) ADD COLUMN (\w+)/gm)) tables[table].push(column);
-  assert.equal(MIGRATIONS.length, 2);
-  const additive = MIGRATIONS[1].replace(/^\s*--.*$/gm, '').split(';').map(x => x.trim()).filter(Boolean);
-  assert.deepEqual(additive, ['ALTER TABLE orders ADD COLUMN terms_version TEXT NULL', 'ALTER TABLE orders ADD COLUMN terms_accepted_at TEXT NULL'], '0002: nur neue Spalten, kein DROP/UPDATE/DELETE');
+  assert.equal(MIGRATIONS.length, 3);
+  const statementsOf = m => m.replace(/^\s*--.*$/gm, '').split(';').map(x => x.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  assert.deepEqual(statementsOf(MIGRATIONS[1]), ['ALTER TABLE orders ADD COLUMN terms_version TEXT NULL', 'ALTER TABLE orders ADD COLUMN terms_accepted_at TEXT NULL'], '0002: nur neue Spalten, kein DROP/UPDATE/DELETE');
+  /* 0003 (Rechtstexte 2026-11-04): Nachweis der Erklärungen je Auftrag, eigene Tabelle für Werbeeinwilligungen – nur hinzufügen */
+  assert.ok(statementsOf(MIGRATIONS[2]).every(x => /^(ALTER TABLE orders ADD COLUMN|CREATE TABLE IF NOT EXISTS marketing_consents|CREATE INDEX IF NOT EXISTS)/.test(x)), '0003: nur neue Spalten, Tabelle und Index');
   assert.deepEqual(tables, {
-    orders: ['id', 'reference', 'idempotency_key', 'google_sub', 'email', 'website_url', 'privacy_version', 'status', 'created_at', 'terms_version', 'terms_accepted_at'],
+    orders: ['id', 'reference', 'idempotency_key', 'google_sub', 'email', 'website_url', 'privacy_version', 'status', 'created_at', 'terms_version', 'terms_accepted_at', 'business_confirmed', 'marketing_consent', 'declarations'],
     notifications: ['id', 'order_id', 'status', 'attempts', 'next_attempt_at', 'locked_until', 'last_error', 'sent_at', 'created_at'],
     rate_limits: ['bucket', 'window_start', 'hits'],
     sessions: ['id_hash', 'data', 'version', 'created_at', 'expires_at'],
+    /* Werbeeinwilligung bis zum Widerruf, ohne Website-Adresse (Datenschutzerklärung Abschnitt 12) */
+    marketing_consents: ['id', 'google_sub', 'email', 'wording', 'privacy_version', 'given_at', 'order_reference', 'revoked_at'],
   });
   assert.ok(!/token|password|ip_address/i.test(sql.replace(/^\s*--.*$/gm, '')));
 });

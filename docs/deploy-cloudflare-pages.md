@@ -208,17 +208,17 @@ R2-Fehler). `Content-Type: video/mp4` ist fest, unabhängig von den Metadaten im
 Functions; ein Test vergleicht beide), dazu `Cross-Origin-Resource-Policy: same-origin` und `X-Robots-Tag: noindex`.
 Lokal geprüft (`wrangler pages dev` mit lokalem R2, Playwright): Chromium und WebKit spielen alle drei eingebundenen Videos mit 206.
 
-Wiedergabe (Entscheidung des Auftraggebers 04.11.2026: keine Play-/Pause-Schaltflächen, keine Bedienelemente): `<video autoplay
-muted loop playsinline preload="metadata">`. `app.js` sichert stumm/inline/Schleife ab, startet ein Video, sobald es zu mindestens
-20 % im Bild ist (WebKit mobil lehnt `play()` für ein Video am Bildschirmrand ab), hält es erst ganz außerhalb an und versucht es nach
-Tabwechsel (`visibilitychange`), Zurück-Navigation (`pageshow`) und wiederkehrendem Netz (`online`) erneut. Der Zustand steht zur
-Diagnose in `data-wiedergabe` (läuft, angehalten, `abgelehnt: <Grund>`, Ladefehler, Bewegung reduziert). Browser-Regeln werden nicht
-umgangen: Lehnt der Browser ab (iOS-Stromsparmodus, Autoplay-Sperre) oder ist „Bewegung reduzieren“ eingestellt, bleibt das Standbild.
-Bekannte Systemgrenze: WebKit erzwingt im Stromsparmodus (iOS, macOS) für `autoplay`-Videos, die nicht laufen, eigene native
-Bedienelemente (lokal mit Playwright-WebKit auf macOS im Stromsparmodus beobachtet: Leiste mit Play, Zeit, AirPlay, Ton); deren
-Symbole lädt WebKit aus `blob:`-Adressen, die die CSP (`img-src 'self'`) sperrt (Konsolenmeldung „Button failed to load …“). Die
-Seite blendet diese Systemelemente nicht aus. Ersatz durch animierte Bilder (WebP, 640 px, 12 Bilder/s: 1,1 / 3,1 / 1,7 MB) wurde
-geprüft und nicht eingebaut: sichtbar unschärfer (kleine Schrift), ruckeliger, Verhalten im iOS-Stromsparmodus unbelegt.
+Wiedergabe (Entscheidungen des Auftraggebers 04.11.2026: niemals Play-/Pause-Schaltflächen, keine Bedienelemente): `<video muted
+loop playsinline preload="metadata">`, bewusst ohne `autoplay` und ohne `controls`. Grund: Für `autoplay`-Videos, die nicht laufen
+dürfen, blendet WebKit im Stromsparmodus (iOS, macOS) eigene Play-/Pause-Bedienelemente ein (lokal mit Playwright-WebKit auf macOS im
+Stromsparmodus beobachtet); ohne `autoplay` tut es das nicht. Gestartet wird nur per Skript: `app.js` sichert stumm/inline/Schleife ab,
+startet ein Video, sobald es zu mindestens 20 % im Bild ist (WebKit mobil lehnt `play()` für ein Video am Bildschirmrand ab), hält es
+erst ganz außerhalb an und versucht es nach Tabwechsel (`visibilitychange`), Zurück-Navigation (`pageshow`) und wiederkehrendem Netz
+(`online`) erneut. Der Zustand steht zur Diagnose in `data-wiedergabe` (läuft, angehalten, `abgelehnt: <Grund>`, Ladefehler,
+Bewegung reduziert). Browser-Regeln werden nicht umgangen: Lehnt der Browser ab (iOS-Stromsparmodus, Autoplay-Sperre) oder ist
+„Bewegung reduzieren“ eingestellt, bleibt das Standbild – ohne Bedienelemente. Ersatz durch animierte Bilder (WebP, 640 px,
+12 Bilder/s: 1,1 / 3,1 / 1,7 MB) wurde geprüft und nicht eingebaut: sichtbar unschärfer (kleine Schrift), ruckeliger, Verhalten im
+iOS-Stromsparmodus unbelegt.
 
 Kosten und Grenzen (Free-Plan): Jede Video-Anfrage ist ein Function-Aufruf (Workers-Kontingent, 100 000 Anfragen pro
 Tag; Safari stellt je Video etwa zwei Anfragen) und zwei R2-Lesevorgänge (`head`, `get`). Ist das Kontingent erschöpft
@@ -231,15 +231,19 @@ eingebundenen Videos.
 
 ## 8. Daten, Backup, Aufbewahrung
 
-- Je Auftrag: Referenz, Google-Kennung, bestätigte E-Mail, Website, Datenschutz-Version, Zeitpunkt, Zustellstatus.
+- Je Auftrag: Referenz, Google-Kennung, bestätigte E-Mail, Website, Datenschutz- und AGB-Version, Zeitpunkte, Unternehmer-Bestätigung,
+  Werbeeinwilligung (ja/nein), Wortlaut der bestätigten Kästchen (Migration 0003), Bearbeitungs- und Zustellstatus. Werbeeinwilligungen
+  zusätzlich in `marketing_consents` (ohne Website-Adresse; bis zum Widerruf, dann `revoked_at` setzen – Sperrliste).
   Sessions (Hash der Cookie-ID, Ablauf nach 1 h) und pseudonymisierte Rate-Limits löscht der Cron. Keine Tokens.
 - Backup: D1 Time Travel; vor jeder Schemaänderung zusätzlich `npx wrangler d1 export pxwa --remote --output pxwa-<datum>.sql`
   (enthält personenbezogene Daten: verschlüsselt ablegen, nie ins Repository).
-- Aufbewahrung: Frist **offen** (D-5). Vorbereitet, aber nicht aktiv: `ORDER_RETENTION_DAYS` (Tage). Ist der Wert
-  gesetzt, löscht der Cron nur Aufträge mit `status = 'completed'`, deren Eingang älter als die Frist ist, samt
-  Benachrichtigung. Offene Aufträge (`received`) bleiben immer erhalten. Bezugspunkt der Frist (Eingang oder
-  Erledigung) gehört zur Entscheidung D-5. Erledigt markieren nach dem Versand des Berichts:
-  `npx wrangler d1 execute pxwa --remote --command "UPDATE orders SET status = 'completed' WHERE reference = 'PXA-…'"`.
+- Aufbewahrung (Entscheidung des Auftraggebers 04.11.2026): `ORDER_RETENTION_DAYS = "120"` – der Cron löscht jeden Auftrag samt
+  Benachrichtigung vier Monate nach Eingang, unabhängig vom Status (Datenschutzerklärung Abschnitte 8 und 16). Bericht und Mails
+  dazu im Postfach 360@pixelkiez.de nach derselben Frist löschen, soweit keine Aufbewahrungspflicht besteht. Werbeeinwilligungen
+  bleiben bis zum Widerruf; Widerruf eintragen:
+  `npx wrangler d1 execute pxwa --remote --command "UPDATE marketing_consents SET revoked_at = datetime('now') WHERE email = '…' AND revoked_at IS NULL"`.
+- Betriebsprotokoll: Workers Logs ohne Aufrufprotokolle (`[observability.logs] invocation_logs = false`), nur eigene Meldungen
+  ohne IP-, E-Mail- und Website-Adressen; Aufbewahrung bei Cloudflare 3 Tage (Free) bzw. 7 Tage (Paid).
 - Nicht zugestellte Benachrichtigungen wöchentlich prüfen:
   `npx wrangler d1 execute pxwa --remote --command "SELECT o.reference, n.status, n.attempts, n.last_error FROM orders o JOIN notifications n ON n.order_id = o.id WHERE n.status <> 'sent'"`.
 - Nach Korrektur eines dauerhaften Fehlers (Abschnitt 6) erneut einreihen; der nächste Cron-Lauf versendet einmal:

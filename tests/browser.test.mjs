@@ -190,7 +190,7 @@ test('Befund-Video bei „Jeder Befund verständlich erklärt“: links neben de
     });
     await page.waitForFunction(() => document.querySelector('#nutzen .showcase-video').paused);
     const before = await state();
-    assert.deepEqual([before.paused, before.heroVideo, before.autoplay, before.knoepfe], [true, 1, true, 0], `${width}: außerhalb des Bildes angehalten; Hero-Video (Demo) da; autoplay; keine Schaltflächen`);
+    assert.deepEqual([before.paused, before.heroVideo, before.autoplay, before.knoepfe], [true, 1, false, 0], `${width}: außerhalb des Bildes angehalten; Hero-Video (Demo) da; ohne autoplay (Start per Skript); keine Schaltflächen`);
     await page.evaluate(() => document.querySelector('#nutzen .showcase-frame').scrollIntoView({ block: 'center' }));
     await page.waitForFunction(() => { const v = document.querySelector('#nutzen .showcase-video'); return !v.paused && v.currentTime > 0.3; }, null, { timeout: 8000 });
     const m = await state();
@@ -363,7 +363,7 @@ test('Videos ohne Bedienelemente: alle drei starten stumm, inline und in Schleif
             await zeige(page, sec);
             await laeuft(page, sec);
             const m = await page.evaluate(s => { const v = document.querySelector(`${s} .showcase-video`); return [v.muted, v.defaultMuted, v.playsInline, v.loop, v.autoplay, v.controls, v.dataset.wiedergabe]; }, sec);
-            assert.deepEqual(m, [true, true, true, true, true, false, 'läuft'], `${was} ${sec}: stumm, inline, Schleife, autoplay, ohne Leiste`);
+            assert.deepEqual(m, [true, true, true, true, false, false, 'läuft'], `${was} ${sec}: stumm, inline, Schleife, ohne autoplay-Attribut (Start per Skript), ohne Leiste`);
             assert.deepEqual(await ohneKnoepfe(page), { knoepfe: 0, controls: 0, vollbild: false }, `${was} ${sec}: keine Schaltflächen, kein Vollbild`);
             /* Ende der Datei: läuft in Schleife weiter */
             await page.evaluate(s => { const v = document.querySelector(`${s} .showcase-video`); v.currentTime = v.duration - 0.3; }, sec);

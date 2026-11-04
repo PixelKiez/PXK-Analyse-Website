@@ -48,12 +48,17 @@ test('Website + AGB + Google: genau ein Free-Auftrag mit AGB-Version und Zustimm
   assert.equal(field(first.text, 'agb_version'), TERMS_VERSION);
   assert.match(first.text, /href="\/agb\.html">AGB<\/a>/);
   assert.match(first.text, /href="\/datenschutz\.html">Datenschutzerklärung<\/a>/);
-  assert.match(first.text, /type="submit">Analysieren<\/button>/);
+  assert.match(first.text, /type="submit">Analyse anfragen<\/button>/);
+  /* Drei Kästchen, keins vorausgewählt: AGB und Unternehmer Pflicht, Werbung freiwillig (Rechtstexte 2026-11-04, Variante A, nur Unternehmer) */
+  assert.match(first.text, /<input id="unternehmer" type="checkbox" name="unternehmer" value="1" required><span>Ich frage die Analyse als Unternehmer an/);
+  assert.match(first.text, /<input id="werbung" type="checkbox" name="werbung" value="1"><span>Freiwillig: Ja, 360°Pixelkiez darf mir per E-Mail/);
+  assert.match(first.text, /href="\/datenschutz\.html#werbung">Datenschutzerklärung, Abschnitt 12<\/a>/);
+  assert.ok(!/checked/.test(first.text) && !/Webdesign/.test(first.text), 'nichts vorausgewählt, kein Webdesign im Einwilligungsumfang');
   assert.match(first.text, /Kostenlose Website-Analyse – 0 €, kein Abo/);
   /* Datenhinweis wie der Ablauf: Website und AGB-Zustimmung liegen schon vor der Google-Anmeldung in der Session (siehe flow unten),
      Auftrag mit E-Mail-Adresse erst nach der Anmeldung, ohne abgeschlossene Anmeldung weder Auftrag noch Benachrichtigung */
-  assert.match(first.text, /<li>Vor der Google-Anmeldung speichern wir Ihre Website-Adresse sowie Version und Zeitpunkt Ihrer Zustimmung zu den AGB vorübergehend in einer serverseitigen Sitzung\. Wird die Anmeldung nicht abgeschlossen, entsteht daraus kein Auftrag, und Pixelkiez erhält keine Benachrichtigung\.<\/li>/);
-  assert.match(first.text, /<li>Erst nach erfolgreicher Google-Anmeldung und mit gültiger Zustimmung entsteht der eigentliche kostenlose Analyseauftrag\. Erst dann ordnen wir ihm Ihre von Google bestätigte E-Mail-Adresse und die Kennung Ihres Google-Kontos zu; dazu kommen der Zeitpunkt der Anfrage sowie Version und Zeitpunkt Ihrer Zustimmung zu den AGB\.<\/li>/);
+  assert.match(first.text, /<li>Vor der Google-Anmeldung speichern wir Ihre Website-Adresse und Ihre Angaben aus den Kästchen höchstens zehn Minuten in einer serverseitigen Sitzung\. Wird die Anmeldung nicht abgeschlossen, entsteht daraus kein Auftrag, und Pixelkiez erhält keine Benachrichtigung\.<\/li>/);
+  assert.match(first.text, /<li>Erst nach erfolgreicher Google-Anmeldung entsteht der kostenlose Analyseauftrag\. Dazu speichern wir Ihre von Google bestätigte E-Mail-Adresse, die Kennung Ihres Google-Kontos, den Zeitpunkt der Anfrage sowie Wortlaut, Version und Zeitpunkt Ihrer Bestätigungen\. Die Anfragedaten löschen wir automatisch vier Monate nach Eingang\.<\/li>/);
   assert.doesNotMatch(first.text, /Erst nach der Google-Anmeldung speichern wir Ihre Website-Adresse/, 'keine Behauptung, die Website-Adresse werde erst nach der Anmeldung gespeichert');
   const t0 = Math.floor(Date.now() / 1000);
   const { start, auth, callbackPath } = await begin(c, google, { website: 'HTTPS://WWW.Musterfirma.DE/leistungen?utm_source=x#top' });
@@ -74,6 +79,7 @@ test('Website + AGB + Google: genau ein Free-Auftrag mit AGB-Version und Zustimm
   assert.equal(flow.consent.url, 'https://www.musterfirma.de/leistungen', 'URL normalisiert, Query und Fragment verworfen');
   assert.equal(flow.consent.version, TERMS_VERSION);
   assert.ok(flow.consent.at >= t0 && flow.consent.at <= t0 + 5, 'Zeitpunkt vom Server');
+  assert.deepEqual([flow.consent.business, flow.consent.marketing], [true, false], 'Unternehmer bestätigt, keine Werbeeinwilligung');
   assert.deepEqual(await counts(), NOTHING, 'vor der Rückkehr von Google noch kein Auftrag');
   const callback = await c.req('GET', callbackPath);
   assert.equal(callback.status, 303);
@@ -92,10 +98,16 @@ test('Website + AGB + Google: genau ein Free-Auftrag mit AGB-Version und Zustimm
   assert.equal(done.headers.get('cache-control'), 'no-store');
   const rows = await orders();
   assert.equal(rows.length, 1);
-  assert.deepEqual(Object.keys(rows[0]).sort(), ['created_at', 'email', 'google_sub', 'id', 'idempotency_key', 'privacy_version', 'reference', 'status', 'terms_accepted_at', 'terms_version', 'website_url']);
+  assert.deepEqual(Object.keys(rows[0]).sort(), ['business_confirmed', 'created_at', 'declarations', 'email', 'google_sub', 'id', 'idempotency_key', 'marketing_consent', 'privacy_version', 'reference', 'status', 'terms_accepted_at', 'terms_version', 'website_url']);
   const o = rows[0];
   assert.deepEqual([o.reference, o.email, o.website_url, o.privacy_version, o.status], [ref, CUSTOMER, 'https://www.musterfirma.de/leistungen', 'TEST-2026-10-30', 'received']);
   assert.deepEqual([o.terms_version, o.terms_accepted_at], [TERMS_VERSION, utc(flow.consent.at)], 'AGB-Version und Zeitpunkt der Zustimmung (vor der Anmeldung) gespeichert');
+  /* Nachweis (Art. 7 Abs. 1 DSGVO): Unternehmer bestätigt, keine Werbeeinwilligung, Wortlaut genau der beiden Pflichtkästchen */
+  assert.deepEqual([o.business_confirmed, o.marketing_consent], [1, 0]);
+  assert.deepEqual(o.declarations.split('\n'), [
+    'Ich beauftrage die kostenlose Website-Analyse für die angegebene Adresse. Es gelten die AGB. Die Datenschutzerklärung habe ich zur Kenntnis genommen.',
+    'Ich frage die Analyse als Unternehmer an (gewerblich, freiberuflich, Verein oder Organisation, § 14 BGB).']);
+  assert.equal((await app.sql('SELECT COUNT(*) AS n FROM marketing_consents'))[0].n, 0, 'ohne Häkchen keine Werbeeinwilligung');
   await settled();
   assert.equal(mail.state.accepted.length, 1, 'genau eine Mail');
   const m = mail.state.accepted[0];
@@ -133,7 +145,7 @@ test('Ohne AGB-Häkchen: kein Auftrag, keine Session, keine Weiterleitung zu Goo
     assert.equal(r.status, 422, `agb=${JSON.stringify(agb)}`);
     assert.equal(r.location, null, 'keine Weiterleitung zu Google');
     assert.deepEqual(r.headers.getSetCookie(), [], 'keine Session');
-    assert.match(r.text, /Bitte akzeptieren Sie die AGB/);
+    assert.match(r.text, /Bitte bestätigen Sie die Beauftragung und die AGB/);
     assert.match(r.text, /<input id="agb" type="checkbox" name="agb" value="1" required aria-invalid="true" aria-describedby="agb-error" autofocus>/, 'Häkchen markiert, Fokus darauf, nicht vorausgewählt');
     assert.ok(r.text.includes('value="musterfirma.de/?a=1&amp;b=&#039;2&#039;"'), 'Eingabe bleibt erhalten und ist escaped');
   }
@@ -146,6 +158,43 @@ test('Ohne AGB-Häkchen: kein Auftrag, keine Session, keine Weiterleitung zu Goo
   assert.deepEqual(await counts(), NOTHING);
   assert.equal((await app.sql('SELECT COUNT(*) AS n FROM sessions'))[0].n, 0);
   assert.equal(google.log.token.length, tokens, 'Google wird nicht kontaktiert');
+});
+
+test('Ohne Unternehmer-Häkchen: kein Auftrag, keine Session, keine Weiterleitung zu Google; Fehler am Häkchen mit Fokus (nur Unternehmer, AGB § 4 Abs. 2)', { skip }, async () => {
+  await reset();
+  const tokens = google.log.token.length;
+  for (const [i, unternehmer] of [false, '0', '', 'on', 'true', '1 '].entries()) {
+    const c = new Client(app, { ip: `198.51.100.${60 + i}` });
+    const r = await c.req('POST', '/api/anfrage', { form: startForm({ unternehmer }) });
+    assert.equal(r.status, 422, `unternehmer=${JSON.stringify(unternehmer)}`);
+    assert.equal(r.location, null, 'keine Weiterleitung zu Google');
+    assert.deepEqual(r.headers.getSetCookie(), [], 'keine Session');
+    assert.match(r.text, /Die Analyse ist nur für Unternehmer möglich/);
+    assert.match(r.text, /<input id="unternehmer" type="checkbox" name="unternehmer" value="1" required aria-invalid="true" aria-describedby="unternehmer-error" autofocus>/);
+  }
+  assert.deepEqual(await counts(), NOTHING);
+  assert.equal(google.log.token.length, tokens, 'Google wird nicht kontaktiert');
+});
+
+test('Werbeeinwilligung freiwillig: nur "1" gilt; mit Einwilligung Wortlaut am Auftrag und eigener Nachweis in marketing_consents (ohne Website-Adresse), der die Löschung des Auftrags überdauert', { skip }, async () => {
+  await reset();
+  /* Andere Werte als "1" gelten nicht als Einwilligung – die Anfrage selbst bleibt möglich */
+  const ohne = new Client(app, { ip: '198.51.100.70' });
+  const r0 = await login(ohne, google, { website: 'firma-ohne.de', werbung: 'on' });
+  assert.equal(r0.callback.status, 303);
+  const c = new Client(app, { ip: '198.51.100.71' });
+  const r1 = await login(c, google, { website: 'firma-mit.de', werbung: true });
+  assert.equal(r1.callback.status, 303);
+  const rows = await app.sql('SELECT reference, website_url, marketing_consent, declarations, privacy_version, terms_accepted_at FROM orders ORDER BY id');
+  assert.deepEqual(rows.map(o => [o.website_url, o.marketing_consent, o.declarations.split('\n').length]), [['https://firma-ohne.de', 0, 2], ['https://firma-mit.de', 1, 3]]);
+  assert.match(rows[1].declarations.split('\n')[2], /^Ja, 360°Pixelkiez darf mir per E-Mail Informationen und Angebote zur Website-Analyse von 360°Pixelkiez, Fachinformationen zu Website-Technik, SEO und KI-Auffindbarkeit sowie Bitten um Feedback zu meinem Bericht senden – auch als Newsletter\. Ich kann diese Einwilligung jederzeit widerrufen/);
+  const consents = await app.sql('SELECT * FROM marketing_consents');
+  assert.equal(consents.length, 1);
+  const k = consents[0];
+  assert.deepEqual([k.email, k.order_reference, k.privacy_version, k.given_at, k.revoked_at, k.wording], [CUSTOMER, rows[1].reference, rows[1].privacy_version, rows[1].terms_accepted_at, null, rows[1].declarations.split('\n')[2]]);
+  assert.ok(!JSON.stringify(k).includes('firma-mit'), 'Nachweis ohne Website-Adresse');
+  assert.ok(!/Webdesign/.test(k.wording), 'Einwilligungsumfang ohne Webdesign');
+  await reset();
 });
 
 test('Manipulierte Zustimmung: falsche, fehlende oder veraltete AGB-Version im Formular und manipulierte Zustimmung in der Session → kein Auftrag', { skip }, async () => {

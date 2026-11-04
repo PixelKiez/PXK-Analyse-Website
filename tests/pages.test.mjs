@@ -397,7 +397,7 @@ test('Lokales Pages mit Worker über das Service Binding: Website + AGB → Func
     /* Ohne AGB-Häkchen lehnt der Worker auch hinter der Function ab: keine Weiterleitung, keine Session */
     const noAgb = await c.req('POST', '/api/anfrage', { form: startForm({ agb: false }) });
     assert.deepEqual([noAgb.status, noAgb.location, noAgb.headers.getSetCookie().length], [422, null, 0]);
-    assert.match(noAgb.text, /Bitte akzeptieren Sie die AGB/);
+    assert.match(noAgb.text, /Bitte bestätigen Sie die Beauftragung und die AGB/);
     const crossSite = await c.req('POST', '/api/anfrage', { form: startForm(), headers: { origin: 'https://evil.example' } });
     assert.equal(crossSite.status, 403, 'Origin-Prüfung des Workers greift auch hinter der Function');
     assert.deepEqual(site.sql('SELECT COUNT(*) AS n FROM orders'), [{ n: 0 }]);

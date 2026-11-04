@@ -42,9 +42,19 @@
 }
 
 /* Rechtsseiten (Impressum, Datenschutz) */
-.legal-body { display: grid; gap: 12px; max-width: 68ch; color: var(--ink-70); }
+.legal-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; max-width: 68ch; color: var(--ink-70); overflow-wrap: anywhere; }
 .legal-h { margin-top: 18px; font-size: 20px; letter-spacing: -.01em; line-height: 1.3; color: var(--ink); }
 .legal-h:first-child { margin-top: 0; }
+/* Rechtstexte (Fassung 2026-11-04): Tabellen (Empfänger, Speicherdauer) scrollen mobil in ihrem Rahmen, die Seite bleibt ohne
+   seitlichen Überlauf; Hinweiskasten für das Widerspruchsrecht */
+.legal-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--line-soft); border-radius: 12px; background: var(--surface); }
+.legal-table-wrap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.legal-table { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.45; overflow-wrap: normal; }
+.legal-table th, .legal-table td { padding: 10px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line-soft); }
+.legal-table tbody tr:last-child td { border-bottom: 0; }
+.legal-table th { font: 500 12px/1.4 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-45); white-space: nowrap; }
+.legal-note { margin: 0; padding: 14px 16px; border-left: 3px solid var(--accent); border-radius: 0 10px 10px 0; background: var(--surface); color: var(--ink); }
+.legal-body code { font: 400 .92em var(--font-mono); }
 
 /* Längerer Name 360°Pixelkiez: auf schmalen Handys entfällt der Zusatz „Website-Analyse“ im Navigationslogo, damit er nicht umbricht
    und Button und Menü-Button in der Pille bleiben (Umbruch gemessen bis 473 px in Chromium und WebKit) */
