@@ -208,17 +208,22 @@ R2-Fehler). `Content-Type: video/mp4` ist fest, unabhängig von den Metadaten im
 Functions; ein Test vergleicht beide), dazu `Cross-Origin-Resource-Policy: same-origin` und `X-Robots-Tag: noindex`.
 Lokal geprüft (`wrangler pages dev` mit lokalem R2, Playwright): Chromium und WebKit spielen alle drei eingebundenen Videos mit 206.
 
-Wiedergabe (`app.js`): Die Videos starten stumm, sobald sie zu mindestens 20 % im Bild sind (WebKit mobil lehnt `play()` für ein
-Video ab, das nur an den Bildschirmrand stößt); ganz aus dem Bild halten sie an. Lehnt der Browser den automatischen Start ab
-(iOS-Stromsparmodus, Datensparen, Autoplay-Sperre: `play()` wird abgelehnt) oder ist „Bewegung reduzieren“ eingestellt,
-steht mittig „Abspielen“ auf dem Standbild; ein Tippen startet das Video. Eine eigene Schaltfläche (mindestens 44 × 44 px)
-hält jedes Video an und startet es wieder; die Browser-Leiste (`controls`) bleibt aus, weil WebKit deren Symbole aus
-`blob:`-Adressen lädt, die die CSP (`img-src 'self'`) sperrt.
+Wiedergabe (Entscheidung des Auftraggebers 04.11.2026: keine Play-/Pause-Schaltflächen, keine Bedienelemente): `<video autoplay
+muted loop playsinline preload="metadata">`. `app.js` sichert stumm/inline/Schleife ab, startet ein Video, sobald es zu mindestens
+20 % im Bild ist (WebKit mobil lehnt `play()` für ein Video am Bildschirmrand ab), hält es erst ganz außerhalb an und versucht es nach
+Tabwechsel (`visibilitychange`), Zurück-Navigation (`pageshow`) und wiederkehrendem Netz (`online`) erneut. Der Zustand steht zur
+Diagnose in `data-wiedergabe` (läuft, angehalten, `abgelehnt: <Grund>`, Ladefehler, Bewegung reduziert). Browser-Regeln werden nicht
+umgangen: Lehnt der Browser ab (iOS-Stromsparmodus, Autoplay-Sperre) oder ist „Bewegung reduzieren“ eingestellt, bleibt das Standbild.
+Bekannte Systemgrenze: WebKit erzwingt im Stromsparmodus (iOS, macOS) für `autoplay`-Videos, die nicht laufen, eigene native
+Bedienelemente (lokal mit Playwright-WebKit auf macOS im Stromsparmodus beobachtet: Leiste mit Play, Zeit, AirPlay, Ton); deren
+Symbole lädt WebKit aus `blob:`-Adressen, die die CSP (`img-src 'self'`) sperrt (Konsolenmeldung „Button failed to load …“). Die
+Seite blendet diese Systemelemente nicht aus. Ersatz durch animierte Bilder (WebP, 640 px, 12 Bilder/s: 1,1 / 3,1 / 1,7 MB) wurde
+geprüft und nicht eingebaut: sichtbar unschärfer (kleine Schrift), ruckeliger, Verhalten im iOS-Stromsparmodus unbelegt.
 
 Kosten und Grenzen (Free-Plan): Jede Video-Anfrage ist ein Function-Aufruf (Workers-Kontingent, 100 000 Anfragen pro
 Tag; Safari stellt je Video etwa zwei Anfragen) und zwei R2-Lesevorgänge (`head`, `get`). Ist das Kontingent erschöpft
-oder R2 gestört, bleibt das Standbild (Poster) mit dem Hinweis „Das Video konnte gerade nicht geladen werden.“ und
-„Erneut versuchen“ stehen (nie eine schwarze Fläche, nie ein Standbild ohne Bedienung). Nach dem Deploy
+oder R2 gestört, bleibt das Standbild (Poster) ohne Schaltfläche stehen (nie eine schwarze Fläche); kommt das Netz zurück oder
+wird das Video wieder sichtbar, startet es von selbst. Nach dem Deploy
 prüfen: `curl -s -D - -o /dev/null -H 'Range: bytes=0-1' https://360.pixelkiez.de/media/report-pdf-de-1x1-lavendel.mp4`
 (erwartet 206, `Content-Range: bytes 0-1/3519956`), dieselbe Anfrage mit `-X POST` (405) und mit `bytes=9999999-` (416),
 im Workers-Log die CPU-Zeit der Function, und auf einem echten iPhone (auch im Stromsparmodus) und Android-Gerät alle drei
@@ -255,8 +260,8 @@ curl -s -o /dev/null -w "%{http_code}\n" "https://<projekt>.pages.dev/api/anfrag
 Im Browser mit einem Test-Google-Konto und einer eigenen Website: URL eingeben → Google → bestätigen.
 Erwartet: Referenz `PXA-…`, genau eine Zeile in `orders`, `notifications.status = 'sent'`, **genau eine** Mail in
 360@pixelkiez.de (Absender @notify.pixelkiez.de, SPF/DKIM „pass“ im Mail-Header). Zurück + erneut senden und
-dieselbe URL erneut anfragen: keine zweite Mail. Auf einem iPhone: alle drei Videos laufen oder starten per
-Tippen auf „Abspielen“ (nie eine schwarze Fläche, nie ein Standbild ohne Bedienung). Danach Testdaten löschen:
+dieselbe URL erneut anfragen: keine zweite Mail. Auf einem iPhone: alle drei Videos laufen von selbst, stumm und
+inline (im Stromsparmodus: Standbild bzw. die Systemsteuerung von iOS, siehe Abschnitt 7). Danach Testdaten löschen:
 `DELETE FROM notifications WHERE order_id IN (SELECT id FROM orders WHERE reference = 'PXA-…'); DELETE FROM orders WHERE reference = 'PXA-…'`.
 
 ## 10. Release und Rollback

@@ -43,78 +43,60 @@
     });
   }
 
-  /* Videos (historische Demo unter dem Hero, „Ein PDF. Sieben Seiten.“, „Jeder Befund verständlich erklärt.“): starten, sobald sie ins
-     Bild scrollen, und laufen in Schleife; außerhalb des Bildes angehalten (spart Akku und Daten). Eigene Schaltfläche statt der
-     Browser-Leiste (die bräuchte in WebKit Symbole aus blob:-Adressen, die die CSP sperrt): Abspielen/Anhalten jederzeit per Klick oder
-     Tippen auf das Video.
-     Lehnt der Browser den automatischen Start ab (iOS-Stromsparmodus, Datensparen, Autoplay-Sperre: play() wird abgelehnt) oder ist
-     „Bewegung reduzieren“ eingestellt, steht mittig „Abspielen“ da; gestartet wird dann durch Tippen (echte Nutzergeste).
-     Scheitert das Laden (Netz, Kontingent, R2), bleibt das Standbild (Poster) mit Hinweis und „Erneut versuchen“ – nie eine schwarze
-     Fläche und nie ein Standbild ohne Bedienung. */
-  const ICON = {
-    play: '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M4.5 2.5v11l9-5.5z"/></svg>',
-    pause: '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M4 2.5h3v11H4zm5 0h3v11H9z"/></svg>',
-  };
-  const players = [...document.querySelectorAll('.showcase-video')].map(v => {
-    const frame = v.closest('.showcase-frame');
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'video-toggle';
-    const note = document.createElement('p');
-    note.className = 'video-hinweis';
-    note.textContent = 'Das Video konnte gerade nicht geladen werden.';
-    frame.append(note, button);
-    /* auto: automatischer Start erlaubt; started: einmal per Geste gestartet; stopped: per Schaltfläche angehalten; failed: Ladefehler;
-       refused: der letzte automatische Start wurde abgelehnt (dann „Abspielen“; beim nächsten Hineinscrollen neuer Versuch) */
-    const p = { v, auto: !reduce, started: false, stopped: false, failed: false, refused: false };
-    const render = () => {
-      const playing = !v.paused && !v.ended;
-      const wait = !playing && (p.stopped || p.failed || p.refused || !(p.auto || p.started));
-      frame.classList.toggle('is-playing', playing);
-      frame.classList.toggle('braucht-start', wait);
-      note.hidden = !p.failed;
-      button.setAttribute('aria-label', playing ? 'Video anhalten' : p.failed ? 'Video erneut laden und abspielen' : 'Video abspielen');
-      button.innerHTML = (playing ? ICON.pause : ICON.play) + (wait ? `<span>${p.failed ? 'Erneut versuchen' : 'Abspielen'}</span>` : '');
-    };
-    const fail = () => { p.failed = true; v.pause(); render(); };
-    p.play = gesture => {
-      const run = v.play();
-      if (run) run.then(() => { p.failed = p.refused = false; render(); }, err => {
-        /* Ohne Geste abgelehnt (Stromsparmodus, Autoplay-Sperre; WebKit mobil auch, solange das Video kaum sichtbar ist): „Abspielen“
-           zeigen, beim nächsten Hineinscrollen erneut versuchen. Abgebrochen (pause() oder load() kam dazwischen): kein Fehler. */
-        if (err && err.name === 'NotAllowedError') { if (!gesture) p.refused = true; }
-        else if (!err || err.name !== 'AbortError') p.failed = true;
-        render();
-      });
-    };
-    /* Klick oder Tippen auf das Video oder die Schaltfläche (Tastatur: Schaltfläche) */
-    frame.addEventListener('click', () => {
-      if (!v.paused && !v.ended) { p.stopped = true; v.pause(); return; }
-      p.stopped = false;
-      p.started = true;
-      if (p.failed) { p.failed = false; v.load(); }
-      p.play(true);
+  /* Videos (historische Demo unter dem Hero, „Ein PDF. Sieben Seiten.“, „Jeder Befund verständlich erklärt.“): stumm, inline, in
+     Endlosschleife, ohne Bedienelemente (Entscheidung des Auftraggebers 04.11.2026: keine Play-/Pause-Schaltflächen). Im HTML steht
+     autoplay muted loop playsinline; hier wird das nur abgesichert: Start, sobald ein Video zu mindestens 20 % im Bild ist (WebKit
+     mobil lehnt play() für ein Video ab, das nur an den Bildschirmrand stößt), Halt erst ganz außerhalb (Akku, Daten), neuer Versuch
+     nach Tabwechsel (visibilitychange), Zurück-Navigation (pageshow) und wiederkehrendem Netz (online). Browser-Regeln werden nicht
+     umgangen: Lehnt der Browser ab (iOS-Stromsparmodus, Autoplay-Sperre) oder scheitert das Laden, bleibt das Standbild (Poster)
+     ohne Schaltfläche. Der Zustand steht zur Diagnose in data-wiedergabe (läuft, angehalten, abgelehnt: <Grund>, Ladefehler,
+     Bewegung reduziert). Bei „Bewegung reduzieren“ kein automatischer Start (Systemeinstellung des Nutzers). */
+  const videos = [...document.querySelectorAll('.showcase-video')];
+  const sichtbar = new Set(), bekannt = new Set();
+  const zustand = (v, z) => { v.dataset.wiedergabe = z; };
+  const start = v => {
+    if (reduce || !sichtbar.has(v) || document.visibilityState !== 'visible' || !v.paused) return;
+    /* Nach einem Ladefehler die Quelle neu wählen (z. B. wieder online) */
+    if (v.error || v.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) v.load();
+    const run = v.play();
+    /* Abgelehnt (NotAllowedError: Stromsparmodus, Autoplay-Sperre) festhalten; abgebrochen (pause() kam dazwischen) ist kein Fehler,
+       ein Ladefehler bleibt als solcher stehen */
+    if (run) run.catch(err => {
+      const grund = err ? err.name : 'unbekannt';
+      if (v.paused && grund !== 'AbortError' && v.dataset.wiedergabe !== 'Ladefehler') zustand(v, `abgelehnt: ${grund}`);
     });
-    ['play', 'playing', 'pause', 'ended', 'emptied'].forEach(t => v.addEventListener(t, render));
-    v.addEventListener('error', fail);
+  };
+  videos.forEach(v => {
+    v.muted = v.defaultMuted = true;
+    v.playsInline = true;
+    v.loop = true;
+    v.controls = false;
+    v.addEventListener('playing', () => zustand(v, 'läuft'));
+    /* Ein Video, das außerhalb des Bildes von selbst startet (autoplay), wieder anhalten; es startet beim Hineinscrollen */
+    v.addEventListener('play', () => { if (bekannt.has(v) && !sichtbar.has(v)) v.pause(); });
+    v.addEventListener('pause', () => { if (!v.error && v.dataset.wiedergabe === 'läuft') zustand(v, 'angehalten'); });
+    const fehler = () => zustand(v, 'Ladefehler');
+    v.addEventListener('error', fehler);
     const source = v.querySelector('source');
-    if (source) source.addEventListener('error', fail);
+    if (source) source.addEventListener('error', fehler);
+    if (reduce) { v.autoplay = false; v.pause(); zustand(v, 'Bewegung reduziert'); return; }
     /* Ist das Laden schon gescheitert, bevor dieses Skript lief, kam das error-Ereignis zu früh. NETWORK_NO_SOURCE allein beweist
        das nicht: Während der Quellenauswahl steht der Wert kurz ebenfalls dort (WebKit unter Last). load() startet die Auswahl neu;
-       scheitert sie wirklich, kommt das error-Ereignis jetzt beim Listener an (bei preload="none" ohne Download). */
+       scheitert sie wirklich, kommt das error-Ereignis jetzt beim Listener an. */
     if (v.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) v.load();
-    render();
-    return p;
   });
-  if (players.length && 'IntersectionObserver' in window) {
-    /* Automatisch starten erst ab 20 % im Bild: WebKit mobil lehnt play() für ein Video ab, das nur an den Bildschirmrand stößt
-       (Hero-Video beim Laden genau an der Unterkante). Ganz aus dem Bild: anhalten. Dazwischen nichts ändern. */
+  if (videos.length && !reduce && 'IntersectionObserver' in window) {
     const io = new IntersectionObserver(entries => entries.forEach(e => {
-      const p = players.find(x => x.v === e.target);
-      if (e.intersectionRatio >= 0.2) { if ((p.auto || p.started) && !p.stopped && !p.failed && e.target.paused) p.play(false); }
-      else if (e.intersectionRatio === 0 && !e.target.paused) e.target.pause();
+      const v = e.target;
+      bekannt.add(v);
+      if (e.intersectionRatio >= 0.2) { sichtbar.add(v); start(v); }
+      else if (e.intersectionRatio === 0) { sichtbar.delete(v); if (!v.paused) v.pause(); }
     }), { threshold: [0, 0.2, 0.6] });
-    players.forEach(p => io.observe(p.v));
+    videos.forEach(v => io.observe(v));
+    const alle = () => videos.forEach(start);
+    document.addEventListener('visibilitychange', alle);
+    addEventListener('pageshow', alle);
+    addEventListener('online', alle);
   }
 
   const form = $('#analyze'), input = $('#url');

@@ -58,15 +58,6 @@
 .showcase-note { margin-top: 14px; text-align: center; font: 400 12px var(--font-mono); color: var(--ink-45); }
 .showcase-note b { font-weight: 500; color: var(--ink); }
 .showcase-badge { position: absolute; top: clamp(10px, 1.6vw, 16px); left: clamp(10px, 1.6vw, 16px); z-index: 1; padding: 6px 10px; border-radius: var(--r-pill); background: rgb(255 255 255 / .94); color: var(--ink); font: 500 12px/1 var(--font-mono); letter-spacing: .04em; text-transform: uppercase; pointer-events: none; }
-/* Eigene Wiedergabe-Schaltfläche (app.js): klein unten rechts, solange das Video läuft;
-   groß und mittig mit „Abspielen“, wenn ein Start per Tippen nötig ist (kein Autoplay, angehalten, „Bewegung reduzieren“, Ladefehler) */
-.video-toggle { position: absolute; right: 12px; bottom: 12px; z-index: 2; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 44px; min-height: 44px; padding: 0 12px; border: 0; border-radius: var(--r-pill); background: rgb(12 12 12 / .72); color: #fff; font: 500 15px var(--font-sans); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-.video-toggle svg { width: 16px; height: 16px; fill: currentColor; }
-.video-toggle:hover { background: rgb(12 12 12 / .86); }
-.video-toggle:focus-visible { outline: 2px solid #fff; outline-offset: 2px; box-shadow: 0 0 0 4px var(--accent); }
-.braucht-start .video-toggle { right: 50%; bottom: 50%; transform: translate(50%, 50%); min-height: 56px; padding: 0 22px 0 18px; font-size: 16px; background: var(--ink); box-shadow: 0 10px 30px rgb(12 12 12 / .3); }
-.braucht-start .video-toggle svg { width: 18px; height: 18px; }
-.video-hinweis { position: absolute; top: 12px; left: 12px; right: 12px; z-index: 2; margin: 0; padding: 10px 14px; border-radius: 10px; background: rgb(255 255 255 / .96); color: var(--ink); font-size: 14px; line-height: 1.4; }
 /* Zweites Video rechts neben dem Text im Abschnitt „Ihr Bericht“ (Spalte aus .split); quadratisch, höchstens 560 px */
 .report-media { width: 100%; max-width: 560px; min-width: 0; margin: 0; justify-self: center; }
 .showcase-video--square { aspect-ratio: 1 / 1; }

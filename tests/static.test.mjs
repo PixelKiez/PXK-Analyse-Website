@@ -138,11 +138,14 @@ test('Startseite: kostenloses Angebot, sechs Bereiche, sieben PDF-Seiten, GEO & 
   const txt = el => H.norm(H.textOf(el));
   const text = H.norm(H.visibleText(root));
   /* Videos aus R2: Berichtsvideo neben dem Text bei „Ein PDF. Sieben Seiten.“, Befund-Video bei „Jeder Befund verständlich erklärt.“
-     (an der Stelle der früheren Beispielkarte); unter dem Hero die historische Demo; stumm, Schleife, erst beim Hineinscrollen; ohne
-     Browser-Leiste (WebKit lädt deren Symbole aus blob:-Adressen, die die CSP sperrt) – Abspielen/Anhalten über die Schaltfläche aus app.js */
+     (an der Stelle der früheren Beispielkarte); unter dem Hero die historische Demo. Entscheidung des Auftraggebers 04.11.2026: autoplay,
+     stumm, Schleife, inline, preload="metadata", ohne Bedienelemente – weder Browser-Leiste noch eigene Play-/Pause-Schaltflächen */
   const videos = H.byTag(root, 'video');
   assert.deepEqual(videos.map(v => [H.find(root, e => e.tag === 'section' && H.find(e, x => x === v).length)[0].attrs.get('id'), H.byTag(v, 'source')[0].attrs.get('src'), v.attrs.get('poster')]), VIDEOS_EINGEBUNDEN);
-  for (const v of videos) assert.ok(['muted', 'loop', 'playsinline', 'poster', 'aria-label'].every(a => v.attrs.has(a)) && !v.attrs.has('controls') && !v.attrs.has('autoplay') && v.attrs.get('preload') === 'none');
+  for (const v of videos) assert.ok(['autoplay', 'muted', 'loop', 'playsinline', 'poster', 'aria-label'].every(a => v.attrs.has(a)) && !v.attrs.has('controls') && v.attrs.get('preload') === 'metadata');
+  /* Keine selbst erzeugten Bedienelemente: app.js erzeugt keine Schaltflächen, keine Stile dafür */
+  assert.ok(!/createElement\(['"]button|video-toggle|braucht-start|video-hinweis|\.controls = true/.test(read('public/assets/app.js')), 'app.js ohne Video-Schaltflächen');
+  assert.ok(!/video-toggle|braucht-start|video-hinweis/.test(read('public/assets/anfrage.css')), 'CSS ohne Video-Schaltflächen');
   for (const v of videos) assert.equal(H.byTag(v, 'source')[0].attrs.get('type'), 'video/mp4');
   assert.ok(VIDEOS_EINGEBUNDEN.every(([, src]) => R2_VIDEOS.includes(src.slice('media/'.length))), 'jedes eingebundene Video liegt in R2');
   /* Hero-Video: zeigt einen früheren Entwurf (Metriken, simulierte Analyse) – deshalb sichtbar als historische Demo gekennzeichnet */
