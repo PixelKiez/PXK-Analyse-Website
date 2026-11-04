@@ -36,17 +36,10 @@
 .hero .url-field input { color: var(--ink); }
 .hero .url-field input::placeholder { color: var(--ink-70); }
 .hero .facts { color: var(--ink-70); }
-/* Verwaschene Farbflächen im Hero (Entscheidung des Auftraggebers 04.11.2026): Pfirsich, Orange und Lila aus den Pixelkiez-Farben,
-   weich ineinander verlaufend hinter Überschrift und Text; Orange und Lila nur in geringer Deckkraft, damit der Text kontrastreich bleibt */
-.hero::before {
-  background:
-    radial-gradient(34% 40% at 16% 34%, rgb(254 91 42 / .20), transparent 70%),
-    radial-gradient(48% 58% at 30% 10%, rgb(255 214 199 / .95), transparent 72%),
-    radial-gradient(36% 44% at 84% 38%, rgb(123 92 214 / .18), transparent 70%),
-    radial-gradient(48% 58% at 70% 8%, rgb(235 226 252 / .95), transparent 72%),
-    radial-gradient(40% 36% at 50% 92%, rgb(255 230 221 / .70), transparent 75%);
-  filter: blur(18px);
-}
+/* Startseite im verwaschenen Look der Unterseiten (Entscheidung des Auftraggebers 04.11.2026; gleicher Verlauf wie .inhalt in
+   inhalt.css): über die ganze Breite Lila am oberen Rand, darunter Pfirsich, dann weich ins Papiergrau; ersetzt die Farbflecken im Hero */
+body:has(.hero) { background: linear-gradient(180deg, #EBE2FC 0%, #EFE2F6 9%, #F8E3E6 20%, #FFE6DD 34%, rgb(255 230 221 / .6) 58%, rgb(255 230 221 / 0) 100%) no-repeat, var(--paper); background-size: 100% 1150px, auto; }
+.hero::before { content: none; }
 @media (max-width: 620px) {
   .hero .h1 { font-size: clamp(34px, min(12vw, 6.2svh), 46px); }
   .hero .lead { font-size: clamp(16px, 2.3svh, 18px); }
