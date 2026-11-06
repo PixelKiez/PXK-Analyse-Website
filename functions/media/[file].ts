@@ -5,7 +5,7 @@
    den Metadaten im Bucket. Gültige Range-Anfragen bekommen 206 (RFC 9110), sonst 200 oder 416 –
    Safari/iOS spielt Videos nur mit 206 ab. Nur GET und HEAD, kein Logging, keine Cookies. _headers gilt nicht für
    Function-Antworten: Die Sicherheits-Header stehen deshalb hier und müssen denen in public/_headers entsprechen
-   (tests/pages.test.mjs vergleicht beide); noindex gilt wie in _headers für alle Adressen (Soft-Launch). */
+   (tests/pages.test.mjs vergleicht beide). Nur das lizenzierte Hintergrundbild ist auf der Produktionsdomain indexierbar. */
 
 interface Env {
   MEDIA?: R2Bucket;
@@ -32,7 +32,7 @@ const SECURITY_HEADERS: Record<string, string> = {
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
-  /* Videos und Bilder nur für die eigene Website (kein Einbinden auf fremden Seiten) und nicht indexieren */
+  /* Videos und Bilder nur für die eigene Website (kein Einbinden auf fremden Seiten). */
   'Cross-Origin-Resource-Policy': 'same-origin',
   'X-Robots-Tag': 'noindex',
 };
@@ -66,7 +66,11 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, next }) => {
   headers.set('Cache-Control', 'public, max-age=0, must-revalidate');
   headers.set('ETag', etag);
 
-  if (matchesAny(request.headers.get('if-none-match'), etag)) return new Response(null, { status: 304, headers });
+  const indexedImage = url.hostname === '360.pixelkiez.de' && url.pathname === '/media/360-pixelkiez-designrunde-am-tisch.webp';
+  if (matchesAny(request.headers.get('if-none-match'), etag)) {
+    if (indexedImage) headers.delete('X-Robots-Tag');
+    return new Response(null, { status: 304, headers });
+  }
 
   let range = parseRange(request.headers.get('range'), size);
   /* If-Range: Teilantwort nur, wenn die Datei unverändert ist (starker ETag-Vergleich); sonst die ganze Datei */
@@ -76,6 +80,7 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, next }) => {
     headers.set('Content-Range', `bytes */${size}`);
     return text(416, 'Angeforderter Bereich nicht verfügbar.', headers, head);
   }
+  if (indexedImage) headers.delete('X-Robots-Tag');
   const [status, start, end] = range === null ? [200, 0, size - 1] : [206, range.start, range.end];
   if (status === 206) headers.set('Content-Range', `bytes ${start}-${end}/${size}`);
   headers.set('Content-Length', String(end - start + 1));

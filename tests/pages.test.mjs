@@ -255,6 +255,31 @@ test('Video-Function (R2): HEAD, ETag (If-None-Match → 304, If-Range), nur GET
   }
 });
 
+test('Nur das Hintergrundbild der Produktionsdomain darf indexiert werden', { skip }, async () => {
+  const fn = await startPagesFunction({ media: seeded() });
+  const [path] = R2_MEDIEN.find(([, key]) => key === R2_BILDER[0]);
+  try {
+    const full = await fn.fetch(SITE + path);
+    assert.equal(full.status, 200);
+    assert.equal(full.headers.get('x-robots-tag'), null);
+    const etag = full.headers.get('etag');
+    await full.arrayBuffer();
+    for (const options of [{ method: 'HEAD' }, { headers: { range: 'bytes=0-1' } }, { headers: { 'if-none-match': etag } }]) {
+      const response = await fn.fetch(SITE + path, options);
+      assert.equal(response.status, options.method === 'HEAD' ? 200 : options.headers.range ? 206 : 304);
+      assert.equal(response.headers.get('x-robots-tag'), null);
+      await response.arrayBuffer();
+    }
+    for (const url of ['https://pxwa.pages.dev' + path, 'https://test.pxwa.pages.dev' + path, SITE + R2_MEDIEN.find(([, key]) => key === R2_BILDER[1])[0], SITE + VIDEOS[0]]) {
+      const response = await fn.fetch(url);
+      assert.equal(response.headers.get('x-robots-tag'), 'noindex', url);
+      await response.arrayBuffer();
+    }
+  } finally {
+    await fn.stop();
+  }
+});
+
 test('Bild-Function (R2): das Hintergrundbild kommt fest als image/webp aus pictures/ (200, 206, ETag, Sicherheits-Header); das Original-PNG und andere Pfade im Ordner bedient die Function nicht', { skip }, async () => {
   const [pfad, key] = R2_MEDIEN.find(([, k]) => k === R2_BILDER[0]);
   const fn = await startPagesFunction({ media: seeded({ 'pictures/Sonnige Designrunde am Tisch.png': FILE }) });
