@@ -647,6 +647,10 @@ test('Bild-Metadaten: Titelbild je Seite (Open Graph, Twitter, JSON-LD), Icons, 
     [`${BASE}/${bild.attrs.get('src')}`, '1672', '941', 'image/webp', 'de-DE', '360°Pixelkiez', '360°Pixelkiez']);
   assert.equal(imgs[0].digitalSourceType, 'https://schema.org/TrainedAlgorithmicMediaDigitalSource', 'KI-Herkunft maschinenlesbar');
   assert.ok(imgs[0].name && imgs[0].description && imgs[0].uploadDate, 'Name, Beschreibung, Datum');
+  /* Bild-Metadaten der Google Search Console (06.11.2026): Rechtehinweis nur mit dem Namen (ohne ©, KI-Bild; Entscheidung des Auftraggebers), Lizenz = Abschnitt „Urheberrecht“ im Impressum */
+  assert.deepEqual([imgs[0].copyrightNotice, imgs[0].license, imgs[0].acquireLicensePage],
+    ['360°Pixelkiez', `${BASE}/impressum`, `${BASE}/impressum`], 'copyrightNotice, license, acquireLicensePage');
+  assert.match(read('public/impressum.html'), /<h2 class="legal-h">Urheberrecht<\/h2>/, 'Lizenzseite enthält den Abschnitt „Urheberrecht“');
 });
 
 test('Design: styles.css unverändert gegenüber vision.html; alle verwendeten Klassen sind definiert', () => {
