@@ -5,12 +5,15 @@ import type { Db } from './db';
    die ID selbst steht nirgends in der Datenbank. Unbekannte oder abgelaufene IDs werden nie übernommen.
    Tokens von Google landen nie in der Session. Abgelaufene Zeilen löscht der Cron-Lauf. */
 
-/* AGB-Zustimmung aus dem Hero: serverseitig vor der Google-Anmeldung erfasst. url ist die normalisierte Website,
-   version die beim Absenden gültige AGB-Version, at der Zeitpunkt laut Server (nie aus dem Formular). */
+/* Erklärungen aus dem Formular: serverseitig vor der Google-Anmeldung erfasst. url ist die normalisierte Website,
+   version die beim Absenden gültige AGB-Version, at der Zeitpunkt laut Server (nie aus dem Formular). business ist die
+   Pflichtbestätigung „Unternehmer“ (nur true wird angenommen), marketing die freiwillige Werbeeinwilligung. */
 export interface Consent {
   url: string;
   version: string;
   at: number;
+  business: true;
+  marketing: boolean;
 }
 
 /* Eine laufende Google-Anmeldung. Zustimmung und Idempotenzschlüssel hängen an genau diesem state: Der Callback, der den

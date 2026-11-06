@@ -36,28 +36,62 @@
 .hero .url-field input { color: var(--ink); }
 .hero .url-field input::placeholder { color: var(--ink-70); }
 .hero .facts { color: var(--ink-70); }
+/* Startseite im verwaschenen Look der Unterseiten (Entscheidungen des Auftraggebers 04.11.2026; gleicher Verlauf wie .inhalt in
+   inhalt.css): Lila ganz oben am Bildschirmrand – die Menüleiste liegt über der Farbe, oben keine Kante –, darunter Pfirsich, dann
+   weich ins Papiergrau. So breit wie der Seitenrahmen (bis 1280 px): ragt nicht links und rechts über die Rahmenlinien hinaus; die
+   erste Ebene führt die Rahmenlinien neben der Menüleiste bis zum oberen Rand fort (nur mit Rahmenlinien, ab 1321 px). Lila als
+   Hintergrundfarbe unter einer Papiergrau-Ebene über die ganze Seite: Zu sehen bleibt Papiergrau, aber Safari ab iOS 26 färbt die
+   Statusleiste nach der Hintergrundfarbe der Seite (theme-color gilt dort nicht mehr) – sonst stünde dort ein grauer Streifen über
+   dem Lila. Ersetzt die Farbflecken im Hero. */
+body:has(main.frame > .hero) {
+  background-color: #EBE2FC;
+  background-image: linear-gradient(90deg, var(--line-soft) 1px, transparent 1px calc(100% - 1px), var(--line-soft) calc(100% - 1px)),
+    linear-gradient(180deg, #EBE2FC 0%, #EFE2F6 9%, #F8E3E6 20%, #FFE6DD 34%, rgb(255 230 221 / .6) 58%, rgb(255 230 221 / 0) 100%),
+    linear-gradient(var(--paper), var(--paper));
+  background-size: min(100%, var(--frame)) 80px, min(100%, var(--frame)) 1150px, 100% 100%;
+  background-position: center top;
+  background-repeat: no-repeat;
+}
+@media (max-width: 1320px) { body:has(main.frame > .hero) { background-size: 0 0, 100% 1150px, 100% 100%; } }
+.hero::before { content: none; }
 @media (max-width: 620px) {
   .hero .h1 { font-size: clamp(34px, min(12vw, 6.2svh), 46px); }
   .hero .lead { font-size: clamp(16px, 2.3svh, 18px); }
 }
 
 /* Rechtsseiten (Impressum, Datenschutz) */
-.legal-body { display: grid; gap: 12px; max-width: 68ch; color: var(--ink-70); }
+.legal-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; max-width: 68ch; color: var(--ink-70); overflow-wrap: anywhere; }
 .legal-h { margin-top: 18px; font-size: 20px; letter-spacing: -.01em; line-height: 1.3; color: var(--ink); }
 .legal-h:first-child { margin-top: 0; }
+/* Rechtstexte (Fassung 2026-11-04): Tabellen (Empfänger, Speicherdauer) scrollen mobil in ihrem Rahmen, die Seite bleibt ohne
+   seitlichen Überlauf; Hinweiskasten für das Widerspruchsrecht */
+.legal-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--line-soft); border-radius: 12px; background: var(--surface); }
+.legal-table-wrap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.legal-table { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.45; overflow-wrap: normal; }
+.legal-table th, .legal-table td { padding: 10px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line-soft); }
+.legal-table tbody tr:last-child td { border-bottom: 0; }
+.legal-table th { font: 500 12px/1.4 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-45); white-space: nowrap; }
+.legal-note { margin: 0; padding: 14px 16px; border-left: 3px solid var(--accent); border-radius: 0 10px 10px 0; background: var(--surface); color: var(--ink); }
+.legal-body code { font: 400 .92em var(--font-mono); }
 
 /* Längerer Name 360°Pixelkiez: auf schmalen Handys entfällt der Zusatz „Website-Analyse“ im Navigationslogo, damit er nicht umbricht
    und Button und Menü-Button in der Pille bleiben (Umbruch gemessen bis 473 px in Chromium und WebKit) */
 @media (max-width: 489px) { .nav .logo span { display: none; } }
+/* Logo (Auftraggeber 04.11.2026): „360°“ als Text, direkt daneben das Pixelkiez-Logo aus R2 (WebP 518 × 120, alt „Pixelkiez“),
+   gelesen „360°Pixelkiez“; der Zusatz „Website-Analyse“ mit demselben Abstand wie bisher */
+.logo:has(.logo-bild) { gap: 0; }
+.logo-bild { display: block; height: 22px; width: auto; margin-left: 4px; }
+.logo:has(.logo-bild) span { margin-left: 10px; }
+/* Sehr schmale Handys (320 px): etwas kleiner, damit „Analyse“ und der Menü-Button in der Pille bleiben */
+@media (max-width: 359px) { .logo-bild { height: 18px; } }
 
-/* Video unter dem Hero (historische Demo, deutlich gekennzeichnet): zentriertes Widget mit abgerundeten Ecken, 16:9, nicht über die ganze Breite */
+/* Video unter dem Hero: zentriertes Widget mit abgerundeten Ecken, 16:9, nicht über die ganze Breite (ohne Bildunterschrift) */
 .showcase { padding: 0 var(--gutter) clamp(56px, 8vw, 104px); }
 .showcase-media { width: min(100%, 960px); margin: 0 auto; }
 .showcase-frame { position: relative; overflow: hidden; isolation: isolate; border-radius: clamp(14px, 2vw, 24px); background: #0E1416; box-shadow: 0 24px 60px rgb(12 12 12 / .16); }
-.showcase-video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; }
-.showcase-note { margin-top: 14px; text-align: center; font: 400 12px var(--font-mono); color: var(--ink-45); }
-.showcase-note b { font-weight: 500; color: var(--ink); }
-.showcase-badge { position: absolute; top: clamp(10px, 1.6vw, 16px); left: clamp(10px, 1.6vw, 16px); z-index: 1; padding: 6px 10px; border-radius: var(--r-pill); background: rgb(255 255 255 / .94); color: var(--ink); font: 500 12px/1 var(--font-mono); letter-spacing: .04em; text-transform: uppercase; pointer-events: none; }
+.showcase-video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; -webkit-tap-highlight-color: transparent; }
+/* Ein stehendes Video startet per Tipp/Klick (app.js, z. B. iOS-Stromsparmodus) – am Desktop zeigt der Zeiger das an */
+.showcase-video[data-wiedergabe^="abgelehnt"], .showcase-video[data-wiedergabe="Bewegung reduziert"] { cursor: pointer; }
 /* Zweites Video rechts neben dem Text im Abschnitt „Ihr Bericht“ (Spalte aus .split); quadratisch, höchstens 560 px */
 .report-media { width: 100%; max-width: 560px; min-width: 0; margin: 0; justify-self: center; }
 .showcase-video--square { aspect-ratio: 1 / 1; }
@@ -88,6 +122,12 @@ html, body { overscroll-behavior-y: none; }
 .steps--cards { gap: clamp(12px, 1.6vw, 20px); }
 .steps--cards .step, .steps--cards .step:first-child { padding: clamp(22px, 2.6vw, 32px); border: 1px solid var(--line-soft); border-radius: clamp(14px, 2vw, 24px); }
 .steps--cards .step p, .spec--cards .spec-row p { color: var(--ink-70); }
+/* „Für alle, die eine Website verantworten.“ mit Foto als Hintergrund (Auftraggeber 04.11.2026; WebP aus R2 über functions/media,
+   dekorativ, alt=""): füllt den Abschnitt innerhalb des Seitenrahmens, die Karten bleiben in Text und Farbe unverändert darüber.
+   Ein heller Papiergrau-Schleier, hinter der Überschrift dichter, hält die Überschrift lesbar. */
+.section--bild { position: relative; isolation: isolate; overflow: hidden; }
+.section-bild { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; }
+.section--bild::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgb(239 240 241 / .86) 0%, rgb(239 240 241 / .62) 40%, rgb(239 240 241 / .4) 100%); pointer-events: none; }
 .spec--cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(12px, 1.6vw, 20px); border-bottom: 0; }
 .spec--cards .spec-row { grid-template-columns: minmax(0, 1fr); gap: 14px; align-content: start; padding: clamp(22px, 2.6vw, 32px); border: 1px solid var(--line-soft); border-radius: clamp(14px, 2vw, 24px); }
 @media (max-width: 860px) { .spec--cards { grid-template-columns: minmax(0, 1fr); } }

@@ -16,8 +16,3 @@ https://:project.pages.dev/*
 
 https://:version.:project.pages.dev/*
   X-Robots-Tag: noindex
-
-# Soft-Launch: Bis zur SEO-Freigabe wird auch 360.pixelkiez.de nicht indexiert (zusätzlich zu <meta name="robots"> in jeder Seite).
-# Eigene Host-Regel statt eines zweiten „/*“-Blocks: Ein doppelter Pfad ersetzt den ersten Block und damit die Sicherheits-Header.
-https://360.pixelkiez.de/*
-  X-Robots-Tag: noindex

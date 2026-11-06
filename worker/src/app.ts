@@ -101,7 +101,7 @@ class App {
     if (done) return this.respond(200, this.view.accepted(done.reference, done.url, done.email, done.kind));
     const pending = session?.data.pending;
     return this.respond(200, this.view.input(this.config.termsVersion, pending?.url ?? '', {},
-      pending ? 'Die Google-Anmeldung wurde nicht abgeschlossen. Es wurde keine Anfrage gespeichert. Bitte akzeptieren Sie die AGB und klicken Sie erneut auf „Analysieren“.' : null));
+      pending ? 'Die Google-Anmeldung wurde nicht abgeschlossen. Es wurde keine Anfrage gespeichert. Bitte bestätigen Sie die Kästchen erneut und klicken Sie auf „Analyse anfragen“.' : null));
   }
 
   private async start(session: Session | null, form: URLSearchParams): Promise<Response> {
@@ -110,16 +110,20 @@ class App {
     }
     const raw = form.get('website') ?? '';
     const url = normalizeWebsite(raw);
-    /* AGB: Häkchen genau "1", und die abgeschickte Seite muss die aktuelle AGB-Version gezeigt haben.
-       Ohne beides weder Session noch Weiterleitung zu Google – die Website-Adresse verlässt den Server nicht. */
+    /* AGB und Unternehmer: Häkchen genau "1", und die abgeschickte Seite muss die aktuelle AGB-Version gezeigt haben.
+       Ohne das weder Session noch Weiterleitung zu Google – die Website-Adresse verlässt den Server nicht. Werbung ist freiwillig:
+       nur genau "1" gilt als Einwilligung, alles andere als keine. */
     const accepted = form.get('agb') === '1';
+    const business = form.get('unternehmer') === '1';
+    const marketing = form.get('werbung') === '1';
     const shown = form.get('agb_version');
     const current = shown !== null && safeEqual(shown, this.config.termsVersion);
-    if (url === null || !accepted || !current) {
-      const agb = !accepted ? 'Bitte akzeptieren Sie die AGB, damit wir Ihre Website analysieren können.'
+    if (url === null || !accepted || !business || !current) {
+      const agb = !accepted ? 'Bitte bestätigen Sie die Beauftragung und die AGB, damit wir Ihre Website analysieren können.'
         : !current ? 'Die AGB wurden aktualisiert. Bitte lesen Sie die aktuelle Fassung und bestätigen Sie sie erneut.' : null;
-      const errors = { url: url === null ? 'Bitte geben Sie eine öffentliche Website-Adresse wie beispiel.de ein.' : null, agb };
-      return this.respond(url !== null && accepted ? 409 : 422, this.view.input(this.config.termsVersion, [...raw].slice(0, 300).join(''), errors));
+      const errors = { url: url === null ? 'Bitte geben Sie eine öffentliche Website-Adresse wie beispiel.de ein.' : null, agb,
+        business: business ? null : 'Die Analyse ist nur für Unternehmer möglich. Bitte bestätigen Sie, dass Sie als Unternehmer anfragen.' };
+      return this.respond(url !== null && accepted && business ? 409 : 422, this.view.input(this.config.termsVersion, [...raw].slice(0, 300).join(''), errors));
     }
     const s = session ?? (await this.newSession());
     delete s.data.done;
@@ -128,7 +132,7 @@ class App {
     const nonce = randomHex(32);
     const verifier = b64url(randomBytes(48));
     /* Ein neuer Start ersetzt einen offenen Flow samt Zustimmung: dessen state wird damit ungültig */
-    s.data.oidc = { state, nonce, verifier, at: this.now, idem: randomHex(16), consent: { url, version: this.config.termsVersion, at: this.now } };
+    s.data.oidc = { state, nonce, verifier, at: this.now, idem: randomHex(16), consent: { url, version: this.config.termsVersion, at: this.now, business: true, marketing } };
     await this.sessions.save(s);
     return this.redirect(await this.oidc().authorizationUrl(state, nonce, verifier));
   }
@@ -180,6 +184,7 @@ class App {
     if (!consent || typeof consent.url !== 'string' || normalizeWebsite(consent.url) !== consent.url
       || typeof consent.version !== 'string' || !safeEqual(consent.version, this.config.termsVersion)
       || !Number.isInteger(consent.at) || consent.at < this.now - LIMITS.consentTtl
+      || consent.business !== true || typeof consent.marketing !== 'boolean'
       || typeof flow.idem !== 'string' || !/^[0-9a-f]{32}$/.test(flow.idem)) {
       log('Google-Rückkehr ohne gültige AGB-Zustimmung');
       return this.respond(409, this.view.error('Zustimmung nicht mehr gültig', 'Ihre Zustimmung zu den AGB ist abgelaufen oder die AGB wurden geändert. Es wurde keine Anfrage gespeichert. Bitte starten Sie die Anfrage erneut.', 'Neu starten', '/api/anfrage'));
@@ -196,7 +201,7 @@ class App {
       return this.respond(429, this.view.error('Zu viele Versuche', 'Bitte warten Sie und versuchen Sie es später erneut.'));
     }
     const orders = new OrderService(this.db, LIMITS.duplicateDays, LIMITS.ordersPerAccountDay);
-    const r = await orders.submit(user.sub, user.email, consent.url, flow.idem, this.config.privacyVersion, { version: consent.version, at: consent.at }, this.now);
+    const r = await orders.submit(user.sub, user.email, consent.url, flow.idem, this.config.privacyVersion, { version: consent.version, at: consent.at, marketing: consent.marketing }, this.now);
     if (r.result === 'limit') {
       return this.respond(429, this.view.error('Tageslimit erreicht', 'Mit diesem Google-Konto sind heute bereits mehrere Anfragen eingegangen. Bitte versuchen Sie es morgen erneut.'));
     }

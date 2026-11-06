@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { randomBytes, createHash } from 'node:crypto';
 import {
   ROOT, CUSTOMER, NOTIFY_TO, mockGoogle, mockResend, startPages, startPagesFunction, buildPagesFunctions, uploadFiles,
-  Client, login, startForm, referenceOf, waitFor, workerAvailable, wranglerAvailable, TERMS_VERSION, SOFT_LAUNCH, R2_VIDEOS,
+  Client, login, startForm, referenceOf, waitFor, workerAvailable, wranglerAvailable, TERMS_VERSION, SOFT_LAUNCH, R2_VIDEOS, R2_BILDER, R2_MEDIEN,
 } from './lib/harness.mjs';
 import { execFileSync } from 'node:child_process';
 
@@ -98,9 +98,9 @@ test('Pages Function: ohne Service Binding (Vorschau) oder bei Ausnahme im Worke
   }
 });
 
-test('Routing: Functions laufen nur für /api/* und genau die drei Videos aus R2 (_routes.json); Poster und alle übrigen Dateien bleiben statisch', { skip }, () => {
+test('Routing: Functions laufen nur für /api/* und genau die drei Videos und das Hintergrundbild aus R2 (_routes.json); Poster und alle übrigen Dateien bleiben statisch', { skip }, () => {
   const routes = JSON.parse(readFileSync(join(ROOT, 'public/_routes.json'), 'utf8'));
-  assert.deepEqual(routes, { version: 1, include: ['/api/*', ...VIDEOS], exclude: [] });
+  assert.deepEqual(routes, { version: 1, include: ['/api/*', ...R2_MEDIEN.map(([p]) => p)], exclude: [] });
   /* Wrangler erzeugt aus functions/media/[file].ts die breitere Regel /media/*; die eigene _routes.json hat Vorrang und
      beschränkt die Video-Function auf die drei festen Pfade */
   const generated = buildPagesFunctions().routes;
@@ -111,23 +111,23 @@ test('Routing: Functions laufen nur für /api/* und genau die drei Videos aus R2
   walk('');
   assert.deepEqual(files.sort(), ['api/[[path]].ts', 'media/[file].ts', 'tsconfig.json']);
   assert.deepEqual(uploadFiles().filter(f => /\.(mp4|webm|mov|m4v)$/i.test(f)), [], 'keine Videos im Pages-Upload: sie kommen aus R2');
-  /* Allowlist der Function: genau diese drei Pfade, jeder fest auf seinen R2-Schlüssel */
+  /* Allowlist der Function: genau diese vier Pfade, jeder fest auf seinen R2-Schlüssel */
   const src = readFileSync(join(ROOT, 'functions/media/[file].ts'), 'utf8');
-  assert.deepEqual([...src.matchAll(/\['(\/media\/[^']*)', '([^']*)'\]/g)].map(m => [m[1], m[2]]), R2_VIDEOS.map(k => [`/media/${k}`, k]));
+  assert.deepEqual([...src.matchAll(/\['(\/media\/[^']*)', '([^']*)'\]/g)].map(m => [m[1], m[2]]), R2_MEDIEN);
 });
 
 /* ---------- Video-Function (functions/media/[file].ts) kompiliert in workerd, mit Miniflare-R2 als Binding MEDIA ---------- */
 
 const VIDEOS = R2_VIDEOS.map(k => `/media/${k}`);
-const POSTERS = ['/media/360-pixelkiez-video-historisch-poster.jpg', '/media/report-pdf-lavendel-poster.jpg', '/media/section-bericht-peach-poster.jpg'];
+const POSTERS = ['/media/360-pixelkiez-website-analyse-poster.jpg', '/media/report-pdf-lavendel-poster.jpg', '/media/section-bericht-peach-poster.jpg'];
 const FILE = Uint8Array.from({ length: 1000 }, (_, i) => (i * 7) % 251);
 /* Je Schlüssel ein anderer Inhalt: so fällt auf, wenn ein Pfad das falsche Objekt liefert */
-const content = key => FILE.map(b => (b + R2_VIDEOS.indexOf(key) + 1) % 256);
-const seeded = (extra = {}) => ({ ...Object.fromEntries(R2_VIDEOS.map(k => [k, content(k)])), ...extra });
+const content = key => FILE.map(b => (b + R2_MEDIEN.findIndex(([, k]) => k === key) + 1) % 256);
+const seeded = (extra = {}) => ({ ...Object.fromEntries(R2_MEDIEN.map(([, k]) => [k, content(k)])), ...extra });
 /* Sicherheits-Header des Blocks /* in public/_headers */
 const headersFile = () => Object.fromEntries(readFileSync(join(ROOT, 'public/_headers'), 'utf8').split(/\n(?=\S)/).find(b => b.startsWith('/*\n'))
   .split('\n').slice(1).map(l => l.trim()).filter(l => l && !l.startsWith('!') && !l.startsWith('#')).map(l => [l.slice(0, l.indexOf(':')).toLowerCase(), l.slice(l.indexOf(':') + 1).trim()]));
-/* noindex laut _headers für eine Adresse (Host-Regeln für *.pages.dev und, im Soft-Launch, 360.pixelkiez.de) */
+/* noindex laut _headers für eine Adresse; die Medien-Function setzt darüber hinaus ihre eigene noindex-Regel. */
 const noindexIn = host => {
   const h = readFileSync(join(ROOT, 'public/_headers'), 'utf8');
   return host.endsWith('.pages.dev') ? /^https:\/\/:project\.pages\.dev\/\*\n {2}X-Robots-Tag: noindex$/m.test(h) : new RegExp(`^https://${host.replace(/\./g, '\\.')}/\\*\\n {2}X-Robots-Tag: noindex$`, 'm').test(h);
@@ -212,7 +212,7 @@ test('Video-Function (R2): HEAD, ETag (If-None-Match → 304, If-Range), nur GET
       assert.equal(r.headers.get('access-control-allow-origin'), null);
       assert.equal(r.headers.get('cross-origin-resource-policy'), 'same-origin', 'Video nicht auf fremden Seiten einbindbar');
       assert.deepEqual(r.headers.getSetCookie(), []);
-      assert.equal(r.headers.get('x-robots-tag') === 'noindex', noindexIn('360.pixelkiez.de'), 'noindex wie in _headers für 360.pixelkiez.de');
+      assert.equal(r.headers.get('x-robots-tag'), 'noindex', 'R2-Medien bleiben gemäß Function-Regel ausgeschlossen');
     }
     const preview = await fn.fetch('https://pxwa.pages.dev' + VIDEOS[0], { headers: { range: 'bytes=0-1' } });
     await preview.arrayBuffer();
@@ -224,7 +224,7 @@ test('Video-Function (R2): HEAD, ETag (If-None-Match → 304, If-Range), nur GET
     /* Andere Pfade (Poster, alte oder unbekannte Videos, Objekte außerhalb der Allowlist, Umgehungsversuche, das Verzeichnis selbst)
        bedient die Function nicht selbst: weiter an die statischen Dateien – nie ein anderes R2-Objekt, nie ein Listing */
     for (const p of [...POSTERS, '/media/', '/media/geheim.mp4', '/media/kunden/auftraege.json', '/media/report-pdf-de-1x1.mp4', '/media/gibt-es-nicht.mp4',
-      '/media/360-pixelkiez-video-1080p.mp4.bak', '/media/%2e%2e%2fapi%2fanfrage', '/media/360-PIXELKIEZ-VIDEO-1080P.MP4', '/media/__proto__', '/media/constructor', '/media/360-pixelkiez-video-1080p.mp4/']) {
+      '/media/360-pixelkiez-video-1080p.mp4', '/media/360-pixelkiez-video-1080p.mp4.bak', '/media/%2e%2e%2fapi%2fanfrage', '/media/360-PIXELKIEZ-VIDEO-1080P.MP4', '/media/__proto__', '/media/constructor', '/media/360-pixelkiez-video-1080p.mp4/']) {
       const r = await fn.fetch(SITE + p, { headers: { range: 'bytes=0-1' } });
       assert.deepEqual([r.status, await r.text()], [200, 'statische Datei'], p);
     }
@@ -252,6 +252,29 @@ test('Video-Function (R2): HEAD, ETag (If-None-Match → 304, If-Range), nur GET
     } finally {
       await f.stop();
     }
+  }
+});
+
+test('Bild-Function (R2): das Hintergrundbild kommt fest als image/webp aus pictures/ (200, 206, ETag, Sicherheits-Header); das Original-PNG und andere Pfade im Ordner bedient die Function nicht', { skip }, async () => {
+  const [pfad, key] = R2_MEDIEN.find(([, k]) => k === R2_BILDER[0]);
+  const fn = await startPagesFunction({ media: seeded({ 'pictures/Sonnige Designrunde am Tisch.png': FILE }) });
+  try {
+    const full = await fn.fetch(SITE + pfad);
+    assert.equal(full.status, 200, pfad);
+    assert.deepEqual(new Uint8Array(await full.arrayBuffer()), content(key), 'genau dieses Objekt');
+    assert.deepEqual([full.headers.get('content-type'), full.headers.get('content-length'), full.headers.get('x-content-type-options'), full.headers.get('cross-origin-resource-policy'), full.headers.get('x-frame-options')],
+      ['image/webp', '1000', 'nosniff', 'same-origin', 'DENY']);
+    assert.match(full.headers.get('etag'), /^"[0-9a-f]{32}"$/, 'starker ETag aus R2');
+    const teil = await fn.fetch(SITE + pfad, { headers: { range: 'bytes=0-9' } });
+    assert.deepEqual([teil.status, teil.headers.get('content-range'), teil.headers.get('content-type')], [206, 'bytes 0-9/1000', 'image/webp']);
+    assert.deepEqual(new Uint8Array(await teil.arrayBuffer()), content(key).slice(0, 10));
+    for (const p of ['/media/pictures/360-pixelkiez-designrunde-am-tisch.webp', '/media/Sonnige%20Designrunde%20am%20Tisch.png', '/media/pictures/Sonnige%20Designrunde%20am%20Tisch.png',
+      '/media/pictures/', '/media/360-pixelkiez-designrunde-am-tisch.png', '/media/360-PIXELKIEZ-DESIGNRUNDE-AM-TISCH.WEBP']) {
+      const r = await fn.fetch(SITE + p);
+      assert.deepEqual([r.status, await r.text()], [200, 'statische Datei'], p);
+    }
+  } finally {
+    await fn.stop();
   }
 });
 
@@ -315,18 +338,24 @@ test('Lokales Pages ohne verbundenen Worker: alle Dateien mit Sicherheits-Header
   }
 });
 
-test('Lokales Pages: alle drei Videos aus lokalem R2 mit echten Byte-Ranges (200/206/416, HEAD, If-None-Match, 405); Poster statisch; leerer Bucket 404', { skip }, async t => {
+test('Lokales Pages: alle drei Videos und das Hintergrundbild aus lokalem R2 mit echten Byte-Ranges (200/206/416, HEAD, If-None-Match, 405); Poster statisch; leerer Bucket 404', { skip }, async t => {
   /* Mit PXK_MEDIA_DIR die echten Videos (lokale Kopie der R2-Objekte), sonst Testdaten je Schlüssel */
   const dir = mkdtempSync(join(tmpdir(), 'pxwa-media-'));
-  const media = Object.fromEntries(R2_VIDEOS.map(k => {
+  const media = Object.fromEntries(R2_MEDIEN.map(([, k]) => {
     const real = process.env.PXK_MEDIA_DIR && join(process.env.PXK_MEDIA_DIR, k);
     if (real) return [k, real];
-    writeFileSync(join(dir, k), randomBytes(300000));
-    return [k, join(dir, k)];
+    const f = join(dir, k.replace(/\//g, '_'));
+    writeFileSync(f, randomBytes(300000));
+    return [k, f];
   }));
   const site = await startPages({ worker: false, media });
   try {
     const get = (p, init = {}) => fetch(site.base + p, { redirect: 'manual', ...init });
+    for (const [pfad, key] of R2_MEDIEN.filter(([, k]) => R2_BILDER.includes(k))) {
+      const r = await get(pfad);
+      assert.deepEqual([r.status, r.headers.get('content-type'), r.headers.get('x-frame-options')], [200, 'image/webp', 'DENY'], pfad);
+      assert.ok(Buffer.from(await r.arrayBuffer()).equals(readFileSync(media[key])), `${pfad}: bytegleich`);
+    }
     for (const key of R2_VIDEOS) {
       const video = `/media/${key}`;
       const file = readFileSync(media[key]);
@@ -374,10 +403,10 @@ test('Lokales Pages: alle drei Videos aus lokalem R2 mit echten Byte-Ranges (200
     await site.stop();
     rmSync(dir, { recursive: true, force: true });
   }
-  /* Bucket ohne die Objekte: die drei Pfade antworten 404 (text/plain), keine andere Datei */
+  /* Bucket ohne die Objekte: die vier Pfade antworten 404 (text/plain), keine andere Datei */
   const empty = await startPages({ worker: false });
   try {
-    for (const video of VIDEOS) {
+    for (const video of R2_MEDIEN.map(([p]) => p)) {
       const r = await fetch(empty.base + video, { headers: { range: 'bytes=0-1' } });
       assert.deepEqual([r.status, r.headers.get('content-type'), (await r.text()).trim()], [404, 'text/plain; charset=utf-8', 'Nicht gefunden.'], video);
     }
@@ -397,7 +426,7 @@ test('Lokales Pages mit Worker über das Service Binding: Website + AGB → Func
     /* Ohne AGB-Häkchen lehnt der Worker auch hinter der Function ab: keine Weiterleitung, keine Session */
     const noAgb = await c.req('POST', '/api/anfrage', { form: startForm({ agb: false }) });
     assert.deepEqual([noAgb.status, noAgb.location, noAgb.headers.getSetCookie().length], [422, null, 0]);
-    assert.match(noAgb.text, /Bitte akzeptieren Sie die AGB/);
+    assert.match(noAgb.text, /Bitte bestätigen Sie die Beauftragung und die AGB/);
     const crossSite = await c.req('POST', '/api/anfrage', { form: startForm(), headers: { origin: 'https://evil.example' } });
     assert.equal(crossSite.status, 403, 'Origin-Prüfung des Workers greift auch hinter der Function');
     assert.deepEqual(site.sql('SELECT COUNT(*) AS n FROM orders'), [{ n: 0 }]);
@@ -433,10 +462,16 @@ test('Lokales Pages mit Worker über das Service Binding: Website + AGB → Func
 
 /* Stand der Videos im R2-Bucket 360pixelkiez (per API gelesen am 03.11.2026; bitgleich mit den lokalen Dateien im Originalarbeitsbaum) */
 const R2_OBJECTS = {
-  '360-pixelkiez-video-1080p.mp4': [3544147, '3c34886c0bfa8130ca08b64c496813d6e199cae218d57016539a765584a073f3'],
+  '360-pixelkiez-video-1080p-website-look.mp4': [9065852, '0e9bc84320c4b491af4aa01f3ded8923e0b1a53454d8a8209abbc9c007be5a70'],
   'report-pdf-de-1x1-lavendel.mp4': [3519956, 'ce5ca6ec4596fc45261bb09d644bb18d95ea38f780c8bb0dbf4ecc67e540b496'],
   'section-bericht-peach-5x4.mp4': [1230026, '81499189cf8a2968705b2ba4c13caccec312d4131481855f55b39300ce0c1130'],
+  /* WebP-Fassung (q78, XMP) des am 04.11.2026 hochgeladenen pictures/Sonnige Designrunde am Tisch.png, hochgeladen 04.11.2026 */
+  'pictures/360-pixelkiez-designrunde-am-tisch.webp': [172666, '00d5b6b198e208e3ec143a25504f1f96cd70201826016838ee8436a00ccb9c5f'],
+  /* Logo: zugeschnittene WebP-Fassung (518 × 120, verlustfrei, XMP) des am 04.11.2026 hochgeladenen pictures/PK_TRS_logo.png */
+  'pictures/pixelkiez-logo.webp': [13840, '89a2ca04a49e00447fed873139b39b38d91f14d6dcb152d7c27449aabefb337a'],
 };
+/* Urheber und Credit im XMP der Bilder: das Logo gehört Pixelkiez, das Hintergrundbild 360°Pixelkiez */
+const URHEBER = { 'pictures/360-pixelkiez-designrunde-am-tisch.webp': '360°Pixelkiez', 'pictures/pixelkiez-logo.webp': 'Pixelkiez' };
 
 test('Medien: nur die drei Poster sind versioniert und statisch (unter 25 MiB); Videos liegen nicht im Repository oder Pages-Upload, sondern in R2', async t => {
   const POSTER_FILES = POSTERS.map(p => p.slice(1)).sort();
@@ -445,7 +480,7 @@ test('Medien: nur die drei Poster sind versioniert und statisch (unter 25 MiB); 
   /* Im Git-Index (bzw. Commit), nicht nur als ignorierte lokale Kopie; den Commit selbst prüft tests/release.test.mjs */
   const tracked = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', 'public/media'], { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean);
   assert.deepEqual(tracked.map(f => f.slice('public/'.length)).sort(), POSTER_FILES, 'Poster nicht ignoriert, keine weiteren Medien');
-  assert.deepEqual(Object.keys(R2_OBJECTS), R2_VIDEOS);
+  assert.deepEqual(Object.keys(R2_OBJECTS), [...R2_VIDEOS, ...R2_BILDER]);
   for (const f of POSTER_FILES) {
     const buf = readFileSync(join(ROOT, 'public', f));
     assert.ok(buf.length < 25 * 1024 * 1024, `${f}: ${buf.length} Byte`);
@@ -453,10 +488,21 @@ test('Medien: nur die drei Poster sind versioniert und statisch (unter 25 MiB); 
   }
 });
 
-test('R2-Videos (lokale Kopie in PXK_MEDIA_DIR): Größe und SHA-256 wie im Bucket, MP4 mit Faststart (moov vor mdat)', { skip: !process.env.PXK_MEDIA_DIR && 'NOT_RUN: PXK_MEDIA_DIR nicht gesetzt (Verzeichnis mit den drei R2-Objekten)' }, async t => {
+test('R2-Videos und -Bild (lokale Kopie in PXK_MEDIA_DIR): Größe und SHA-256 wie im Bucket, MP4 mit Faststart (moov vor mdat), WebP mit XMP-Metadaten inkl. KI-Herkunft', { skip: !process.env.PXK_MEDIA_DIR && 'NOT_RUN: PXK_MEDIA_DIR nicht gesetzt (Verzeichnis mit den R2-Objekten)' }, async t => {
   for (const [key, [size, sha]] of Object.entries(R2_OBJECTS)) {
     const buf = readFileSync(join(process.env.PXK_MEDIA_DIR, key));
     assert.deepEqual([buf.length, createHash('sha256').update(buf).digest('hex')], [size, sha], key);
+    if (key.endsWith('.webp')) {
+      /* Titel, Beschreibung, Urheber, Credit und die maschinenlesbare KI-Herkunft (IPTC DigitalSourceType, Entscheidung des
+         Auftraggebers 04.11.2026); kein Copyright-Vermerk (rein KI-erzeugt) */
+      assert.deepEqual([buf.toString('latin1', 0, 4), buf.toString('latin1', 8, 12)], ['RIFF', 'WEBP'], key);
+      const xmp = buf.toString('utf8');
+      for (const s of ['<dc:title>', '<dc:description>', `<dc:creator><rdf:Seq><rdf:li>${URHEBER[key]}</rdf:li>`, `<photoshop:Credit>${URHEBER[key]}</photoshop:Credit>`,
+        '<Iptc4xmpExt:DigitalSourceType>http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia</Iptc4xmpExt:DigitalSourceType>']) assert.ok(xmp.includes(s), `${key}: ${s}`);
+      assert.ok(!xmp.includes('<dc:rights>'), `${key}: kein Copyright-Vermerk`);
+      t.diagnostic(`${key}: ${(buf.length / 1024).toFixed(1)} KiB, WebP mit XMP`);
+      continue;
+    }
     const atoms = [];
     for (let o = 0; o + 8 <= buf.length && atoms.length < 6;) { const n = buf.readUInt32BE(o); atoms.push(buf.toString('latin1', o + 4, o + 8)); if (n < 8) break; o += n; }
     assert.ok(atoms[0] === 'ftyp' && atoms.indexOf('moov') > -1 && atoms.indexOf('moov') < atoms.indexOf('mdat'), `${key}: ${atoms.join(' ')}`);

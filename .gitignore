@@ -11,6 +11,6 @@ node_modules/
 # public/media/: versioniert sind genau die drei Poster der eingebundenen Videos; die Videos selbst liegen im R2-Bucket
 # 360pixelkiez (functions/media/[file].ts). Alles andere dort bleibt ignoriert
 public/media/*
-!public/media/360-pixelkiez-video-historisch-poster.jpg
+!public/media/360-pixelkiez-website-analyse-poster.jpg
 !public/media/report-pdf-lavendel-poster.jpg
 !public/media/section-bericht-peach-poster.jpg

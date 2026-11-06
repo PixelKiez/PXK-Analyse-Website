@@ -1,8 +1,7 @@
 /* PXWA – Soft-Launch (statisch, vor der Freigabe der Google-Anmeldung). Ausführen im Repo-Root: node --test tests/softlaunch.test.mjs
    Prüft das Pages-Artefakt (public/): keine Anfragewege (Formular, Eingabe, POST, Google-Login), keine Schaltfläche, die eine
    funktionierende Anfrage nahelegt, sichtbarer Hinweis „Kostenlose Analyse-Anfragen in Kürze verfügbar“, nur die freigegebenen
-   Videos aus R2 (PXK-159), noindex, Entwurfskennzeichnung der Rechtstexte, keine Secrets, Startseite gegenüber main nur mit den
-   freigegebenen Änderungen. Gilt nur für die Branches release/pxwa-soft-launch*. */
+   Videos aus R2 (PXK-159), Indexierungsregeln, Rechtstexte, keine Secrets und die Startseite gegenüber dem letzten Live-Stand. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
@@ -22,10 +21,10 @@ const NOTICE = 'Kostenlose Analyse-Anfragen in Kürze verfügbar';
 /* Videos (Entscheidung des Auftraggebers 03.11.2026 per Rückfrage, PXK-159): Die drei R2-Objekte sind über ihre Adresse abrufbar.
    Eingebunden sind das Berichtsvideo (Lavendel) und das Befund-Video (Peach). Das Berichtsvideo zeigt nach Frame-Prüfung noch
    „Die 4 wichtigsten Metriken“, „Pro Metrik eine Seite“ und eine Schaltfläche „Jetzt analysieren“ – vom Auftraggeber so freigegeben.
-   Das Hero-Video (vier Metriken, Schein-Analyse, „Jetzt analysieren“, kontakt@pixelkiez.de im Abspann) steht seit dem P0-Hotfix wieder
-   unter dem Hero, aber sichtbar als „Historische Demo“ gekennzeichnet (Plakette im Video, Bildunterschrift, Alternativtext). */
-const R2_PFADE = ['/media/360-pixelkiez-video-1080p.mp4', '/media/report-pdf-de-1x1-lavendel.mp4', '/media/section-bericht-peach-5x4.mp4'];
-const EINGEBUNDEN = [['demo', 'media/360-pixelkiez-video-1080p.mp4', 'media/360-pixelkiez-video-historisch-poster.jpg'], ['bericht', 'media/report-pdf-de-1x1-lavendel.mp4', 'media/report-pdf-lavendel-poster.jpg'], ['nutzen', 'media/section-bericht-peach-5x4.mp4', 'media/section-bericht-peach-poster.jpg']];
+   Das Hero-Video steht seit dem P0-Hotfix wieder unter dem Hero. Entscheidung des Auftraggebers 04.11.2026: keine Kennzeichnung als
+   alte Fassung und keine Sätze unter den Videos; neue Fassungen der Videos lädt der Auftraggeber in R2 hoch. */
+const R2_PFADE = ['/media/360-pixelkiez-video-1080p-website-look.mp4', '/media/report-pdf-de-1x1-lavendel.mp4', '/media/section-bericht-peach-5x4.mp4', '/media/360-pixelkiez-designrunde-am-tisch.webp', '/media/pixelkiez-logo.webp'];
+const EINGEBUNDEN = [['demo', 'media/360-pixelkiez-video-1080p-website-look.mp4', 'media/360-pixelkiez-website-analyse-poster.jpg'], ['bericht', 'media/report-pdf-de-1x1-lavendel.mp4', 'media/report-pdf-lavendel-poster.jpg'], ['nutzen', 'media/section-bericht-peach-5x4.mp4', 'media/section-bericht-peach-poster.jpg']];
 
 test('Artefakt: alle 22 Seiten vorhanden, in media/ nur die drei Poster, Functions nur unter /api/* und für die drei R2-Videos', () => {
   assert.equal(PAGES.length, 22);
@@ -70,32 +69,40 @@ test('Hinweis sichtbar; keine Schaltfläche oder Überschrift legt eine funktion
   for (const p of PAGES.filter(p => p.startsWith('wissen/') || p.startsWith('analyse/'))) assert.ok(text(read(p)).includes(`${NOTICE}.`), `${p}: Hinweis statt „Website eingeben“`);
 });
 
-test('Videos nur wie entschieden: historische Demo unter dem Hero, Berichtsvideo und Befund-Video auf der Startseite, keine Video-Metadaten; keine veralteten Aussagen im Seitentext', () => {
+test('Videos nur wie entschieden: Hero-Video, Berichtsvideo und Befund-Video auf der Startseite, ohne Bildunterschriften, Video-Metadaten nur dort; keine veralteten Aussagen im Seitentext', () => {
   for (const p of PAGES) {
     const html = read(p);
     if (p === 'index.html') {
       const videos = [...html.matchAll(/<section class="[^"]*" id="([^"]+)">(?:(?!<\/section>)[\s\S])*?<video\b[^>]*poster="([^"]+)"[^>]*>\s*<source src="([^"]+)" type="video\/mp4">/g)].map(m => [m[1], m[3], m[2]]);
       assert.deepEqual(videos, EINGEBUNDEN, 'genau die drei entschiedenen Videos in ihren Abschnitten');
       assert.equal((html.match(/<video\b/g) || []).length, 3);
-      assert.match(html, /<section class="showcase" id="demo">[\s\S]*?aria-label="Historische Demo[\s\S]*?<span class="showcase-badge" aria-hidden="true">Historische Demo<\/span>[\s\S]*?<figcaption class="showcase-note"><b>Historische Demo<\/b> eines früheren Entwurfs/, 'Hero-Video als historische Demo gekennzeichnet');
+      assert.ok(![...html.matchAll(/<figure class="(?:showcase-media|report-media[^"]*)">[\s\S]*?<\/figure>/g)].some(m => /<figcaption/.test(m[0])) && !/showcase-badge|Historische Demo/.test(html), 'keine Bildunterschriften unter Videos, keine Kennzeichnung als alte Fassung');
     } else {
       assert.ok(!/<video\b|<source\b|poster=/.test(html), `${p}: Video`);
-      assert.ok(!/(src|href|content)="[^"]*\bmedia\//.test(html.replace(/https:\/\/static\.googleusercontent\.com\/media\//g, '')), `${p}: Verweis auf media/`);
+      /* Einziger erlaubter Verweis: das Logo aus R2 oben und im Footer (Entscheidung des Auftraggebers 04.11.2026) */
+      assert.ok(!/(src|href|content)="[^"]*\bmedia\//.test(html.replace(/https:\/\/static\.googleusercontent\.com\/media\//g, '').replace(/ src="(?:\/|\.\.\/)?media\/pixelkiez-logo\.webp"/g, '')), `${p}: Verweis auf media/`);
     }
-    assert.ok(!/VideoObject/.test(html), `${p}: Video-Metadaten`);
+    if (p !== 'index.html') assert.ok(!/VideoObject/.test(html), `${p}: Video-Metadaten nur auf der Startseite`);
     assert.ok(!/vier (wichtigsten )?Metriken|kontakt@pixelkiez\.de/i.test(html), `${p}: veraltete Aussage`);
   }
 });
 
-test('noindex bleibt: jede Seite mit robots-Meta, zusätzlich X-Robots-Tag für alle Pfade auf 360.pixelkiez.de', () => {
-  for (const p of PAGES) assert.match(read(p), /<meta name="robots" content="noindex,nofollow">/, p);
-  assert.match(read('_headers'), /^https:\/\/360\.pixelkiez\.de\/\*\n {2}X-Robots-Tag: noindex$/m);
-  assert.equal((read('_headers').match(/^\/\*$/gm) || []).length, 1, 'genau ein „/*“-Block (Sicherheits-Header)');
-  assert.ok(!FILES.includes('robots.txt') && !FILES.includes('sitemap.xml'), 'keine Freigabe für Suchmaschinen');
+test('Indexierung: reguläre Seiten freigegeben, Fehlerseite und Vorschau ausgeschlossen', () => {
+  for (const p of PAGES.filter(p => p !== '404.html')) assert.match(read(p), /<meta name="robots" content="index,follow">/, p);
+  assert.match(read('404.html'), /<meta name="robots" content="noindex,nofollow">/);
+  const headers = read('_headers');
+  assert.doesNotMatch(headers, /^https:\/\/360\.pixelkiez\.de\/\*\n {2}X-Robots-Tag: noindex$/m);
+  assert.match(headers, /^https:\/\/:project\.pages\.dev\/\*\n {2}X-Robots-Tag: noindex$/m);
+  assert.match(headers, /^https:\/\/:version\.:project\.pages\.dev\/\*\n {2}X-Robots-Tag: noindex$/m);
+  assert.equal((headers.match(/^\/\*$/gm) || []).length, 1, 'Sicherheits-Header bleiben erhalten');
+  assert.ok(FILES.includes('sitemap.xml'), 'Sitemap vorhanden');
 });
 
-test('Rechtstexte: Entwürfe bleiben als Entwurf gekennzeichnet, keine behauptete Freigabe', () => {
-  for (const p of ['datenschutz.html', 'agb.html']) assert.ok(text(read(p)).includes('ENTWURF – nicht rechtlich freigegeben.'), p);
+test('Rechtstexte: Fassung 2026-11-04 (Entscheidung des Auftraggebers) ohne Entwurfsvermerk und ohne offene Platzhalter, keine behauptete Freigabe', () => {
+  for (const p of ['impressum.html', 'datenschutz.html', 'agb.html']) {
+    const t = text(read(p));
+    assert.ok(t.includes('Stand: 4. November 2026') && !/ENTWURF|\[[^\]]*\]/.test(t), `${p}: veröffentlichte Fassung ohne Platzhalter`);
+  }
   for (const p of PAGES) assert.ok(!/rechtssicher|DSGVO-konform|datenschutzkonform|rechtlich (geprüft und )?freigegeben(?! )/i.test(text(read(p)).replace('nicht rechtlich freigegeben', '')), `${p}: behauptete Freigabe`);
 });
 
@@ -105,7 +112,8 @@ test('Keine Secrets, Test- oder Konfigurationswerte und keine Personendaten auß
     assert.ok(!/-----BEGIN [A-Z ]*PRIVATE KEY|GOCSPX-|\bre_[A-Za-z0-9]{16,}|\bsk_[A-Za-z0-9]{16,}|\bAKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{20,}\./.test(s), `${f}: Secret`);
     assert.ok(!/test-only|mock-access-token|MAIL_API_TOKEN|GOOGLE_CLIENT_SECRET|SESSION_SECRET/.test(s), `${f}: Test- oder Konfigurationswert`);
     const mails = [...new Set((s.match(/[\w.+-]+@[\w-]+\.[\w.-]+/g) || []).map(m => m.replace(/\.+$/, '')))].filter(m => !/\.(png|jpg|svg|css|js)$/.test(m));
-    assert.deepEqual(mails.filter(m => m !== '360@pixelkiez.de'), [], `${f}: andere E-Mail-Adressen`);
+    /* Einzige eigene Adresse; die Datenschutzerklärung nennt zusätzlich die Aufsichtsbehörde (Art. 77 DSGVO) */
+    assert.deepEqual(mails.filter(m => m !== '360@pixelkiez.de' && !(f === 'datenschutz.html' && m === 'mailbox@datenschutz-berlin.de')), [], `${f}: andere E-Mail-Adressen`);
   }
   assert.ok(!existsSync(join(PUBLIC, '.dev.vars')));
 });
@@ -153,9 +161,10 @@ test('Schriften selbst ausgeliefert: keine externen Ressourcen, CSP nur eigene H
 /* Startseite gegenüber main (c69cd1b, letzter Stand vor dem Soft-Launch): ersetzt im Soft-Launch den Hero-Schutz aus tests/static.test.mjs.
    Jede Zeile ist eine einzeln freigegebene Änderung; alles andere muss gleich bleiben. */
 const MAIN_SHA = 'c69cd1b3cb7dba1426df5006890fec3417841c9f';
-test('Startseite gegenüber main: nur Soft-Launch, Schriften-Fix, Partner, Logo-Zusatz und die Videos aus R2 – sonst unverändert', () => {
+test('Startseite gegenüber main: nur Soft-Launch, Schriften-Fix, Partner, Logo, Favicon, Videos und Hintergrundbild aus R2 – sonst unverändert', () => {
   const main = execFileSync('git', ['show', `${MAIN_SHA}:public/index.html`], { cwd: ROOT, encoding: 'utf8' });
   const ERLAUBT = [
+    ['<meta name="robots" content="noindex,nofollow">', '<meta name="robots" content="index,follow">'],
     /* Soft-Launch (c528d96): kein Formularziel, Hinweis statt Formular, Schaltflächen ohne Anfrage, Ablauf „sobald Anfragen möglich sind“ */
     ["form-action 'self' https://accounts.google.com\">", "form-action 'none'\">"],
     [/    <form class="analyze" id="analyze"[\s\S]*?<p class="hero-note">[^\n]*\n/, '    <!-- Soft-Launch: kein Anfrageformular, bis die Google-Anmeldung freigegeben ist (keine Eingabe, kein POST, kein Google-Login) -->\n    <div class="analyze">\n      <p class="bald"><svg class="i"><use href="#i-globe"/></svg><span><b>Kostenlose Analyse-Anfragen in Kürze verfügbar.</b> Bis dahin nimmt diese Website noch keine Anfragen an.</span></p>\n'],
@@ -167,18 +176,30 @@ test('Startseite gegenüber main: nur Soft-Launch, Schriften-Fix, Partner, Logo-
     /* Datenschutz-Fix (94f0b18): Schriften selbst ausgeliefert */
     ["style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;", "style-src 'self'; font-src 'self';"],
     ['<link rel="preconnect" href="https://fonts.googleapis.com">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">\n', '<link rel="stylesheet" href="assets/fonts.css">\n'],
-    /* Videos (PXK-159): keine Video-Metadaten; das Hero-Video als historische Demo mit neuem Poster, darunter die Partner-Logos (P0-Hotfix);
+    ['<script type="application/ld+json">{"@context":"https://schema.org","@graph":', '<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"360°Pixelkiez","alternateName":"360.pixelkiez.de","url":"https://360.pixelkiez.de/"}</script>\n<script type="application/ld+json">{"@context":"https://schema.org","@graph":'],
+    /* Videos (PXK-159): Video-Metadaten (VideoObject) für alle drei Videos (04.11.2026); das Hero-Video aus R2 mit neuem Poster, darunter die Partner-Logos;
        Berichtsvideo in der Lavendel-Fassung; Befund-Video statt der Beispielkarte */
-    [/\n<script type="application\/ld\+json">\{"@context":"https:\/\/schema\.org","@graph":\[\{"@type":"VideoObject".*?<\/script>/, ''],
-    [/  <section class="showcase" aria-label="Beispielansicht">\n[\s\S]*?\n  <\/section>\n/, '  <section class="showcase" id="demo">\n    <figure class="showcase-media">\n      <div class="showcase-frame">\n        <video class="showcase-video" autoplay muted loop playsinline preload="metadata" width="1920" height="1080" poster="media/360-pixelkiez-video-historisch-poster.jpg" aria-label="Historische Demo-Animation eines früheren Entwurfs von 360°Pixelkiez mit simulierter Analyse. Alle gezeigten Werte sind Beispieldaten.">\n          <source src="media/360-pixelkiez-video-1080p.mp4" type="video/mp4">\n        </video>\n        <span class="showcase-badge" aria-hidden="true">Historische Demo</span>\n      </div>\n      <figcaption class="showcase-note"><b>Historische Demo</b> eines früheren Entwurfs: Die Animation zeigt eine ältere Auswahl an Metriken und simuliert eine Analyse, die so nicht stattfindet. Heute prüft Pixelkiez Websites persönlich in sechs Bereichen; Anfragen sind über diese Website noch nicht möglich. Alle gezeigten Werte sind Beispieldaten.</figcaption>\n    </figure>\n  </section>\n\n  <section class="partner-band" aria-label="Partner">\n    <ul class="partner-logos">\n      <li><a href="https://pixelkiez.de/" target="_blank" rel="noopener"><img src="assets/partner/pixelkiez.png" alt="Pixelkiez" width="104" height="24"></a></li>\n      <li><a href="https://studio.dyai.cloud/" target="_blank" rel="noopener"><img src="assets/partner/dyai-studio.svg" alt="DYAI Studio" width="133" height="26"></a></li>\n    </ul>\n  </section>\n'],
+    [/\n<script type="application\/ld\+json">\{"@context":"https:\/\/schema\.org","@graph":\[\{"@type":"VideoObject".*?<\/script>/, '\n<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"VideoObject","name":"Kostenlose Website-Analyse von 360°Pixelkiez","inLanguage":"de-DE","description":"Animierter Überblick über die kostenlose Website-Analyse von 360°Pixelkiez: Prüfung öffentlicher Seiten, Befunde mit Messwerten und Beleg, Hebel und Fahrplan für die nächsten Schritte und der Bericht als PDF mit sieben Seiten. Alle gezeigten Werte sind Beispieldaten.","thumbnailUrl":"https://360.pixelkiez.de/media/360-pixelkiez-website-analyse-poster.jpg","contentUrl":"https://360.pixelkiez.de/media/360-pixelkiez-video-1080p-website-look.mp4","uploadDate":"2026-11-04T11:41:54+00:00","duration":"PT48S","width":1920,"height":1080,"publisher":{"@type":"Organization","name":"360°Pixelkiez","url":"https://360.pixelkiez.de/"}},{"@type":"VideoObject","name":"Der PDF-Bericht mit sieben Seiten","inLanguage":"de-DE","description":"Animierte Vorstellung des PDF-Berichts mit sieben Seiten: Kernaussage zuerst, Überblick auf einen Blick, die Bereiche im Detail und ein Fahrplan mit den nächsten Schritten. Beispielbericht, alle gezeigten Werte sind Beispieldaten.","thumbnailUrl":"https://360.pixelkiez.de/media/report-pdf-lavendel-poster.jpg","contentUrl":"https://360.pixelkiez.de/media/report-pdf-de-1x1-lavendel.mp4","uploadDate":"2026-11-01T20:17:58+00:00","duration":"PT35S","width":1080,"height":1080,"publisher":{"@type":"Organization","name":"360°Pixelkiez","url":"https://360.pixelkiez.de/"}},{"@type":"VideoObject","name":"Jeder Befund verständlich erklärt","inLanguage":"de-DE","description":"Animiertes fiktives Beispiel eines Befunds aus dem Bericht: Die Startseite nennt nur Schlagworte, dazu Befund, warum er wichtig ist, und die Empfehlung. Danach die nächsten Schritte, das Weitergeben des PDFs an Team, Agentur oder IT und der Hinweis: 0 €, kein Abo.","thumbnailUrl":"https://360.pixelkiez.de/media/section-bericht-peach-poster.jpg","contentUrl":"https://360.pixelkiez.de/media/section-bericht-peach-5x4.mp4","uploadDate":"2026-11-01T20:17:58+00:00","duration":"PT29S","width":1350,"height":1080,"publisher":{"@type":"Organization","name":"360°Pixelkiez","url":"https://360.pixelkiez.de/"}},{"@type":"ImageObject","name":"Für alle, die eine Website verantworten – 360°Pixelkiez","inLanguage":"de-DE","description":"Symbolbild: Vier Menschen arbeiten in sonnigem Licht an einem runden Tisch mit Laptops, Notizbuch und Kaffee an ihrer Website.","contentUrl":"https://360.pixelkiez.de/media/360-pixelkiez-designrunde-am-tisch.webp","encodingFormat":"image/webp","uploadDate":"2026-11-04T14:13:03+00:00","width":1672,"height":941,"creditText":"360°Pixelkiez","copyrightNotice":"360°Pixelkiez","license":"https://360.pixelkiez.de/impressum","acquireLicensePage":"https://360.pixelkiez.de/impressum","digitalSourceType":"https://schema.org/TrainedAlgorithmicMediaDigitalSource","creator":{"@type":"Organization","name":"360°Pixelkiez","url":"https://360.pixelkiez.de/"}}]}</script>'],
+    [/  <section class="showcase" aria-label="Beispielansicht">\n[\s\S]*?\n  <\/section>\n/, '  <section class="showcase" id="demo">\n    <figure class="showcase-media">\n      <div class="showcase-frame">\n        <video class="showcase-video" muted loop playsinline preload="metadata" width="1920" height="1080" poster="media/360-pixelkiez-website-analyse-poster.jpg" aria-label="Animierter Überblick über die kostenlose Website-Analyse von 360°Pixelkiez: Prüfung öffentlicher Seiten, Befunde mit Messwerten und Beleg, Hebel und Fahrplan für die nächsten Schritte und der Bericht als PDF mit sieben Seiten. Alle gezeigten Werte sind Beispieldaten.">\n          <source src="media/360-pixelkiez-video-1080p-website-look.mp4" type="video/mp4">\n        </video>\n      </div>\n    </figure>\n  </section>\n\n  <section class="partner-band" aria-label="Partner">\n    <ul class="partner-logos">\n      <li><a href="https://pixelkiez.de/" target="_blank" rel="noopener"><img src="assets/partner/pixelkiez.png" alt="Pixelkiez" width="104" height="24"></a></li>\n      <li><a href="https://studio.dyai.cloud/" target="_blank" rel="noopener"><img src="assets/partner/dyai-studio.svg" alt="DYAI Studio" width="133" height="26"></a></li>\n    </ul>\n  </section>\n'],
     ['poster="media/report-pdf-poster.jpg"', 'poster="media/report-pdf-lavendel-poster.jpg"'],
-    /* Videos ohne Bedienelemente, von selbst (Entscheidung des Auftraggebers 04.11.2026) */
-    ['<video class="showcase-video showcase-video--square" muted loop playsinline preload="none"', '<video class="showcase-video showcase-video--square" autoplay muted loop playsinline preload="metadata"'],
+    /* Keine Sätze unter den Videos (Entscheidung des Auftraggebers 04.11.2026); „Beispieldaten“ steht im Alternativtext */
+    ['\n        <figcaption class="showcase-note">Beispielbericht. Alle gezeigten Werte sind Beispieldaten.</figcaption>', ''],
+    ['und ein Fahrplan mit den nächsten Schritten."', 'und ein Fahrplan mit den nächsten Schritten. Beispielbericht, alle gezeigten Werte sind Beispieldaten."'],
+    ['<div class="footer-brand"><a class="logo" href="#top">360°Pixelkiez<span>Analyse</span></a>', '<div class="footer-brand"><a class="logo" href="#top">360°<img class="logo-bild" src="media/pixelkiez-logo.webp" alt="Pixelkiez" width="518" height="120" loading="lazy" decoding="async"><span>Website-Analyse</span></a>'],
+    /* Videos ohne Bedienelemente, Start per Skript (Entscheidungen des Auftraggebers 04.11.2026) */
+    ['<video class="showcase-video showcase-video--square" muted loop playsinline preload="none"', '<video class="showcase-video showcase-video--square" muted loop playsinline preload="metadata"'],
     ['<source src="media/report-pdf-de-1x1.mp4" type="video/mp4">', '<source src="media/report-pdf-de-1x1-lavendel.mp4" type="video/mp4">'],
-    [/      <article class="card detail" aria-label="Fiktives Beispiel eines Befunds im Bericht">\n[\s\S]*?\n      <\/article>\n/, '      <figure class="report-media report-media--wide">\n        <div class="showcase-frame">\n          <video class="showcase-video showcase-video--5x4" autoplay muted loop playsinline preload="metadata" width="1350" height="1080" poster="media/section-bericht-peach-poster.jpg" aria-label="Animiertes fiktives Beispiel eines Befunds aus dem Bericht: Die Startseite nennt nur Schlagworte, dazu Befund, warum er wichtig ist, und die Empfehlung. Danach die nächsten Schritte, das Weitergeben des PDFs an Team, Agentur oder IT und der Hinweis: 0 €, kein Abo.">\n            <source src="media/section-bericht-peach-5x4.mp4" type="video/mp4">\n          </video>\n        </div>\n        <figcaption class="showcase-note">Fiktives Beispiel, kein Befund einer echten Website.</figcaption>\n      </figure>\n'],
+    [/      <article class="card detail" aria-label="Fiktives Beispiel eines Befunds im Bericht">\n[\s\S]*?\n      <\/article>\n/, '      <figure class="report-media report-media--wide">\n        <div class="showcase-frame">\n          <video class="showcase-video showcase-video--5x4" muted loop playsinline preload="metadata" width="1350" height="1080" poster="media/section-bericht-peach-poster.jpg" aria-label="Animiertes fiktives Beispiel eines Befunds aus dem Bericht: Die Startseite nennt nur Schlagworte, dazu Befund, warum er wichtig ist, und die Empfehlung. Danach die nächsten Schritte, das Weitergeben des PDFs an Team, Agentur oder IT und der Hinweis: 0 €, kein Abo.">\n            <source src="media/section-bericht-peach-5x4.mp4" type="video/mp4">\n          </video>\n        </div>\n      </figure>\n'],
     /* Logo-Zusatz „Website-Analyse“ und Pixelkiez-Logo in der Footer-Leiste (Entscheidung des Auftraggebers 03.11.2026) */
-    ['<a class="logo" href="#top">360°Pixelkiez<span>Analyse</span></a>\n    <div class="nav-links">', '<a class="logo" href="#top">360°Pixelkiez<span>Website-Analyse</span></a>\n    <div class="nav-links">'],
+    ['<a class="logo" href="#top">360°Pixelkiez<span>Analyse</span></a>\n    <div class="nav-links">', '<a class="logo" href="#top">360°<img class="logo-bild" src="media/pixelkiez-logo.webp" alt="Pixelkiez" width="518" height="120" decoding="async"><span>Website-Analyse</span></a>\n    <div class="nav-links">'],
     ['      <span>© 2026 360°Pixelkiez</span>\n', '      <span>© 2026 360°Pixelkiez</span>\n      <a href="https://pixelkiez.de/" target="_blank" rel="noopener"><img class="footer-partner" src="assets/partner/pixelkiez.png" alt="Pixelkiez" width="87" height="20"></a>\n'],
+    /* Hintergrundbild im Abschnitt „Für alle …“ aus R2 mit ImageObject im JSON-LD oben (Entscheidung des Auftraggebers 04.11.2026) */
+    ['  <section class="section" id="fuer-wen">\n', '  <section class="section section--bild" id="fuer-wen">\n    <img class="section-bild" src="media/360-pixelkiez-designrunde-am-tisch.webp" width="1672" height="941" alt="" loading="lazy" decoding="async">\n'],
+    /* Favicon-Satz des Auftraggebers (favicon.io, 05.11.2026) statt des „P°“-Favicons */
+    ['<link rel="icon" href="favicon.ico" sizes="32x32">\n<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">\n<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">\n',
+      '<link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">\n<link rel="icon" href="favicon-32x32.png" type="image/png" sizes="32x32">\n<link rel="icon" href="favicon-16x16.png" type="image/png" sizes="16x16">\n<link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">\n<link rel="manifest" href="site.webmanifest">\n'],
+    /* Rechtstexte (Entscheidung des Auftraggebers 04.11.2026): AGB-Link in der Footer-Leiste */
+    ['<a href="datenschutz.html">Datenschutz</a></nav>', '<a href="datenschutz.html">Datenschutz</a><a href="agb.html">AGB</a></nav>'],
   ];
   let expected = main;
   for (const [from, to] of ERLAUBT) {

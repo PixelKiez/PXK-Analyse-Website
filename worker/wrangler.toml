@@ -27,8 +27,8 @@ BASE_URL = "https://360.pixelkiez.de"
 GOOGLE_CLIENT_ID = ""
 # Version der Datenschutzerklärung, die mit jedem Auftrag gespeichert wird. Mit "ENTWURF-…" nimmt die Produktion keine Aufträge an.
 PRIVACY_VERSION = "ENTWURF-2026-10-31"
-# Version der AGB, die im Hero akzeptiert werden muss (gleich dem Feld agb_version in public/index.html und der Angabe in
-# public/agb.html). Mit "ENTWURF-…" nimmt die Produktion keine Aufträge an – erst die rechtlich freigegebene Fassung eintragen.
+# Version der AGB, die im Formular bestätigt werden muss. Mit "ENTWURF-…" nimmt die Produktion keine Aufträge an. Die Rechtstexte
+# 2026-11-04 sind veröffentlicht; beim Freischalten der Anfragen PRIVACY_VERSION und TERMS_VERSION auf "2026-11-04" setzen.
 TERMS_VERSION = "ENTWURF-2026-10-31"
 # Einzige freigegebene Mail-API (Resend). Der API-Key kommt als Secret MAIL_API_TOKEN.
 MAIL_API_URL = "https://api.resend.com/emails"
@@ -37,8 +37,14 @@ MAIL_FROM = ""
 # Einziger interner Empfänger (fest im Code, PRODUCTION_NOTIFY_TO). Erst deployen, wenn das Postfach 360@pixelkiez.de
 # existiert und eine Zustellung nachgewiesen ist (docs/deploy-cloudflare-pages.md, Abschnitt 6).
 MAIL_NOTIFY_TO = "360@pixelkiez.de"
-# Löschfrist für erledigte Aufträge in Tagen – bewusst nicht gesetzt, solange die Aufbewahrungsfrist (D-5) offen ist
-# ORDER_RETENTION_DAYS = "<tage>"
+# Löschfrist für Aufträge in Tagen (Entscheidung des Auftraggebers 04.11.2026: vier Monate ab Eingang; Datenschutzerklärung
+# Abschnitte 8 und 16). Der Cron löscht ältere Aufträge samt interner Benachrichtigung.
+ORDER_RETENTION_DAYS = "120"
 
+# Betriebsprotokoll (Workers Logs) nur mit eigenen Meldungen (Anzahlen, Auftragsreferenzen, Fehlerarten – keine IP- oder
+# E-Mail-Adressen); keine automatischen Aufrufprotokolle mit Anfrage-Metadaten. Aufbewahrung bei Cloudflare 3 bzw. 7 Tage.
 [observability]
 enabled = true
+
+[observability.logs]
+invocation_logs = false

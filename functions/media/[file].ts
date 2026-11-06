@@ -1,7 +1,8 @@
-/* 360°Pixelkiez – Pages Function nur für die drei Videos aus Cloudflare R2 (Bucket 360pixelkiez, Pages-Binding MEDIA).
-   public/_routes.json listet genau diese Pfade; Poster und alle anderen Dateien bleiben statisch. Der R2-Schlüssel kommt aus der
-   festen Liste unten, nie aus der Anfrage: kein Listing, kein öffentlicher Bucket, keine anderen Objekte. Content-Type ist fest
-   (video/mp4), unabhängig von den Metadaten im Bucket. Gültige Range-Anfragen bekommen 206 (RFC 9110), sonst 200 oder 416 –
+/* 360°Pixelkiez – Pages Function nur für die drei Videos, das Hintergrundbild und das Logo aus Cloudflare R2 (Bucket 360pixelkiez,
+   Pages-Binding MEDIA). public/_routes.json listet genau diese Pfade; Poster und alle anderen Dateien bleiben statisch. Der
+   R2-Schlüssel kommt aus der festen Liste unten, nie aus der Anfrage: kein Listing, kein öffentlicher Bucket, keine anderen Objekte
+   (auch nicht die Original-PNGs im Ordner pictures/). Content-Type ist fest nach Dateiendung (video/mp4, image/webp), unabhängig von
+   den Metadaten im Bucket. Gültige Range-Anfragen bekommen 206 (RFC 9110), sonst 200 oder 416 –
    Safari/iOS spielt Videos nur mit 206 ab. Nur GET und HEAD, kein Logging, keine Cookies. _headers gilt nicht für
    Function-Antworten: Die Sicherheits-Header stehen deshalb hier und müssen denen in public/_headers entsprechen
    (tests/pages.test.mjs vergleicht beide); noindex gilt wie in _headers für alle Adressen (Soft-Launch). */
@@ -10,12 +11,18 @@ interface Env {
   MEDIA?: R2Bucket;
 }
 
-/* Pfad → R2-Schlüssel (Stand der Objekte im Bucket am 03.11.2026; tests/pages.test.mjs prüft Größe und SHA-256) */
-const VIDEOS: ReadonlyMap<string, string> = new Map([
-  ['/media/360-pixelkiez-video-1080p.mp4', '360-pixelkiez-video-1080p.mp4'],
+/* Pfad → R2-Schlüssel (Stand der Objekte im Bucket am 04.11.2026; tests/pages.test.mjs prüft Größe und SHA-256). Bild und Logo sind
+   optimierte WebP-Fassungen (mit XMP-Metadaten) der hochgeladenen Originale pictures/Sonnige Designrunde am Tisch.png und
+   pictures/PK_TRS_logo.png */
+const MEDIEN: ReadonlyMap<string, string> = new Map([
+  ['/media/360-pixelkiez-video-1080p-website-look.mp4', '360-pixelkiez-video-1080p-website-look.mp4'],
   ['/media/report-pdf-de-1x1-lavendel.mp4', 'report-pdf-de-1x1-lavendel.mp4'],
   ['/media/section-bericht-peach-5x4.mp4', 'section-bericht-peach-5x4.mp4'],
+  ['/media/360-pixelkiez-designrunde-am-tisch.webp', 'pictures/360-pixelkiez-designrunde-am-tisch.webp'],
+  ['/media/pixelkiez-logo.webp', 'pictures/pixelkiez-logo.webp'],
 ]);
+
+const TYPEN: Readonly<Record<string, string>> = { mp4: 'video/mp4', webp: 'image/webp' };
 
 const SECURITY_HEADERS: Record<string, string> = {
   'Strict-Transport-Security': 'max-age=31536000',
@@ -25,14 +32,14 @@ const SECURITY_HEADERS: Record<string, string> = {
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
-  /* Videos nur für die eigene Website (kein Einbinden auf fremden Seiten) und nicht indexieren */
+  /* Videos und Bilder nur für die eigene Website (kein Einbinden auf fremden Seiten) und nicht indexieren */
   'Cross-Origin-Resource-Policy': 'same-origin',
   'X-Robots-Tag': 'noindex',
 };
 
 export const onRequest: PagesFunction<Env> = async ({ request, env, next }) => {
   const url = new URL(request.url);
-  const key = VIDEOS.get(url.pathname);
+  const key = MEDIEN.get(url.pathname);
   /* Andere Pfade erreichen die Function nur bei geänderten Routen: dann wie ohne Function als statische Datei */
   if (key === undefined) return next();
   const head = request.method === 'HEAD';
@@ -54,7 +61,7 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, next }) => {
   if (meta === null) return text(404, 'Nicht gefunden.', headers, head);
   const size = meta.size;
   const etag = meta.httpEtag;
-  headers.set('Content-Type', 'video/mp4');
+  headers.set('Content-Type', TYPEN[key.slice(key.lastIndexOf('.') + 1)] ?? 'application/octet-stream');
   headers.set('Accept-Ranges', 'bytes');
   headers.set('Cache-Control', 'public, max-age=0, must-revalidate');
   headers.set('ETag', etag);

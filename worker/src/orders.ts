@@ -1,18 +1,26 @@
 import { randomBytes, safeEqual } from './crypto';
 import { type Db, isUniqueViolation, utcText } from './db';
 import { StorageError } from './errors';
+import { DECLARATIONS } from './view';
 
 /* Nimmt Aufträge an. Auftrag und ausstehende interne Benachrichtigung werden in EINER Transaktion (D1-Batch)
    gespeichert (Outbox): Erst danach gilt der Auftrag als angenommen. Fällt der Mailversand danach aus,
    bleibt der Auftrag erhalten und die Benachrichtigung wird später erneut versucht.
    D1 führt Schreibzugriffe nacheinander aus; Duplikat- und Tageslimit stehen deshalb als Bedingung im INSERT selbst,
    parallele Anmeldungen können sie nicht umgehen. Jeder Auftrag speichert die akzeptierte AGB-Version und den
-   serverseitigen Zeitpunkt der Zustimmung (Migration 0002). */
+   serverseitigen Zeitpunkt der Zustimmung (Migration 0002) sowie die Unternehmer-Bestätigung, die Werbeeinwilligung und den
+   Wortlaut der bestätigten Kästchen (Migration 0003). Eine Werbeeinwilligung steht zusätzlich in marketing_consents: Sie gilt
+   bis zum Widerruf und überdauert die Löschung des Auftrags (Nachweis nach Art. 7 Abs. 1 DSGVO), ohne Website-Adresse. */
 
 export interface AcceptedTerms {
   version: string;
   at: number;
+  marketing: boolean;
 }
+
+/* Gespeicherter Wortlaut: Pflichtkästchen immer, Werbung nur bei Einwilligung */
+export const declarationsText = (marketing: boolean): string =>
+  [DECLARATIONS.terms, DECLARATIONS.business, ...(marketing ? [DECLARATIONS.marketing] : [])].join('\n');
 
 export type OrderResult =
   | { result: 'created' | 'idempotent' | 'duplicate'; reference: string; orderId: number }
@@ -36,15 +44,21 @@ export class OrderService {
       const reference = newReference();
       try {
         const [inserted] = await this.db.batch<{ id: number }>([
-          [`INSERT INTO orders (reference, idempotency_key, google_sub, email, website_url, privacy_version, terms_version, terms_accepted_at, status, created_at)
-            SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?11, ?12, 'received', ?7
+          [`INSERT INTO orders (reference, idempotency_key, google_sub, email, website_url, privacy_version, terms_version, terms_accepted_at, status, created_at,
+              business_confirmed, marketing_consent, declarations)
+            SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?11, ?12, 'received', ?7, 1, ?13, ?14
             WHERE NOT EXISTS (SELECT 1 FROM orders WHERE idempotency_key = ?2)
               AND NOT EXISTS (SELECT 1 FROM orders WHERE google_sub = ?3 AND website_url = ?5 AND created_at >= ?8)
               AND (SELECT COUNT(*) FROM orders WHERE google_sub = ?3 AND created_at >= ?9) < ?10
             RETURNING id`,
-          [reference, idempotencyKey, sub, email, websiteUrl, privacyVersion, utcText(now), dupSince, daySince, this.maxPerDay, terms.version, utcText(terms.at)]],
+          [reference, idempotencyKey, sub, email, websiteUrl, privacyVersion, utcText(now), dupSince, daySince, this.maxPerDay, terms.version, utcText(terms.at),
+            terms.marketing ? 1 : 0, declarationsText(terms.marketing)]],
           [`INSERT INTO notifications (order_id, status, attempts, next_attempt_at, created_at)
             SELECT id, 'pending', 0, ?2, ?2 FROM orders WHERE reference = ?1`, [reference, utcText(now)]],
+          /* Werbeeinwilligung nur, wenn der Auftrag eben angelegt wurde und eingewilligt ist */
+          [`INSERT INTO marketing_consents (google_sub, email, wording, privacy_version, given_at, order_reference)
+            SELECT google_sub, email, ?2, privacy_version, terms_accepted_at, reference FROM orders WHERE reference = ?1 AND marketing_consent = 1`,
+          [reference, DECLARATIONS.marketing]],
         ]);
         const id = inserted?.[0]?.id;
         if (id !== undefined) return { result: 'created', reference, orderId: id };
@@ -73,15 +87,15 @@ export class OrderService {
   }
 }
 
-/* Löschung nach Frist – vorbereitet, aber nicht aktiv: Die Aufbewahrungsfrist (D-5) ist nicht entschieden, wrangler.toml
-   setzt ORDER_RETENTION_DAYS deshalb nicht. Gelöscht würden nur Aufträge, die Pixelkiez nach dem Versand des Berichts
-   manuell auf status = 'completed' gesetzt hat und deren Eingang länger als die Frist zurückliegt, samt Benachrichtigung.
-   Offene Aufträge (status 'received') bleiben unabhängig vom Alter erhalten. */
-export async function purgeCompletedOrders(db: Db, days: number, now: number): Promise<number> {
+/* Löschung nach Frist (Entscheidung des Auftraggebers 04.11.2026: vier Monate, ORDER_RETENTION_DAYS = 120): Jeder Auftrag wird
+   samt interner Benachrichtigung gelöscht, wenn sein Eingang länger als die Frist zurückliegt – unabhängig vom Bearbeitungsstand
+   (Bearbeitung und Versand des Berichts dauern laut AGB höchstens Wochen). Werbeeinwilligungen (marketing_consents) bleiben bis
+   zum Widerruf; sie enthalten keine Website-Adresse. Läuft im Cron (alle fünf Minuten). */
+export async function purgeOrders(db: Db, days: number, now: number): Promise<number> {
   const before = utcText(now - days * 86400);
   const [, deleted] = await db.batch<{ id: number }>([
-    ["DELETE FROM notifications WHERE order_id IN (SELECT id FROM orders WHERE status = 'completed' AND created_at < ?1)", [before]],
-    ["DELETE FROM orders WHERE status = 'completed' AND created_at < ?1 RETURNING id", [before]],
+    ['DELETE FROM notifications WHERE order_id IN (SELECT id FROM orders WHERE created_at < ?1)', [before]],
+    ['DELETE FROM orders WHERE created_at < ?1 RETURNING id', [before]],
   ]);
   return deleted?.length ?? 0;
 }

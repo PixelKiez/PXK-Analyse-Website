@@ -37,7 +37,11 @@ export const SOFT_LAUNCH = /<p class="bald">/.test(readFileSync(join(ROOT, 'publ
 export const SOFT_LAUNCH_SKIP = SOFT_LAUNCH && 'SOFT_LAUNCH: Hero ohne Anfrageformular bis zur Freigabe der Google-Anmeldung (tests/softlaunch.test.mjs)';
 /* Die drei Videos im R2-Bucket 360pixelkiez (Binding MEDIA): Schlüssel wie in functions/media/[file].ts */
 export const R2_BUCKET = '360pixelkiez';
-export const R2_VIDEOS = ['360-pixelkiez-video-1080p.mp4', 'report-pdf-de-1x1-lavendel.mp4', 'section-bericht-peach-5x4.mp4'];
+export const R2_VIDEOS = ['360-pixelkiez-video-1080p-website-look.mp4', 'report-pdf-de-1x1-lavendel.mp4', 'section-bericht-peach-5x4.mp4'];
+/* Hintergrundbild und Logo aus dem Ordner pictures/ im selben Bucket (Auftraggeber 04.11.2026; WebP-Fassungen der hochgeladenen PNGs) */
+export const R2_BILDER = ['pictures/360-pixelkiez-designrunde-am-tisch.webp', 'pictures/pixelkiez-logo.webp'];
+/* Alles, was functions/media/[file].ts ausliefert: [Pfad auf der Website, R2-Schlüssel] – Pfad ist /media/<Dateiname> */
+export const R2_MEDIEN = [...R2_VIDEOS, ...R2_BILDER].map(k => [`/media/${k.slice(k.lastIndexOf('/') + 1)}`, k]);
 
 const load = async name => { try { return await import(name); } catch { return null; } };
 const miniflare = await load('miniflare');
@@ -288,7 +292,7 @@ export async function startWorker({ google, mail, base, scheme = 'http', authEnd
       if (db) d1 = await mf.getD1Database('DB');
     },
     /* Gesamter gespeicherter Inhalt aller Tabellen */
-    dump: async () => JSON.stringify(await Promise.all(['orders', 'notifications', 'rate_limits', 'sessions'].map(t => app.sql(`SELECT * FROM ${t}`)))),
+    dump: async () => JSON.stringify(await Promise.all(['orders', 'notifications', 'rate_limits', 'sessions', 'marketing_consents'].map(t => app.sql(`SELECT * FROM ${t}`)))),
     /* Cron-Trigger auslösen; liefert Ergebnis und die dabei geschriebenen Log-Zeilen */
     async cron() {
       const before = logs.length;
@@ -367,8 +371,8 @@ export async function startPagesFunction({ api = null, assets, media = null } = 
   return { fetch: (url, init) => mf.dispatchFetch(url, init), stop: () => mf.dispose(), bucket: () => bucket };
 }
 
-/* Lokales Cloudflare Pages (`wrangler pages dev` mit wrangler.toml aus dem Root). worker: true startet den API-Worker aus
-   worker/wrangler.toml in derselben Sitzung (-c … -c …), erreichbar nur über das Service Binding API. Seine [vars] werden
+/* Lokales Cloudflare Pages (`wrangler pages dev` mit wrangler.toml aus dem Root). worker: true ergänzt ein rein lokales
+   API-Service-Binding in einer temporären Konfiguration und startet den API-Worker in derselben Sitzung (-c … -c …). Seine [vars] werden
    durch Testwerte ersetzt (lokaler Modus, Mock-Google, Mock-Resend); D1 ist lokal, mit `wrangler d1 migrations apply --local`.
    worker: false: nur die Website, das Binding ist dann nicht verbunden.
    media: Objekte für das lokale R2 (Binding MEDIA aus wrangler.toml) als { Schlüssel: Pfad einer Datei }; ohne Angabe bleibt es leer */
@@ -393,7 +397,8 @@ export async function startPages({ google, mail, worker = true, env = {}, media 
     writeFileSync(join(dir, 'worker.toml'), toml);
     const m = spawnSync(WRANGLER, ['d1', 'migrations', 'apply', 'pxwa', '--local', '--persist-to', state, '-c', join(dir, 'worker.toml')], { cwd: ROOT, env: wranglerEnv(), encoding: 'utf8' });
     if (m.status !== 0) throw new Error('wrangler d1 migrations apply: ' + m.stdout + m.stderr);
-    args.push('-c', 'wrangler.toml', '-c', join(dir, 'worker.toml'));
+    /* Nur der lokale Integrationstest verbindet den Worker; Produktion bleibt ohne API-Binding. */
+    args.push('-c', 'wrangler.toml', '-c', join(dir, 'worker.toml'), '--service', 'API=pxwa-api');
     google.setRedirectUri(`${base}/api/auth/callback`);
   }
   for (const [key, file] of Object.entries(media)) {
@@ -461,9 +466,11 @@ export class Client {
 
 export const field = (html, name) => (html.match(new RegExp(`name="${name}" value="([^"]*)"`)) || [])[1];
 
-/* Formular des Hero: Website, AGB-Häkchen (agb: false lässt es weg) und die angezeigte AGB-Version */
-export const startForm = ({ website = 'musterfirma.de', agb = true, agbVersion = TERMS_VERSION, extra = {} } = {}) => ({
-  action: 'start', website, ...(agb === true ? { agb: '1' } : agb === false ? {} : { agb }), ...(agbVersion === null ? {} : { agb_version: agbVersion }), ...extra,
+/* Anfrageformular: Website, AGB-Häkchen und Unternehmer-Häkchen (false lässt sie weg, ein String setzt den Wert), freiwillige
+   Werbeeinwilligung (werbung: true setzt "1") und die angezeigte AGB-Version */
+const box = (name, v) => (v === true ? { [name]: '1' } : v === false ? {} : { [name]: v });
+export const startForm = ({ website = 'musterfirma.de', agb = true, unternehmer = true, werbung = false, agbVersion = TERMS_VERSION, extra = {} } = {}) => ({
+  action: 'start', website, ...box('agb', agb), ...box('unternehmer', unternehmer), ...box('werbung', werbung), ...(agbVersion === null ? {} : { agb_version: agbVersion }), ...extra,
 });
 
 /* Hero absenden („Analysieren“) und – wenn der Worker zu Google weiterleitet – den Google-Teil bis zum Code nachbilden */

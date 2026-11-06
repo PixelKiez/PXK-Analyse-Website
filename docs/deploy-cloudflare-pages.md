@@ -21,7 +21,7 @@ Browser ──HTTPS──► 360.pixelkiez.de  (CNAME bei Hostinger → <projekt
                 Cloudflare Pages „pxwa“ ── /, *.html, /assets/*, Poster ──► statische Dateien aus public/
                      │
                      ├─ drei Videos (public/_routes.json) ──► Pages Function functions/media/[file].ts (Byte-Ranges, 206)
-                     │                                          └─ liest nur drei feste Schlüssel aus R2 „360pixelkiez“ (Binding MEDIA)
+                     │                                          └─ liest nur fünf feste Schlüssel aus R2 „360pixelkiez“ (Binding MEDIA)
                      └─ /api/* (public/_routes.json) ──► Pages Function functions/api/[[path]].ts
                                                             │ Service Binding „API“ (intern, keine öffentliche Adresse)
                                                             ▼
@@ -183,42 +183,61 @@ Custom Domain; am 03.11.2026 per API gelesen). Pages liest sie über das Binding
 von Pages hinterlegt ist und in `wrangler.toml` dokumentiert steht. In den Projekteinstellungen hat derzeit auch die
 Vorschau `MEDIA` (R2-Bindings erlauben Lesen und Schreiben); `wrangler.toml` sieht für die Vorschau kein Binding vor.
 Ob die Vorschau den Bucket behalten soll, ist eine offene Entscheidung. Im Bucket (Stand 03.11.2026,
-per API gelesen, Größe und SHA-256 in `tests/pages.test.mjs`): `360-pixelkiez-video-1080p.mp4` (3,4 MiB),
+per API gelesen, Größe und SHA-256 in `tests/pages.test.mjs`; Stand 04.11.2026): `360-pixelkiez-video-1080p-website-look.mp4`
+(8,6 MiB, 1920 × 1080, 60 Bilder/s, 48 s; vom Auftraggeber am 04.11.2026 hochgeladen, ersetzt `360-pixelkiez-video-1080p.mp4`),
 `report-pdf-de-1x1-lavendel.mp4` (3,4 MiB), `section-bericht-peach-5x4.mp4` (1,2 MiB); H.264 (High), yuv420p, ohne Ton,
 `moov` vor `mdat` (Faststart), ohne eingebettete Copyright-Metadaten.
 
 Eingebunden sind seit PXK-159 (Entscheidung des Auftraggebers 03.11.2026) das Berichtsvideo (Lavendel) bei
 „Ein PDF. Sieben Seiten.“ und das Befund-Video (Peach) bei „Jeder Befund verständlich erklärt.“, seit dem P0-Hotfix außerdem
-das Hero-Video direkt unter dem Hero (vor den Partner-Logos, 16:9). Es nennt noch „vier Metriken“, simuliert eine laufende
-Analyse, zeigt „Jetzt analysieren“ und im Abspann kontakt@pixelkiez.de; deshalb ist es sichtbar als „Historische Demo“
-gekennzeichnet (Plakette im Video, Bildunterschrift, Alternativtext). Das R2-Objekt ist unverändert; eine inhaltsrichtige
-Fassung wäre ein neues Objekt mit eigener Freigabe. Auch das Berichtsvideo zeigt noch „Die 4 wichtigsten Metriken“
+das Hero-Video direkt unter dem Hero (vor den Partner-Logos, 16:9). Unter den Videos stehen keine Bildunterschriften und keine
+Kennzeichnung als alte Fassung (Entscheidung des Auftraggebers 04.11.2026); dass alle gezeigten Werte Beispieldaten sind, steht im
+Alternativtext und in den Metadaten der Poster. Das Hero-Video nennt noch „vier Metriken“, simuliert eine laufende Analyse, zeigt
+„Jetzt analysieren“ und im Abspann kontakt@pixelkiez.de. Video-Metadaten: `VideoObject` (JSON-LD) je Video auf der Startseite
+(Name, Beschreibung gleich Alternativtext, Poster, Video-Adresse unter /media/, Dauer, Maße, Upload-Datum aus R2, Herausgeber).
+Auch das Berichtsvideo zeigt noch „Die 4 wichtigsten Metriken“
 und „Jetzt analysieren“; so freigegeben. Versioniert in `public/media/` sind nur die drei Poster
-(`360-pixelkiez-video-historisch-poster.jpg` – Bild bei 31,5 s aus dem R2-Objekt, neutrale Fahrplan-Ansicht –,
+(`360-pixelkiez-website-analyse-poster.jpg` – Titelbild bei 3,2 s aus dem R2-Objekt –,
 `report-pdf-lavendel-poster.jpg`, `section-bericht-peach-poster.jpg`, mit XMP-Metadaten, SHA-256 in
 `tests/release.test.mjs`). Die Titelbilder für soziale Netzwerke liegen unter `public/assets/og/` (1200×630).
 
+Hintergrundbild „Für alle, die eine Website verantworten.“ (Entscheidung des Auftraggebers 04.11.2026): Der Auftraggeber hat
+`pictures/Sonnige Designrunde am Tisch.png` (1672×941, 2,6 MB) in den Bucket geladen; laut eingebetteten Content Credentials
+(C2PA) mit ChatGPT (gpt-image) erzeugt. Ausgeliefert wird nur die WebP-Fassung `pictures/360-pixelkiez-designrunde-am-tisch.webp`
+(q78, 169 KiB, neues Objekt; das Original bleibt unverändert und ist über die Website nicht erreichbar) unter
+`/media/360-pixelkiez-designrunde-am-tisch.webp`. XMP: Titel, Beschreibung, Urheber/Credit 360°Pixelkiez, Erstellungswerkzeug und
+die KI-Herkunft als IPTC `DigitalSourceType` (trainedAlgorithmicMedia), kein Copyright-Vermerk (rein KI-erzeugt). Auf der Seite
+dekorativ (`alt=""`, lazy) mit `ImageObject` im JSON-LD (`digitalSourceType`: TrainedAlgorithmicMediaDigitalSource). Kein
+sichtbarer KI-Hinweis (Entscheidung des Auftraggebers); ob Art. 50 KI-VO einen verlangt, gehört zur anwaltlichen Prüfung.
+
+Logo (Entscheidung des Auftraggebers 04.11.2026): „360°“ als Text, daneben das Pixelkiez-Logo, oben und im Footer aller
+22 Seiten (und der Worker-Seiten). Quelle `pictures/PK_TRS_logo.png` (2172×724, 232 KiB, laut C2PA mit ChatGPT erzeugt);
+ausgeliefert wird die zugeschnittene, verlustfreie WebP-Fassung `pictures/pixelkiez-logo.webp` (518×120, 14 KiB, XMP mit
+Urheber/Credit Pixelkiez und KI-Herkunft, kein Copyright-Vermerk) unter `/media/pixelkiez-logo.webp`, `alt="Pixelkiez"`.
+Jeder Seitenaufruf fragt das Logo über die Function an (meist 304 dank ETag) – bei 100 000 Function-Anfragen am Tag im
+kostenlosen Plan für den Soft-Launch unkritisch.
+
 Pages beantwortet Range-Anfragen statischer Dateien mit 200 statt 206; Safari/iOS spielt Videos dann nicht ab. Die Pages
-Function `functions/media/[file].ts` (`public/_routes.json` nennt genau die drei Pfade) liest nur drei feste Schlüssel aus
+Function `functions/media/[file].ts` (`public/_routes.json` nennt genau die fünf Pfade) liest nur fünf feste Schlüssel aus
 `MEDIA` (`head` und `get`, nie `list`, `put` oder `delete`) und antwortet mit 200 (ohne Range), 206 mit
 `Content-Range`/`Content-Length`/`Accept-Ranges` (gültiger Bereich), 416 (ungültiger oder nicht erfüllbarer Bereich),
 304 (`If-None-Match`), 404 (Objekt fehlt im Bucket), 405 (andere Methoden als GET/HEAD) und 503 (kein Binding,
-R2-Fehler). `Content-Type: video/mp4` ist fest, unabhängig von den Metadaten im Bucket. Andere Pfade unter `/media/`
+R2-Fehler). `Content-Type` ist fest nach Dateiendung (`video/mp4`, `image/webp`), unabhängig von den Metadaten im Bucket. Andere Pfade unter `/media/`
 (Poster, unbekannte Dateien) bleiben statisch. Die Sicherheits-Header setzt die Function selbst (`_headers` gilt nicht für
 Functions; ein Test vergleicht beide), dazu `Cross-Origin-Resource-Policy: same-origin` und `X-Robots-Tag: noindex`.
 Lokal geprüft (`wrangler pages dev` mit lokalem R2, Playwright): Chromium und WebKit spielen alle drei eingebundenen Videos mit 206.
 
-Wiedergabe (Entscheidung des Auftraggebers 04.11.2026: keine Play-/Pause-Schaltflächen, keine Bedienelemente): `<video autoplay
-muted loop playsinline preload="metadata">`. `app.js` sichert stumm/inline/Schleife ab, startet ein Video, sobald es zu mindestens
-20 % im Bild ist (WebKit mobil lehnt `play()` für ein Video am Bildschirmrand ab), hält es erst ganz außerhalb an und versucht es nach
-Tabwechsel (`visibilitychange`), Zurück-Navigation (`pageshow`) und wiederkehrendem Netz (`online`) erneut. Der Zustand steht zur
-Diagnose in `data-wiedergabe` (läuft, angehalten, `abgelehnt: <Grund>`, Ladefehler, Bewegung reduziert). Browser-Regeln werden nicht
-umgangen: Lehnt der Browser ab (iOS-Stromsparmodus, Autoplay-Sperre) oder ist „Bewegung reduzieren“ eingestellt, bleibt das Standbild.
-Bekannte Systemgrenze: WebKit erzwingt im Stromsparmodus (iOS, macOS) für `autoplay`-Videos, die nicht laufen, eigene native
-Bedienelemente (lokal mit Playwright-WebKit auf macOS im Stromsparmodus beobachtet: Leiste mit Play, Zeit, AirPlay, Ton); deren
-Symbole lädt WebKit aus `blob:`-Adressen, die die CSP (`img-src 'self'`) sperrt (Konsolenmeldung „Button failed to load …“). Die
-Seite blendet diese Systemelemente nicht aus. Ersatz durch animierte Bilder (WebP, 640 px, 12 Bilder/s: 1,1 / 3,1 / 1,7 MB) wurde
-geprüft und nicht eingebaut: sichtbar unschärfer (kleine Schrift), ruckeliger, Verhalten im iOS-Stromsparmodus unbelegt.
+Wiedergabe (Entscheidungen des Auftraggebers 04.11.2026: niemals Play-/Pause-Schaltflächen, keine Bedienelemente): `<video muted
+loop playsinline preload="metadata">`, bewusst ohne `autoplay` und ohne `controls`. Grund: Für `autoplay`-Videos, die nicht laufen
+dürfen, blendet WebKit im Stromsparmodus (iOS, macOS) eigene Play-/Pause-Bedienelemente ein (lokal mit Playwright-WebKit auf macOS im
+Stromsparmodus beobachtet); ohne `autoplay` tut es das nicht. Gestartet wird nur per Skript: `app.js` sichert stumm/inline/Schleife ab,
+startet ein Video, sobald es zu mindestens 20 % im Bild ist (WebKit mobil lehnt `play()` für ein Video am Bildschirmrand ab), hält es
+erst ganz außerhalb an und versucht es nach Tabwechsel (`visibilitychange`), Zurück-Navigation (`pageshow`) und wiederkehrendem Netz
+(`online`) erneut. Der Zustand steht zur Diagnose in `data-wiedergabe` (läuft, angehalten, `abgelehnt: <Grund>`, Ladefehler,
+Bewegung reduziert). Browser-Regeln werden nicht umgangen: Lehnt der Browser ab (iOS-Stromsparmodus, Autoplay-Sperre) oder ist
+„Bewegung reduzieren“ eingestellt, bleibt das Standbild – ohne Bedienelemente. Ersatz durch animierte Bilder (WebP, 640 px,
+12 Bilder/s: 1,1 / 3,1 / 1,7 MB) wurde geprüft und nicht eingebaut: sichtbar unschärfer (kleine Schrift), ruckeliger, Verhalten im
+iOS-Stromsparmodus unbelegt.
 
 Kosten und Grenzen (Free-Plan): Jede Video-Anfrage ist ein Function-Aufruf (Workers-Kontingent, 100 000 Anfragen pro
 Tag; Safari stellt je Video etwa zwei Anfragen) und zwei R2-Lesevorgänge (`head`, `get`). Ist das Kontingent erschöpft
@@ -231,15 +250,19 @@ eingebundenen Videos.
 
 ## 8. Daten, Backup, Aufbewahrung
 
-- Je Auftrag: Referenz, Google-Kennung, bestätigte E-Mail, Website, Datenschutz-Version, Zeitpunkt, Zustellstatus.
+- Je Auftrag: Referenz, Google-Kennung, bestätigte E-Mail, Website, Datenschutz- und AGB-Version, Zeitpunkte, Unternehmer-Bestätigung,
+  Werbeeinwilligung (ja/nein), Wortlaut der bestätigten Kästchen (Migration 0003), Bearbeitungs- und Zustellstatus. Werbeeinwilligungen
+  zusätzlich in `marketing_consents` (ohne Website-Adresse; bis zum Widerruf, dann `revoked_at` setzen – Sperrliste).
   Sessions (Hash der Cookie-ID, Ablauf nach 1 h) und pseudonymisierte Rate-Limits löscht der Cron. Keine Tokens.
 - Backup: D1 Time Travel; vor jeder Schemaänderung zusätzlich `npx wrangler d1 export pxwa --remote --output pxwa-<datum>.sql`
   (enthält personenbezogene Daten: verschlüsselt ablegen, nie ins Repository).
-- Aufbewahrung: Frist **offen** (D-5). Vorbereitet, aber nicht aktiv: `ORDER_RETENTION_DAYS` (Tage). Ist der Wert
-  gesetzt, löscht der Cron nur Aufträge mit `status = 'completed'`, deren Eingang älter als die Frist ist, samt
-  Benachrichtigung. Offene Aufträge (`received`) bleiben immer erhalten. Bezugspunkt der Frist (Eingang oder
-  Erledigung) gehört zur Entscheidung D-5. Erledigt markieren nach dem Versand des Berichts:
-  `npx wrangler d1 execute pxwa --remote --command "UPDATE orders SET status = 'completed' WHERE reference = 'PXA-…'"`.
+- Aufbewahrung (Entscheidung des Auftraggebers 04.11.2026): `ORDER_RETENTION_DAYS = "120"` – der Cron löscht jeden Auftrag samt
+  Benachrichtigung vier Monate nach Eingang, unabhängig vom Status (Datenschutzerklärung Abschnitte 8 und 16). Bericht und Mails
+  dazu im Postfach 360@pixelkiez.de nach derselben Frist löschen, soweit keine Aufbewahrungspflicht besteht. Werbeeinwilligungen
+  bleiben bis zum Widerruf; Widerruf eintragen:
+  `npx wrangler d1 execute pxwa --remote --command "UPDATE marketing_consents SET revoked_at = datetime('now') WHERE email = '…' AND revoked_at IS NULL"`.
+- Betriebsprotokoll: Workers Logs ohne Aufrufprotokolle (`[observability.logs] invocation_logs = false`), nur eigene Meldungen
+  ohne IP-, E-Mail- und Website-Adressen; Aufbewahrung bei Cloudflare 3 Tage (Free) bzw. 7 Tage (Paid).
 - Nicht zugestellte Benachrichtigungen wöchentlich prüfen:
   `npx wrangler d1 execute pxwa --remote --command "SELECT o.reference, n.status, n.attempts, n.last_error FROM orders o JOIN notifications n ON n.order_id = o.id WHERE n.status <> 'sent'"`.
 - Nach Korrektur eines dauerhaften Fehlers (Abschnitt 6) erneut einreihen; der nächste Cron-Lauf versendet einmal:
