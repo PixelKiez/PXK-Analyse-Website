@@ -1,8 +1,7 @@
 /* PXWA – Soft-Launch (statisch, vor der Freigabe der Google-Anmeldung). Ausführen im Repo-Root: node --test tests/softlaunch.test.mjs
    Prüft das Pages-Artefakt (public/): keine Anfragewege (Formular, Eingabe, POST, Google-Login), keine Schaltfläche, die eine
    funktionierende Anfrage nahelegt, sichtbarer Hinweis „Kostenlose Analyse-Anfragen in Kürze verfügbar“, nur die freigegebenen
-   Videos aus R2 (PXK-159), noindex, Entwurfskennzeichnung der Rechtstexte, keine Secrets, Startseite gegenüber main nur mit den
-   freigegebenen Änderungen. Gilt nur für die Branches release/pxwa-soft-launch*. */
+   Videos aus R2 (PXK-159), Indexierungsregeln, Rechtstexte, keine Secrets und die Startseite gegenüber dem letzten Live-Stand. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
@@ -88,11 +87,15 @@ test('Videos nur wie entschieden: Hero-Video, Berichtsvideo und Befund-Video auf
   }
 });
 
-test('noindex bleibt: jede Seite mit robots-Meta, zusätzlich X-Robots-Tag für alle Pfade auf 360.pixelkiez.de', () => {
-  for (const p of PAGES) assert.match(read(p), /<meta name="robots" content="noindex,nofollow">/, p);
-  assert.match(read('_headers'), /^https:\/\/360\.pixelkiez\.de\/\*\n {2}X-Robots-Tag: noindex$/m);
-  assert.equal((read('_headers').match(/^\/\*$/gm) || []).length, 1, 'genau ein „/*“-Block (Sicherheits-Header)');
-  assert.ok(!FILES.includes('robots.txt') && !FILES.includes('sitemap.xml'), 'keine Freigabe für Suchmaschinen');
+test('Indexierung: reguläre Seiten freigegeben, Fehlerseite und Vorschau ausgeschlossen', () => {
+  for (const p of PAGES.filter(p => p !== '404.html')) assert.match(read(p), /<meta name="robots" content="index,follow">/, p);
+  assert.match(read('404.html'), /<meta name="robots" content="noindex,nofollow">/);
+  const headers = read('_headers');
+  assert.doesNotMatch(headers, /^https:\/\/360\.pixelkiez\.de\/\*\n {2}X-Robots-Tag: noindex$/m);
+  assert.match(headers, /^https:\/\/:project\.pages\.dev\/\*\n {2}X-Robots-Tag: noindex$/m);
+  assert.match(headers, /^https:\/\/:version\.:project\.pages\.dev\/\*\n {2}X-Robots-Tag: noindex$/m);
+  assert.equal((headers.match(/^\/\*$/gm) || []).length, 1, 'Sicherheits-Header bleiben erhalten');
+  assert.ok(FILES.includes('sitemap.xml'), 'Sitemap vorhanden');
 });
 
 test('Rechtstexte: Fassung 2026-11-04 (Entscheidung des Auftraggebers) ohne Entwurfsvermerk und ohne offene Platzhalter, keine behauptete Freigabe', () => {
@@ -161,6 +164,7 @@ const MAIN_SHA = 'c69cd1b3cb7dba1426df5006890fec3417841c9f';
 test('Startseite gegenüber main: nur Soft-Launch, Schriften-Fix, Partner, Logo, Favicon, Videos und Hintergrundbild aus R2 – sonst unverändert', () => {
   const main = execFileSync('git', ['show', `${MAIN_SHA}:public/index.html`], { cwd: ROOT, encoding: 'utf8' });
   const ERLAUBT = [
+    ['<meta name="robots" content="noindex,nofollow">', '<meta name="robots" content="index,follow">'],
     /* Soft-Launch (c528d96): kein Formularziel, Hinweis statt Formular, Schaltflächen ohne Anfrage, Ablauf „sobald Anfragen möglich sind“ */
     ["form-action 'self' https://accounts.google.com\">", "form-action 'none'\">"],
     [/    <form class="analyze" id="analyze"[\s\S]*?<p class="hero-note">[^\n]*\n/, '    <!-- Soft-Launch: kein Anfrageformular, bis die Google-Anmeldung freigegeben ist (keine Eingabe, kein POST, kein Google-Login) -->\n    <div class="analyze">\n      <p class="bald"><svg class="i"><use href="#i-globe"/></svg><span><b>Kostenlose Analyse-Anfragen in Kürze verfügbar.</b> Bis dahin nimmt diese Website noch keine Anfragen an.</span></p>\n'],
@@ -172,6 +176,7 @@ test('Startseite gegenüber main: nur Soft-Launch, Schriften-Fix, Partner, Logo,
     /* Datenschutz-Fix (94f0b18): Schriften selbst ausgeliefert */
     ["style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;", "style-src 'self'; font-src 'self';"],
     ['<link rel="preconnect" href="https://fonts.googleapis.com">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">\n', '<link rel="stylesheet" href="assets/fonts.css">\n'],
+    ['<script type="application/ld+json">{"@context":"https://schema.org","@graph":', '<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"360°Pixelkiez","alternateName":"360.pixelkiez.de","url":"https://360.pixelkiez.de/"}</script>\n<script type="application/ld+json">{"@context":"https://schema.org","@graph":'],
     /* Videos (PXK-159): Video-Metadaten (VideoObject) für alle drei Videos (04.11.2026); das Hero-Video aus R2 mit neuem Poster, darunter die Partner-Logos;
        Berichtsvideo in der Lavendel-Fassung; Befund-Video statt der Beispielkarte */
     [/\n<script type="application\/ld\+json">\{"@context":"https:\/\/schema\.org","@graph":\[\{"@type":"VideoObject".*?<\/script>/, '\n<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"VideoObject","name":"Kostenlose Website-Analyse von 360°Pixelkiez","inLanguage":"de-DE","description":"Animierter Überblick über die kostenlose Website-Analyse von 360°Pixelkiez: Prüfung öffentlicher Seiten, Befunde mit Messwerten und Beleg, Hebel und Fahrplan für die nächsten Schritte und der Bericht als PDF mit sieben Seiten. Alle gezeigten Werte sind Beispieldaten.","thumbnailUrl":"https://360.pixelkiez.de/media/360-pixelkiez-website-analyse-poster.jpg","contentUrl":"https://360.pixelkiez.de/media/360-pixelkiez-video-1080p-website-look.mp4","uploadDate":"2026-11-04T11:41:54+00:00","duration":"PT48S","width":1920,"height":1080,"publisher":{"@type":"Organization","name":"360°Pixelkiez","url":"https://360.pixelkiez.de/"}},{"@type":"VideoObject","name":"Der PDF-Bericht mit sieben Seiten","inLanguage":"de-DE","description":"Animierte Vorstellung des PDF-Berichts mit sieben Seiten: Kernaussage zuerst, Überblick auf einen Blick, die Bereiche im Detail und ein Fahrplan mit den nächsten Schritten. Beispielbericht, alle gezeigten Werte sind Beispieldaten.","thumbnailUrl":"https://360.pixelkiez.de/media/report-pdf-lavendel-poster.jpg","contentUrl":"https://360.pixelkiez.de/media/report-pdf-de-1x1-lavendel.mp4","uploadDate":"2026-11-01T20:17:58+00:00","duration":"PT35S","width":1080,"height":1080,"publisher":{"@type":"Organization","name":"360°Pixelkiez","url":"https://360.pixelkiez.de/"}},{"@type":"VideoObject","name":"Jeder Befund verständlich erklärt","inLanguage":"de-DE","description":"Animiertes fiktives Beispiel eines Befunds aus dem Bericht: Die Startseite nennt nur Schlagworte, dazu Befund, warum er wichtig ist, und die Empfehlung. Danach die nächsten Schritte, das Weitergeben des PDFs an Team, Agentur oder IT und der Hinweis: 0 €, kein Abo.","thumbnailUrl":"https://360.pixelkiez.de/media/section-bericht-peach-poster.jpg","contentUrl":"https://360.pixelkiez.de/media/section-bericht-peach-5x4.mp4","uploadDate":"2026-11-01T20:17:58+00:00","duration":"PT29S","width":1350,"height":1080,"publisher":{"@type":"Organization","name":"360°Pixelkiez","url":"https://360.pixelkiez.de/"}},{"@type":"ImageObject","name":"Für alle, die eine Website verantworten – 360°Pixelkiez","inLanguage":"de-DE","description":"Symbolbild: Vier Menschen arbeiten in sonnigem Licht an einem runden Tisch mit Laptops, Notizbuch und Kaffee an ihrer Website.","contentUrl":"https://360.pixelkiez.de/media/360-pixelkiez-designrunde-am-tisch.webp","encodingFormat":"image/webp","uploadDate":"2026-11-04T14:13:03+00:00","width":1672,"height":941,"creditText":"360°Pixelkiez","digitalSourceType":"https://schema.org/TrainedAlgorithmicMediaDigitalSource","creator":{"@type":"Organization","name":"360°Pixelkiez","url":"https://360.pixelkiez.de/"}}]}</script>'],
