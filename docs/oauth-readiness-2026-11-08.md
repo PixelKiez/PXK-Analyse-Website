@@ -1,5 +1,7 @@
 # PXWA Google OAuth / Launch Readiness – 2026-11-08
 
+**Update – isolierter OIDC-Test:** Der vorhandene Webclient wurde direkt geprüft: Die Produktions-Weiterleitung `https://360.pixelkiez.de/api/auth/callback` ist gespeichert. Audience ist extern, Veröffentlichungsstatus Test und das angemeldete Konto als Testnutzer eingetragen. Nach ausdrücklicher Freigabe wurde `http://localhost:8787/api/auth/callback` zusätzlich gespeichert; der Produktionswert blieb erhalten. Das Überprüfungscenter zeigt, dass im Testmodus keine Überprüfung erforderlich ist. Ein durchgehender echter Google-Login ist dadurch noch nicht nachgewiesen. Die folgenden ursprünglichen `UNVERIFIED`-Einträge zu diesen Punkten sind historisch.
+
 **Project:** 360°Pixelkiez · Jira PXK-153/PXK-155 · Repo `PixelKiez/PXK-Analyse-Website`  
 **Mode:** PREPARE ONLY. Derived technical audit; not a release authorization or legal approval.  
 **Frozen website base:** `e9b523572ca62abd4e0686ad14311895630beb2b`, Cloudflare Pages deployment `49f35efe-3294-4419-a93e-6800d0a703a8` (independently observed 2026-11-08).  
