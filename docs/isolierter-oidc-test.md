@@ -20,9 +20,15 @@ security find-generic-password -s 'NAME-DES-FREIGEGEBENEN-EINTRAGS' -w | node te
 
 Den Platzhalter nur durch den Eintragsnamen ersetzen, nie durch den Secret-Wert. Bei verweigertem Zugriff, leerem oder nicht passendem Secret wird kein erfolgreicher Google-Test behauptet. Keine Secret-Rotation aus diesem Vorgang ableiten.
 
-Der Schalter `-s` sucht das Dienst-Attribut eines generischen Schlüsselbundeintrags; sein sichtbarer Name kann davon abweichen. Die Suche nach `360 Pixelkiez OAuth` war am 08.11.2026 erfolglos. Der reale Google-Test bleibt offen, bis der tatsächliche, freigegebene Eintrag interaktiv zugänglich ist.
+Der Schalter `-s` sucht das Dienst-Attribut eines generischen Schlüsselbundeintrags; sein sichtbarer Name kann davon abweichen. Am 09.11.2026 wurde der Eintrag `360 Pixelkiez OAuth` im Anmeldeschlüsselbund bestätigt und für den isolierten Test interaktiv verwendet.
 
 Anschließend `http://localhost:8787/api/anfrage` im Browser öffnen und ausschließlich mit dem freigegebenen Testkonto und einer Beispieldomain testen. Der bestehende Callback erzeugt nach gültiger Zustimmung lokal einen Testauftrag und eine Mock-Benachrichtigung. Der Zähler `/__test/status` enthält keine Identitätsdaten. Den Prozess anschließend beenden.
+
+## Ergebnis des echten lokalen Tests – 09.11.2026
+
+Mit dem freigegebenen Google-Testkonto erfolgte ein echter Google-OIDC-Login über den vorhandenen Client und den Localhost-Callback. Die lokale Anwendung zeigte danach ihre Bestätigungsseite. Die lokale Statusabfrage ergab einen Testauftrag, einen lokalen Benachrichtigungseintrag und eine vom Mail-Mock verarbeitete Benachrichtigung. Es gab keinen echten Mailversand; das D1-Binding war ausschließlich flüchtig und lokal. Der Testserver wurde danach beendet.
+
+Der reale Test bestätigt den erfolgreichen Loginpfad, nicht alle Fehlerfälle gegenüber Google oder eine produktive Freigabe. Negative OAuth-, Zustimmungs-, Session- und Wiederholungsfälle wurden in der bestehenden automatisierten Suite mit Mocks getestet; die vollständige Browser-Suite war auf dem lokalen System durch die Chromium-Sandbox blockiert. Es wurden keine Schlüssel, Token oder Accountdaten in diesen Bericht übernommen.
 
 ## Datenschutz-Faktencheck (Vorschlag, keine Rechtsfreigabe)
 

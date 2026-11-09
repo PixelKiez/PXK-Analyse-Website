@@ -1,5 +1,7 @@
 # PXWA Google OAuth / Launch Readiness – 2026-11-08
 
+**Update 09.11.2026:** Der echte Google-OIDC-Erfolgsfall wurde mit dem freigegebenen Testkonto und `http://localhost:8787/api/auth/callback` in der isolierten lokalen Umgebung erfolgreich durchgeführt. Ein lokaler Testauftrag und eine Mock-Benachrichtigung wurden gezählt; kein echter Mailversand oder Produktions-D1-Binding. Der Testserver wurde beendet. Frühere Angaben in diesem Bericht, dass ein echter Google-Test noch aussteht, sind historisch. Die produktive Anmeldung bleibt deaktiviert und nicht freigegeben.
+
 **Update – isolierter OIDC-Test:** Der vorhandene Webclient wurde direkt geprüft: Die Produktions-Weiterleitung `https://360.pixelkiez.de/api/auth/callback` ist gespeichert. Audience ist extern, Veröffentlichungsstatus Test und das angemeldete Konto als Testnutzer eingetragen. Nach ausdrücklicher Freigabe wurde `http://localhost:8787/api/auth/callback` zusätzlich gespeichert; der Produktionswert blieb erhalten. Das Überprüfungscenter zeigt, dass im Testmodus keine Überprüfung erforderlich ist. Ein durchgehender echter Google-Login ist dadurch noch nicht nachgewiesen. Die folgenden ursprünglichen `UNVERIFIED`-Einträge zu diesen Punkten sind historisch.
 
 **Project:** 360°Pixelkiez · Jira PXK-153/PXK-155 · Repo `PixelKiez/PXK-Analyse-Website`  
