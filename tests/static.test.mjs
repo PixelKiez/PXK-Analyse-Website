@@ -776,7 +776,7 @@ test('Release-Grenze API (privater Worker): keine Route, keine workers.dev-Adres
   assert.match(active, /^ENV = "production"$/m);
   assert.match(active, /^BASE_URL = "https:\/\/360\.pixelkiez\.de"$/m);
   assert.match(active, /^MAIL_API_URL = "https:\/\/api\.resend\.com\/emails"$/m);
-  assert.match(active, /^MAIL_FROM = ""$/m, 'Absender erst nach Verifizierung der Versanddomain');
+  assert.match(active, /^MAIL_FROM = "anfrage@360\.pixelkiez\.de"$/m, 'freigegebener Absender auf der verifizierten Versanddomain');
   assert.match(active, /^PRIVACY_VERSION = "ENTWURF-/m, 'Datenschutzerklärung nicht freigegeben: Produktion nimmt keine Aufträge an');
   assert.match(active, /^TERMS_VERSION = "ENTWURF-/m, 'AGB nicht freigegeben: Produktion nimmt keine Aufträge an');
   assert.match(active, /^MAIL_NOTIFY_TO = "360@pixelkiez\.de"$/m);
