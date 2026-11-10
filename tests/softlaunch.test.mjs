@@ -133,10 +133,10 @@ test('Indexierung: reguläre Seiten freigegeben, Fehlerseite und Vorschau ausges
   assert.ok(FILES.includes('sitemap.xml'), 'Sitemap vorhanden');
 });
 
-test('Rechtstexte: Fassung 2026-11-04 (Entscheidung des Auftraggebers) ohne Entwurfsvermerk und ohne offene Platzhalter, keine behauptete Freigabe', () => {
-  for (const p of ['impressum.html', 'datenschutz.html', 'agb.html']) {
+test('Rechtstexte: Fassung 2026-11-04 (Datenschutzerklärung 2026-11-11, § 7 präzisiert) ohne Entwurfsvermerk und ohne offene Platzhalter, keine behauptete Freigabe', () => {
+  for (const [p, stand] of [['impressum.html', '4. November 2026'], ['datenschutz.html', '11. November 2026'], ['agb.html', '4. November 2026']]) {
     const t = text(read(p));
-    assert.ok(t.includes('Stand: 4. November 2026') && !/ENTWURF|\[[^\]]*\]/.test(t), `${p}: veröffentlichte Fassung ohne Platzhalter`);
+    assert.ok(t.includes(`Stand: ${stand}`) && !/ENTWURF|\[[^\]]*\]/.test(t), `${p}: veröffentlichte Fassung ohne Platzhalter`);
   }
   for (const p of PAGES) assert.ok(!/rechtssicher|DSGVO-konform|datenschutzkonform|rechtlich (geprüft und )?freigegeben(?! )/i.test(text(read(p)).replace('nicht rechtlich freigegeben', '')), `${p}: behauptete Freigabe`);
 });
@@ -201,6 +201,8 @@ const MAIN_SHA = 'c69cd1b3cb7dba1426df5006890fec3417841c9f';
    Kenntnisnahme der Datenschutzerklärung, Unternehmer, freiwillige Werbeeinwilligung) im Wortlaut, den der Worker als Nachweis speichert
    (worker/src/view.ts, DECLARATIONS), und die Schaltfläche „Analyse anfragen“. Sonst der Hero wie in main. */
 const FORMULAR_AENDERUNGEN = [
+  /* Aktivierung (PXK-155): das Formular zeigt die freigegebene AGB-Fassung, gleich TERMS_VERSION im Worker */
+  ['<input type="hidden" name="agb_version" value="ENTWURF-2026-10-31">', '<input type="hidden" name="agb_version" value="2026-11-04">'],
   ['<button class="btn btn--accent" type="submit">Analysieren <svg class="i"><use href="#i-arrow"/></svg></button>', '<button class="btn btn--accent" type="submit">Analyse anfragen <svg class="i"><use href="#i-arrow"/></svg></button>'],
   ['      <label class="consent consent--hero"><input id="agb" type="checkbox" name="agb" value="1" required><span>Ich akzeptiere die <a href="agb.html">AGB</a> von 360°Pixelkiez.</span></label>\n      <p class="form-error" id="agb-error" hidden>Bitte akzeptieren Sie die AGB, damit wir Ihre Website analysieren können.</p>\n      <p class="hero-note">Kostenlose Website-Analyse – 0 €, kein Abo. <a href="datenschutz.html">Datenschutzerklärung</a></p>\n',
     '      <label class="consent consent--hero"><input id="agb" type="checkbox" name="agb" value="1" required><span>Ich beauftrage die kostenlose Website-Analyse für die angegebene Adresse. Es gelten die <a href="agb.html">AGB</a>. Die <a href="datenschutz.html">Datenschutzerklärung</a> habe ich zur Kenntnis genommen.</span></label>\n'

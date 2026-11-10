@@ -305,7 +305,7 @@ test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen n
   assert.match(now, /<span>02<\/span><h3>AGB akzeptieren und anmelden<\/h3>/);
 });
 
-test('AGB-Seite: Fassung 2026-11-04 (Variante A, nur Unternehmer), ohne Platzhalter; der Worker bleibt bis zur Anpassung des Formulars gesperrt', () => {
+test('AGB-Seite: Fassung 2026-11-04 (Variante A, nur Unternehmer), ohne Platzhalter; Worker und Startseite verlangen genau diese Fassung', () => {
   /* Entscheidung des Auftraggebers 04.11.2026: AGB aus 03_agb.md übernommen – Werbeeinwilligung freiwillig (Variante A), nur Unternehmer
      (§ 14 BGB), daher ohne Widerrufsbelehrung für Verbraucher; § 10 bis § 13 rücken auf */
   const { root } = H.parse(read('public/agb.html'));
@@ -314,9 +314,10 @@ test('AGB-Seite: Fassung 2026-11-04 (Variante A, nur Unternehmer), ohne Platzhal
   assert.ok(!/ENTWURF|in Vorbereitung|Variante|\[|Widerrufsbelehrung|Muster-Widerrufsformular/.test(main), 'keine Entwurfs-, Varianten- oder Verbraucher-Widerrufsreste');
   for (const s of ['ausschließlich an Unternehmer', 'Verbraucher können die Analyse nicht anfragen', 'Die Einwilligung nach § 6 ist freiwillig', 'keine Rechtsberatung', 'Analyse anfragen', '§ 36 VSBG']) assert.ok(main.includes(s), `AGB: „${s}“`);
   assert.deepEqual(H.byClass(root, 'legal-h').map(e => H.norm(H.textOf(e)).split(' ').slice(0, 2).join(' ')), Array.from({ length: 13 }, (_, i) => `§ ${i + 1}`), '§ 1 bis § 13');
-  /* Die Anfragefunktion bleibt gesperrt, bis Formular und D1 den Texten entsprechen (eigenes Kästchen für Unternehmer und
-     Werbeeinwilligung, Nachweise): die Worker-Konfiguration trägt weiter ENTWURF, config.ts lehnt das in Produktion ab */
-  assert.match(/^TERMS_VERSION = "([^"]+)"$/m.exec(read('worker/wrangler.toml'))[1], /^ENTWURF-/);
+  /* Aktivierung (PXK-155): Formular und D1 entsprechen den Texten; der Worker verlangt genau die veröffentlichte Fassung, und die
+     Startseite zeigt dieselbe Version (sonst lehnt der Worker jede Anfrage mit 409 ab). config.ts lehnt Entwürfe weiter ab. */
+  assert.equal(/^TERMS_VERSION = "([^"]+)"$/m.exec(read('worker/wrangler.toml'))[1], '2026-11-04');
+  assert.ok(read('public/index.html').includes('<input type="hidden" name="agb_version" value="2026-11-04">'), 'Startseite zeigt die AGB-Version des Workers');
   assert.ok(read('worker/src/config.ts').includes("(production && /^entwurf/i.test(termsVersion))) missing.push('TERMS_VERSION');"), 'Produktion lehnt AGB-Entwürfe ab');
 });
 
@@ -524,8 +525,10 @@ test('Eigenständige Website 360°Pixelkiez: Name in Titel, Logo und Footer; Imp
   /* Entscheidung des Auftraggebers 04.11.2026: keine Umsatzsteuer-ID (noch nicht erteilt), keine Platzhalter */
   assert.ok(!/Umsatzsteuer|USt-?Id|Wirtschafts-Identifikationsnummer|Telefon|\[/.test(imprint), 'Impressum ohne USt-ID, W-IdNr., Telefon-Platzhalter');
   const privacy = H.norm(H.textOf(H.byTag(H.parse(read('public/datenschutz.html')).root, 'main')[0]));
-  /* Veröffentlichte Fassung (Entscheidung des Auftraggebers 04.11.2026): ohne Entwurfsvermerk, ohne offene Platzhalter */
-  assert.ok(privacy.includes('Version 2026-11-04') && !/ENTWURF|in Vorbereitung|\[/.test(privacy), 'Datenschutzerklärung: Fassung 2026-11-04 ohne Entwurfsvermerk und Platzhalter');
+  /* Veröffentlichte Fassung (04.11.2026, § 7 präzisiert 11.11.2026): ohne Entwurfsvermerk, ohne offene Platzhalter */
+  assert.ok(privacy.includes('Version 2026-11-11') && !/ENTWURF|in Vorbereitung|\[/.test(privacy), 'Datenschutzerklärung: Fassung 2026-11-11 ohne Entwurfsvermerk und Platzhalter');
+  /* § 7: Googles Bestätigung (email_verified) belegt bei fremden Domains keinen aktuellen Postfachzugriff – keine Zusicherung des Besitzes */
+  assert.ok(!privacy.includes('tatsächlich Ihnen gehört') && privacy.includes('belegt sie nicht in jedem Fall, dass Sie aktuell Zugriff auf das zugehörige Postfach haben'), 'Datenschutz § 7 ohne Besitzzusicherung');
   assert.ok(privacy.includes('Vincent Schnetzer') && privacy.includes('360@pixelkiez.de'), 'Verantwortlicher genannt');
   /* Nennt die tatsächlich genutzten Dienste und Datenflüsse */
   for (const s of ['Cloudflare Pages', 'Cloudflare Workers', 'Cloudflare-D1-Datenbank', 'Jurisdiktionsbeschränkung „Europäische Union“', 'Google Ireland Limited', '`openid` und `email`'.replaceAll('`', ''), 'Resend', 'Hostinger International Ltd.', '__Host-pxwa', 'HMAC', 'Berliner Beauftragte für Datenschutz']) {
@@ -777,8 +780,9 @@ test('Release-Grenze API (privater Worker): keine Route, keine workers.dev-Adres
   assert.match(active, /^BASE_URL = "https:\/\/360\.pixelkiez\.de"$/m);
   assert.match(active, /^MAIL_API_URL = "https:\/\/api\.resend\.com\/emails"$/m);
   assert.match(active, /^MAIL_FROM = "anfrage@360\.pixelkiez\.de"$/m, 'freigegebener Absender auf der verifizierten Versanddomain');
-  assert.match(active, /^PRIVACY_VERSION = "ENTWURF-/m, 'Datenschutzerklärung nicht freigegeben: Produktion nimmt keine Aufträge an');
-  assert.match(active, /^TERMS_VERSION = "ENTWURF-/m, 'AGB nicht freigegeben: Produktion nimmt keine Aufträge an');
+  /* Aktivierung (PXK-155): veröffentlichte Fassungen der Rechtstexte (Datenschutz 2026-11-11, AGB 2026-11-04) */
+  assert.match(active, /^PRIVACY_VERSION = "2026-11-11"$/m, 'Version der veröffentlichten Datenschutzerklärung');
+  assert.match(active, /^TERMS_VERSION = "2026-11-04"$/m, 'Version der veröffentlichten AGB');
   assert.match(active, /^MAIL_NOTIFY_TO = "360@pixelkiez\.de"$/m);
   /* Entscheidung des Auftraggebers 04.11.2026: Anfragedaten vier Monate nach Eingang löschen (Datenschutzerklärung Abschnitte 8 und 16) */
   assert.match(active, /^ORDER_RETENTION_DAYS = "120"$/m, 'Löschfrist vier Monate');

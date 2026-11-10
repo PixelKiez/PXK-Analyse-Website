@@ -199,7 +199,9 @@ test('Werbeeinwilligung freiwillig: nur "1" gilt; mit Einwilligung Wortlaut am A
 
 test('Manipulierte Zustimmung: falsche, fehlende oder veraltete AGB-Version im Formular und manipulierte Zustimmung in der Session → kein Auftrag', { skip }, async () => {
   await reset();
-  for (const [i, agbVersion] of ['ALT-2026-01-01', '', null, TERMS_VERSION + ' ', TERMS_VERSION.toLowerCase(), TERMS_VERSION + 'x'].entries()) {
+  /* Varianten, die tatsächlich von der aktuellen Version abweichen (eine reine Datumsversion hat keine Kleinbuchstaben-Variante) */
+  const variants = ['ALT-2026-01-01', '', null, TERMS_VERSION + ' ', TERMS_VERSION.toLowerCase(), TERMS_VERSION.replaceAll('-', '.'), TERMS_VERSION + 'x'].filter(v => v !== TERMS_VERSION);
+  for (const [i, agbVersion] of variants.entries()) {
     const r = await new Client(app, { ip: `198.51.100.${150 + i}` }).req('POST', '/api/anfrage', { form: startForm({ agbVersion }) });
     assert.equal(r.status, 409, `agb_version=${JSON.stringify(agbVersion)}`);
     assert.equal(r.location, null);
