@@ -132,7 +132,10 @@ nötigen Rechten (Pages, Workers Scripts, D1) und kurzer Laufzeit.
 
 - Zielgruppe **Extern**, Status **In Produktion** (im Testmodus nur eingetragene Testnutzer).
 - Branding: App-Name `360°Pixelkiez`, Support-E-Mail, Startseite `https://360.pixelkiez.de/`, Datenschutz
-  `https://360.pixelkiez.de/datenschutz`, autorisierte Domain `pixelkiez.de`. Kein Logo (würde eine Prüfung auslösen).
+  `https://360.pixelkiez.de/datenschutz`, Nutzungsbedingungen `https://360.pixelkiez.de/agb`, autorisierte Domain
+  `pixelkiez.de` (in der Search Console mit einem Konto des Projekts bestätigt). Für „Sign in with Google“ verlangt Google
+  eine **Brand Verification** (nur nicht sensible Scopes, daher keine volle App-Prüfung; Dauer laut Google etwa 2–3 Werktage).
+  Ohne sie zeigt der Zustimmungsbildschirm nach der Veröffentlichung weder App-Namen noch Logo. Erst danach „App veröffentlichen“.
 - Datenzugriff: nur `openid` und `…/auth/userinfo.email`. Keine Gmail- oder sonstigen Scopes.
 - Client-Typ **Webanwendung**, autorisierte Weiterleitungs-URI exakt `https://360.pixelkiez.de/api/auth/callback`.
   Keine JavaScript-Quellen nötig: Der Code-Austausch läuft serverseitig im Worker (PKCE, state, nonce).
@@ -296,7 +299,65 @@ inline (im Stromsparmodus: Standbild bzw. die Systemsteuerung von iOS, siehe Abs
   `MAIL_FROM` oder `BASE_URL` leeren und den Worker deployen → der Worker antwortet mit 503 (fail closed).
 - **Vorheriger Worker:** `npx wrangler rollback` (Liste: `npx wrangler deployments list`). D1 bleibt unverändert.
 - **Vorherige Website:** im Pages-Projekt unter „Deployments“ ein früheres Deployment „Rollback“ (oder per API
-  `POST /accounts/<konto>/pages/projects/pxwa/deployments/<deployment-id>/rollback`). Für den Soft-Launch ist das
-  Rückfallziel das Produktions-Deployment `c6e9a5de-6a9f-404c-9de1-3513e5f3e86c` (Stand `c528d96`): ohne Videos,
-  Functions nur für `/api/*` (503). Danach per `curl` prüfen, dass `/media/…mp4` wieder 404 liefert.
+  `POST /accounts/<konto>/pages/projects/pxwa/deployments/<deployment-id>/rollback`). Rückfallziel für den Soft-Launch ist
+  seit 06.11.2026 das Produktions-Deployment `49f35efe-3294-4419-a93e-6800d0a703a8` (Stand `e9b5235`, ohne API-Binding,
+  `/api/*` 503). Danach immer per Readback prüfen (Abschnitt 11.4), nie annehmen.
 - Datenbank: keine destruktiven Migrationen; nie `DROP` oder `DELETE` ohne Export (Abschnitt 8).
+
+## 11. Go-live PXK-155: Reihenfolge, Readbacks, Rollback (Stand 10.11.2026)
+
+Jeder Schritt braucht eine eigene, ausdrückliche menschliche Freigabe für genau den genannten SHA. Kein Schritt wird aus
+einem anderen abgeleitet. Nach jedem Schritt Readback; bei Abweichung STOP und Rollback nach 11.4.
+
+### 11.1 Ausgangsstand (frisch gelesen 10.11.2026)
+
+- Pages `pxwa` Produktion `49f35efe-3294-4419-a93e-6800d0a703a8` = `e9b5235` (Soft-Launch, kein API-Binding, `/api/*` 503).
+- Worker `pxwa-api`: nicht vorhanden (0 Worker-Skripte im Konto).
+- D1 `pxwa` (EU, EEUR): nur `_cf_KV`, `d1_migrations` (0 Zeilen), `sqlite_sequence`; Time Travel verfügbar.
+- Google-Client `360 Pixelkiez Web` im Modus Testing (nur eingetragene Testnutzer), Brand Verification nicht belegt.
+- Resend: DNS für `360.pixelkiez.de` vorhanden (`resend._domainkey`, `send.360…`); `notify.pixelkiez.de` ohne Einträge.
+  Status „Verified“ im Resend-Konto nicht selbst gesehen. `MAIL_FROM` leer.
+- Postfach `360@pixelkiez.de`: Zustellung nicht belegt.
+
+### 11.2 Lokal geprüftes Schema (Migrationen 0001 → 0003 auf leerer D1)
+
+Tabellen `orders`, `notifications`, `sessions`, `rate_limits`, `marketing_consents`; Indizes `orders_account_site`,
+`notifications_due`, `sessions_expiry`, `marketing_consents_email`. Alle Migrationen additiv, keine `DROP`.
+
+### 11.3 Reihenfolge
+
+0. **Aktivierungs-Commit** (nach Freigabe der Rechtstexte und des Absenders): `TERMS_VERSION`/`PRIVACY_VERSION` in
+   `worker/wrangler.toml` ohne „ENTWURF“, gleiche AGB-Version im Feld `agb_version` der Startseite, `MAIL_FROM` als
+   freigegebene Adresse `@360.pixelkiez.de`, ggf. korrigierte Datenschutzerklärung mit neuer Version. Danach CI am exakten SHA,
+   `npm ci`, `npm run typecheck`, `npm test`, `npm run test:release` im frischen Klon.
+1. **D1-Migration** (in `worker/`): `npx wrangler d1 time-travel info pxwa` (Bookmark notieren),
+   `npx wrangler d1 migrations list pxwa --remote` (erwartet 0001–0003 offen), `npx wrangler d1 migrations apply pxwa --remote`.
+   Readback: `migrations list` ohne offene Migration; `sqlite_master` wie 11.2.
+2. **Worker** (in `worker/`, frischer Klon des SHA): `npx wrangler deploy --dry-run --outdir /tmp/pxwa-dry`, dann
+   `npx wrangler deploy --tag <sha> --message "PXK-155 <sha>"`. Erst danach die Secrets, je interaktiv, ohne Ausgabe:
+   `GOOGLE_CLIENT_SECRET` (aus dem freigegebenen Schlüsselbundeintrag per stdin), `SECRET` (`openssl rand -hex 32` per stdin),
+   `MAIL_API_TOKEN` (Resend, nur Sending access für `360.pixelkiez.de`). Readback: `npx wrangler deployments list`,
+   `npx wrangler secret list` (nur Namen), keine Route, `workers.dev` aus. Der Worker ist noch unerreichbar (kein Binding).
+3. **Pages-Binding und geschlossener Test** (Phase A): Produktions-Binding `API` → `pxwa-api` im Projekt setzen (Readback
+   `GET /pages/projects/pxwa`: MEDIA und Kompatibilitätsdatum unverändert), dann den **unveränderten Live-Stand `e9b5235`**
+   neu deployen (`git archive` von `public/` und `functions/`, ohne `wrangler.toml`, `--commit-hash e9b5235…`). Der Hero
+   bleibt geschlossen; `/api/anfrage` ist erreichbar, aber Google lässt im Testmodus nur Testnutzer zu.
+   Readback: 200 auf `/api/anfrage`, statische Dateien bytegleich, `/api/*` ohne Binding auf `*.pages.dev`-Vorschau 503.
+   Kontrollierter Test mit dem Google-Testkonto: Website eingeben, Kästchen, Google → Referenz `PXA-…`; D1: genau 1 Auftrag,
+   `notifications.status = 'sent'`; genau 1 Mail in `360@pixelkiez.de` (Absender, Message-ID, SPF/DKIM notieren); zweiter
+   Rücksprung und erneute Anfrage derselben Website erzeugen keinen zweiten Auftrag; ohne Kästchen 422 und kein Auftrag.
+   Danach Testdaten löschen (Abschnitt 9).
+4. **Google**: Brand Verification einreichen und abwarten, dann „App veröffentlichen“. Readback: Audience „In Produktion“.
+5. **Öffentliche Aktivierung**: Kandidat-SHA deployen (wie 3, aber `public/` und `functions/` des Kandidaten). Readback:
+   22 Seiten bytegleich zum Tree, Hero-Formular mit drei Kästchen, CSP `form-action 'self' https://accounts.google.com`,
+   Videos 206, Konsolenfehler 0 (Chromium/WebKit, mobil/Desktop). Ein kontrollierter Auftrag wie in 3, danach löschen.
+
+### 11.4 Rollback und geschlossenes Anfrage-Gate
+
+- **Anfragen sofort schließen, Website bleibt:** Pages-Rollback auf das Phase-A-Deployment (Hero geschlossen) oder auf
+  `49f35efe…` (ohne Binding). Readback: Startseite ohne Formular; bei `49f35efe` `/api/anfrage` 503.
+- **Worker fail-closed ohne Datenverlust:** `npx wrangler secret delete SECRET` → jede Anfrage 503, Aufträge und Outbox bleiben.
+- **Vorherige Worker-Version:** `npx wrangler rollback <version-id>`.
+- **Google:** „Zurück zum Testen“ stoppt öffentliche Anmeldungen sofort.
+- **D1:** Vor dem ersten echten Auftrag: `npx wrangler d1 time-travel restore pxwa --bookmark <bookmark aus Schritt 1>`.
+  Danach nie destruktiv; vorher exportieren (Abschnitt 8).
