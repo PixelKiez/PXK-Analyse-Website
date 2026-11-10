@@ -1,6 +1,6 @@
 # 360°Pixelkiez – privater API-Worker. Erreichbar nur über das Service Binding "API" der Pages-Website
 # (Root-wrangler.toml, functions/api/[[path]].ts). Vorlage ohne Secrets; Deploy nur mit eigener Freigabe für genau einen Commit-SHA.
-# Secrets (nie hier eintragen): npx wrangler secret put GOOGLE_CLIENT_SECRET | SECRET | MAIL_API_TOKEN
+# Secrets (nie hier eintragen): npx wrangler secret put GOOGLE_CLIENT_SECRET | SECRET | MAIL_API_TOKEN | ACCESS_ALLOWLIST
 name = "pxwa-api"
 main = "src/index.ts"
 compatibility_date = "2026-07-30"
@@ -41,6 +41,10 @@ MAIL_NOTIFY_TO = "360@pixelkiez.de"
 # Löschfrist für Aufträge in Tagen (Entscheidung des Auftraggebers 04.11.2026: vier Monate ab Eingang; Datenschutzerklärung
 # Abschnitte 8 und 16). Der Cron löscht ältere Aufträge samt interner Benachrichtigung.
 ORDER_RETENTION_DAYS = "120"
+# Zugang (PXK-155): "testnutzer" = nach der Google-Anmeldung legen nur die Konten aus dem Secret ACCESS_ALLOWLIST einen Auftrag
+# an (kontrollierter Test, auch bei direktem Aufruf von /api/anfrage); alle anderen erhalten 403 ohne Auftrag und ohne Mail.
+# "offen" = öffentlicher Betrieb, nur mit eigener Release-Freigabe für genau einen SHA. Ohne gültigen Wert: keine Anfragen.
+ACCESS_MODE = "testnutzer"
 
 # Betriebsprotokoll (Workers Logs) nur mit eigenen Meldungen (Anzahlen, Auftragsreferenzen, Fehlerarten – keine IP- oder
 # E-Mail-Adressen); keine automatischen Aufrufprotokolle mit Anfrage-Metadaten. Aufbewahrung bei Cloudflare 3 bzw. 7 Tage.

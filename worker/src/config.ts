@@ -29,6 +29,13 @@ export const AUTHORIZED_MAIL_FROM_DOMAINS: readonly string[] = ['360.pixelkiez.d
    (docs/deploy-cloudflare-pages.md, Abschnitt 6). */
 export const PRODUCTION_NOTIFY_TO = '360@pixelkiez.de';
 
+/* Zugang (PXK-155): „testnutzer“ lässt nach der Google-Anmeldung nur die Konten aus dem Secret ACCESS_ALLOWLIST einen Auftrag
+   anlegen – serverseitig, auch wenn /api/anfrage direkt aufgerufen wird und unabhängig vom Google-Testmodus. „offen“ ist der
+   öffentliche Betrieb (nur mit eigener Release-Freigabe). Ohne gültigen Wert sperrt die Produktion die API; lokal gilt ohne
+   Angabe „offen“. Die Liste steht nie im (öffentlichen) Repository und nie im Log. */
+export const ACCESS_MODES = ['testnutzer', 'offen'] as const;
+export const MAX_TEST_ACCOUNTS = 20;
+
 export const LIMITS = {
   startPerIp: [20, 600],         // Anfragestarts je IP: 20 in 10 Minuten
   callbackPerIp: [30, 600],
@@ -59,6 +66,14 @@ export interface Env {
   MAIL_NOTIFY_TO?: string;
   /* Löschfrist erledigter Aufträge in Tagen. Nicht gesetzt = keine Löschung (Aufbewahrungsfrist D-5 offen). */
   ORDER_RETENTION_DAYS?: string;
+  ACCESS_MODE?: string;
+  /* Secret: E-Mail-Adressen der Testkonten, getrennt durch Komma oder Leerzeichen (nur bei ACCESS_MODE = testnutzer) */
+  ACCESS_ALLOWLIST?: string;
+}
+
+export interface AccessConfig {
+  mode: (typeof ACCESS_MODES)[number];
+  allowlist: ReadonlySet<string>;
 }
 
 export interface GoogleConfig {
@@ -91,6 +106,7 @@ export interface Config {
   termsVersion: string;
   mail: MailConfig;
   retentionDays: number | null;
+  access: AccessConfig;
   db: D1Database;
 }
 
@@ -167,6 +183,18 @@ export function loadConfig(env: Env): Config {
   const retentionDays = retention === '' ? null : Number(retention);
   if (retentionDays !== null && !(/^\d{1,4}$/.test(retention) && retentionDays >= 1)) missing.push('ORDER_RETENTION_DAYS');
 
+  const accessMode = str(env.ACCESS_MODE) || (local ? 'offen' : '');
+  const allowlist = new Set<string>();
+  if (accessMode === 'testnutzer') {
+    const entries = str(env.ACCESS_ALLOWLIST).split(/[\s,;]+/).filter(Boolean);
+    /* Nur ASCII wie beim Empfänger; Google liefert die Adresse kleingeschrieben (oidc.ts) */
+    const valid = entries.filter(e => /^[\x21-\x7e]+$/.test(e) && isEmail(e));
+    if (entries.length === 0 || valid.length !== entries.length || entries.length > MAX_TEST_ACCOUNTS) missing.push('ACCESS_ALLOWLIST');
+    for (const e of valid) allowlist.add(e.toLowerCase());
+  } else if (accessMode !== 'offen') {
+    missing.push('ACCESS_MODE');
+  }
+
   if (!env.DB) missing.push('DB');
 
   if (missing.length || !base || !env.DB) {
@@ -186,6 +214,7 @@ export function loadConfig(env: Env): Config {
     termsVersion,
     mail,
     retentionDays,
+    access: { mode: accessMode as AccessConfig['mode'], allowlist },
     db: env.DB,
   };
 }

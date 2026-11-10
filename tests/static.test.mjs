@@ -782,6 +782,8 @@ test('Release-Grenze API (privater Worker): keine Route, keine workers.dev-Adres
   assert.match(active, /^MAIL_NOTIFY_TO = "360@pixelkiez\.de"$/m);
   /* Entscheidung des Auftraggebers 04.11.2026: Anfragedaten vier Monate nach Eingang löschen (Datenschutzerklärung Abschnitte 8 und 16) */
   assert.match(active, /^ORDER_RETENTION_DAYS = "120"$/m, 'Löschfrist vier Monate');
+  /* PXK-155: bis zur eigenen Release-Freigabe nur freigeschaltete Testkonten (Liste als Secret, nie im Repository) */
+  assert.match(active, /^ACCESS_MODE = "testnutzer"$/m, 'kontrollierter Test, kein öffentlicher Auftragseingang');
   /* Betriebsprotokoll nur mit eigenen Meldungen, ohne automatische Aufrufprotokolle (Datenschutzerklärung Abschnitt 5) */
   assert.match(active, /^\[observability\.logs\]\ninvocation_logs = false$/m, 'keine Aufrufprotokolle mit Anfrage-Metadaten');
   const config = read('worker/src/config.ts');
@@ -831,7 +833,7 @@ test('Keine Secrets im Repository', () => {
   assert.deepEqual(hits, []);
   assert.ok(!/=\s*"[^"]{20,}"/.test(read('wrangler.toml').replace(/^#.*$/gm, '')), 'Pages-Konfiguration ohne Schlüsselwerte');
   const vars = read('worker/wrangler.toml').split('[vars]')[1].split('\n[')[0];
-  assert.ok(!/^\s*(GOOGLE_CLIENT_SECRET|SECRET|MAIL_API_TOKEN)\s*=/m.test(vars), 'Secrets nie als [vars]');
+  assert.ok(!/^\s*(GOOGLE_CLIENT_SECRET|SECRET|MAIL_API_TOKEN|ACCESS_ALLOWLIST)\s*=/m.test(vars), 'Secrets nie als [vars]');
   assert.match(read('worker/.dev.vars.example'), /^GOOGLE_CLIENT_SECRET=$/m); assert.match(read('worker/.dev.vars.example'), /^MAIL_API_TOKEN=$/m); assert.match(read('worker/.dev.vars.example'), /^SECRET=$/m);
 });
 

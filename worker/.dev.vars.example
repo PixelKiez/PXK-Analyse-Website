@@ -5,3 +5,5 @@ BASE_URL=http://localhost:8787
 GOOGLE_CLIENT_SECRET=
 SECRET=
 MAIL_API_TOKEN=
+# Nur bei ACCESS_MODE=testnutzer: Testkonten, getrennt durch Komma
+ACCESS_ALLOWLIST=

@@ -463,6 +463,33 @@ test('Tageslimit je Google-Konto: höchstens fünf Aufträge in 24 Stunden', { s
   await settled();
 });
 
+test('Testbetrieb (ACCESS_MODE testnutzer): nur freigeschaltete Google-Konten legen einen Auftrag an; andere Konten 403 ohne Auftrag, Outbox und Mail, Adresse nicht im Log', { skip }, async () => {
+  /* Eigenes Mock-Google: startWorker setzt dort die Redirect-URI dieses Workers */
+  const g2 = await mockGoogle().start();
+  const w = await startWorker({ google: g2, mail, env: { ACCESS_MODE: 'testnutzer', ACCESS_ALLOWLIST: ` tester@beispiel-test.de,\n${CUSTOMER.toUpperCase()} ` } });
+  try {
+    mail.reset();
+    const fremd = 'fremd@beispiel-dritte.de';
+    const denied = (await login(new Client(w), g2, { claims: { email: fremd, sub: '100000000000000000099' } })).callback;
+    assert.equal(denied.status, 403);
+    assert.equal(denied.location, null, 'keine Bestätigung');
+    assert.match(denied.text, /Noch nicht freigeschaltet/);
+    assert.match(denied.text, /Es wurde keine Anfrage gespeichert/);
+    assert.deepEqual(await counts(w), NOTHING);
+    await waitFor(() => w.logs().includes('ohne Freischaltung (Testbetrieb)'), { what: 'Log Testbetrieb' });
+    assert.ok(!w.logs().includes(fremd) && !w.logs().includes('musterfirma'), 'Log ohne Adressen');
+    /* Freigeschaltetes Konto (Groß-/Kleinschreibung in der Liste egal): genau ein Auftrag, genau eine Mail */
+    const ok = (await login(new Client(w, { ip: '198.51.100.90' }), g2)).callback;
+    assert.equal(ok.status, 303);
+    await settled(w);
+    assert.deepEqual((await orders(w)).map(o => o.email), [CUSTOMER]);
+    assert.deepEqual(await w.sql('SELECT status FROM notifications'), [{ status: 'sent' }]);
+    assert.equal(mail.state.accepted.length, 1);
+  } finally {
+    await w.stop(); await g2.stop();
+  }
+});
+
 /* ---------- Fehlerpfade ---------- */
 
 test('Fehlgeschlagene Speicherung: keine Bestätigung, kein halber Auftrag, keine Mail; Neustart mit Häkchen klappt', { skip }, async () => {

@@ -120,6 +120,7 @@ test('Benachrichtigung scheitert nach der Speicherung an der Datenbank: Annahme 
 const PROD = {
   ENV: 'production', BASE_URL: PRODUCTION_BASE, GOOGLE_TOKEN_ENDPOINT: undefined, GOOGLE_JWKS_URI: undefined, GOOGLE_AUTH_ENDPOINT: undefined,
   MAIL_API_URL: 'https://api.resend.com/emails', MAIL_FROM: 'benachrichtigung@360.pixelkiez.de', PRIVACY_VERSION: '2026-11-01', TERMS_VERSION: 'AGB-2026-11-01',
+  ACCESS_MODE: 'offen',
 };
 /* Hero-Formular gegen die Produktionskonfiguration (dort freigegebene AGB-Version) */
 const prodStart = () => startForm({ agbVersion: PROD.TERMS_VERSION });
@@ -141,6 +142,13 @@ test('Produktion: gültige Konfiguration wird angenommen – Basis-URL 360.pixel
   } finally {
     await w.stop();
   }
+  /* Testbetrieb mit gültiger Liste wird ebenfalls angenommen; die Freischaltung prüft erst die Rückkehr von Google (worker.test.mjs) */
+  const t = await startWorker({ base: PRODUCTION_BASE, env: { ...PROD, ACCESS_MODE: 'testnutzer', ACCESS_ALLOWLIST: 'tester@beispiel-test.de, zweit@beispiel-test.de' } });
+  try {
+    assert.equal((await new Client(t).req('POST', '/api/anfrage', { form: prodStart() })).status, 303);
+  } finally {
+    await t.stop();
+  }
 });
 
 test('Produktion: falscher Mail-Anbieter oder Pfad, fremder Absender, Datenschutz- oder AGB-Entwurf, Test-Endpunkte, andere Domain oder ungültige Löschfrist sperren die API (fail closed)', { skip }, async () => {
@@ -160,6 +168,10 @@ test('Produktion: falscher Mail-Anbieter oder Pfad, fremder Absender, Datenschut
     ['http in Produktion', { BASE_URL: 'http://360.pixelkiez.de' }, /BASE_URL/],
     ['Platzhalter-Domain', { BASE_URL: 'https://DOMAIN-FEHLT.example' }, /BASE_URL/],
     ['ungültige Löschfrist', { ORDER_RETENTION_DAYS: '0' }, /ORDER_RETENTION_DAYS/],
+    ['Zugang nicht festgelegt', { ACCESS_MODE: undefined }, /ACCESS_MODE/],
+    ['Zugang unbekannt', { ACCESS_MODE: 'alle' }, /ACCESS_MODE/],
+    ['Testbetrieb ohne Testkonten', { ACCESS_MODE: 'testnutzer', ACCESS_ALLOWLIST: undefined }, /ACCESS_ALLOWLIST/],
+    ['Testbetrieb mit ungültigem Eintrag', { ACCESS_MODE: 'testnutzer', ACCESS_ALLOWLIST: 'tester@beispiel-test.de, kein-konto' }, /ACCESS_ALLOWLIST/],
   ];
   for (const [name, env, key] of variants) {
     mail.reset();

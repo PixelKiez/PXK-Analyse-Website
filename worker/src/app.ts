@@ -197,6 +197,11 @@ class App {
       log(e.message);
       return this.respond(401, this.view.error('Anmeldung nicht bestätigt', 'Ihre Google-Anmeldung konnte nicht bestätigt werden. Es wurde keine Anfrage gespeichert. Bitte versuchen Sie es erneut.', 'Erneut versuchen', '/api/anfrage'));
     }
+    /* Kontrollierter Test: nur freigeschaltete Konten legen Aufträge an – nicht allein über den geschlossenen Hero */
+    if (this.config.access.mode === 'testnutzer' && !this.config.access.allowlist.has(user.email)) {
+      log('Google-Anmeldung ohne Freischaltung (Testbetrieb), kein Auftrag');
+      return this.respond(403, this.view.error('Noch nicht freigeschaltet', 'Anfragen sind im Moment nur für freigeschaltete Testkonten möglich. Es wurde keine Anfrage gespeichert.'));
+    }
     if (!(await this.limiter().allow('order', clientIp(this.request), LIMITS.orderPerIp, this.now))) {
       return this.respond(429, this.view.error('Zu viele Versuche', 'Bitte warten Sie und versuchen Sie es später erneut.'));
     }
