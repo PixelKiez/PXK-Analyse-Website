@@ -1,5 +1,6 @@
 # Cloudflare Pages pxwa – abgeglichen mit dem bestehenden Live-Projekt.
-# Der Soft-Launch hat kein API-Service-Binding. MEDIA ist für die ausgelieferten R2-Medien eingerichtet.
+# MEDIA ist für die ausgelieferten R2-Medien eingerichtet. Nur die Produktion bekommt das Service Binding API zum privaten
+# Worker pxwa-api; Vorschau-Deployments haben keins (/api/* antwortet dort mit 503 und erreicht weder Worker noch D1).
 # Deploy nur mit eigener Freigabe für genau einen Commit-SHA (docs/deploy-cloudflare-pages.md).
 name = "pxwa"
 pages_build_output_dir = "./public"
@@ -15,3 +16,7 @@ compatibility_date = "2026-11-01"
 [[env.production.r2_buckets]]
 binding = "MEDIA"
 bucket_name = "360pixelkiez"
+
+[[env.production.services]]
+binding = "API"
+service = "pxwa-api"

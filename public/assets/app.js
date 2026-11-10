@@ -129,8 +129,8 @@
     setTimeout(step, 2500);
   }
 
-  /* Vorabprüfung: Host mit Punkt, optional mit http(s):// und Pfad; AGB-Häkchen gesetzt */
-  const agb = $('#agb'), submit = form.querySelector('button[type=submit]');
+  /* Vorabprüfung: Host mit Punkt, optional mit http(s):// und Pfad; Pflichtkästchen AGB und Unternehmer gesetzt */
+  const agb = $('#agb'), business = $('#unternehmer'), submit = form.querySelector('button[type=submit]');
   const host = v => v.trim().toLowerCase().replace(/^https?:\/\//, '').split(/[/?#]/)[0];
   const valid = v => v.trim().length <= 2048 && !/[\s<>"`\\]/.test(v.trim()) && /^[a-z0-9äöüß-]+(\.[a-z0-9äöüß-]+)+$/.test(host(v));
   /* Fehlertext ein-/ausblenden und am Feld verknüpfen */
@@ -146,8 +146,9 @@
   form.addEventListener('submit', e => {
     const urlOk = mark(input, valid(input.value));
     const agbOk = !agb || mark(agb, agb.checked);
+    const businessOk = !business || mark(business, business.checked);
     /* Doppelklick: nur die erste gültige Absendung geht zu Google */
-    if (urlOk && agbOk && !sending) {
+    if (urlOk && agbOk && businessOk && !sending) {
       sending = true;
       if (submit) submit.disabled = true;
       return;
@@ -156,8 +157,9 @@
     if (!urlOk) input.focus();
     /* Der Fokus holt nur das Häkchen ins Bild; auf kleinen Bildschirmen (320×568) läge der Fehlertext darunter noch außerhalb */
     else if (!agbOk) { agb.focus(); $('#agb-error').scrollIntoView({ block: 'nearest' }); }
+    else { business.focus(); $('#unternehmer-error').scrollIntoView({ block: 'nearest' }); }
   });
-  if (agb) agb.addEventListener('change', () => { if (agb.checked) mark(agb, true); });
+  for (const box of [agb, business]) if (box) box.addEventListener('change', () => { if (box.checked) mark(box, true); });
   /* Zurück aus der Google-Anmeldung (Seite aus dem Verlauf): Formular wieder benutzbar */
   addEventListener('pageshow', () => { sending = false; if (submit) submit.disabled = false; });
 

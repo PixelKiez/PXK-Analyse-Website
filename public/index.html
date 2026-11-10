@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self' https://accounts.google.com">
 <meta name="robots" content="index,follow">
 <title>360°Pixelkiez – kostenlose Website-Analyse als PDF</title>
 <meta name="description" content="Kostenlose Website-Analyse von 360°Pixelkiez in sechs Bereichen: Auffindbarkeit &amp; SEO, Performance &amp; Technik, Nutzerführung, Vertrauen &amp; Datenschutz, Barrierefreiheit sowie KI-Verständlichkeit (GEO &amp; AI Visibility). Persönlich erstellt, als PDF mit sieben Seiten per E-Mail.">
@@ -84,15 +84,28 @@
     <span class="badge"><span class="pixel" aria-hidden="true"></span>Kostenlose Website-Analyse</span>
     <h1 class="h1">Sehen Sie, was Ihre Website <em>ausbremst</em>.</h1>
     <p class="lead">Pixelkiez prüft Ihre Website persönlich in sechs Bereichen, inklusive GEO &amp; AI Visibility. Den Bericht erhalten Sie kostenlos als PDF mit sieben Seiten per E-Mail.</p>
-    <!-- Soft-Launch: kein Anfrageformular, bis die Google-Anmeldung freigegeben ist (keine Eingabe, kein POST, kein Google-Login) -->
-    <div class="analyze">
-      <p class="bald"><svg class="i"><use href="#i-globe"/></svg><span><b>Kostenlose Analyse-Anfragen in Kürze verfügbar.</b> Bis dahin nimmt diese Website noch keine Anfragen an.</span></p>
+    <form class="analyze" id="analyze" action="/api/anfrage" method="post" novalidate>
+      <input type="hidden" name="action" value="start">
+      <input type="hidden" name="agb_version" value="ENTWURF-2026-10-31">
+      <label class="sr-only" for="url">Adresse Ihrer Website</label>
+      <div class="url-field">
+        <svg class="i"><use href="#i-globe"/></svg>
+        <input id="url" name="website" type="text" inputmode="url" autocomplete="url" maxlength="2048" placeholder="ihre-website.de">
+        <button class="btn btn--accent" type="submit">Analyse anfragen <svg class="i"><use href="#i-arrow"/></svg></button>
+      </div>
+      <p class="form-error" id="url-error" hidden>Bitte geben Sie eine öffentliche Website-Adresse wie beispiel.de ein.</p>
+      <label class="consent consent--hero"><input id="agb" type="checkbox" name="agb" value="1" required><span>Ich beauftrage die kostenlose Website-Analyse für die angegebene Adresse. Es gelten die <a href="agb.html">AGB</a>. Die <a href="datenschutz.html">Datenschutzerklärung</a> habe ich zur Kenntnis genommen.</span></label>
+      <p class="form-error" id="agb-error" hidden>Bitte bestätigen Sie die Beauftragung und die AGB, damit wir Ihre Website analysieren können.</p>
+      <label class="consent consent--hero"><input id="unternehmer" type="checkbox" name="unternehmer" value="1" required><span>Ich frage die Analyse als Unternehmer an (gewerblich, freiberuflich, Verein oder Organisation, § 14 BGB).</span></label>
+      <p class="form-error" id="unternehmer-error" hidden>Die Analyse ist nur für Unternehmer möglich. Bitte bestätigen Sie, dass Sie als Unternehmer anfragen.</p>
+      <label class="consent consent--hero consent--freiwillig"><input id="werbung" type="checkbox" name="werbung" value="1"><span>Freiwillig: Ja, 360°Pixelkiez darf mir per E-Mail Informationen und Angebote zur Website-Analyse von 360°Pixelkiez, Fachinformationen zu Website-Technik, SEO und KI-Auffindbarkeit sowie Bitten um Feedback zu meinem Bericht senden – auch als Newsletter. Ich kann diese Einwilligung jederzeit widerrufen, z. B. über den Abmeldelink in jeder E-Mail oder per Mail an 360@pixelkiez.de. Details: <a href="datenschutz.html#werbung">Datenschutzerklärung, Abschnitt 12</a>.</span></label>
+      <p class="hero-note">Kostenlose Website-Analyse – 0 €, kein Abo. Den Bericht erhalten Sie auch ohne Einwilligung in werbliche E-Mails. <a href="datenschutz.html">Datenschutzerklärung</a></p>
       <div class="facts">
         <span><svg class="i"><use href="#i-check"/></svg>0 €</span>
         <span><svg class="i"><use href="#i-check"/></svg>Sechs Bereiche</span>
         <span><svg class="i"><use href="#i-check"/></svg>PDF mit 7 Seiten</span>
       </div>
-    </div>
+    </form>
   </section>
 
   <section class="showcase" id="demo">
@@ -113,7 +126,7 @@
   </section>
 
   <section class="section cw-peach" id="ablauf">
-    <div class="section-head"><h2 class="h2">In drei Schritten zum PDF-Bericht.</h2><p class="text">So läuft die kostenlose Analyse ab, sobald Anfragen möglich sind.</p></div>
+    <div class="section-head"><h2 class="h2">In drei Schritten zum PDF-Bericht.</h2></div>
     <div class="steps steps--cards">
       <div class="step cw-lilac"><span>01</span><h3>Website eingeben</h3><p>Sie nennen die öffentliche Adresse der Website, die wir analysieren sollen.</p></div>
       <div class="step cw-lilac"><span>02</span><h3>AGB akzeptieren und anmelden</h3><p>Sie akzeptieren die AGB und melden sich mit Google an. Danach ist Ihre Anfrage gespeichert. So wissen wir, wohin der Bericht geht.</p></div>
@@ -196,7 +209,7 @@
         <div class="price"><b class="num">0 €</b><span>einmalig</span></div>
         <p>Persönlich erstellt, als PDF per E-Mail.</p>
         <ul><li><svg class="i"><use href="#i-check"/></svg>Sechs Bereiche inklusive GEO &amp; AI Visibility</li><li><svg class="i"><use href="#i-check"/></svg>PDF-Bericht mit sieben Seiten</li><li><svg class="i"><use href="#i-check"/></svg>Priorisierte Verbesserungen</li><li><svg class="i"><use href="#i-check"/></svg>Kein Abo, keine Folgekosten</li></ul>
-        <p class="plan-bald">In Kürze verfügbar</p>
+        <a class="btn btn--accent btn--block" href="#top">Website eingeben</a>
       </article>
       <article class="plan">
         <div class="plan-name">Anmeldung</div>
@@ -232,8 +245,8 @@
   </section>
 
   <section class="section closing cw-lilac">
-    <h2 class="h2">Kostenlose Analyse-Anfragen in Kürze verfügbar.</h2>
-    <a class="btn btn--ghost" href="wissen/index.html">Zum Wissensbereich <svg class="i"><use href="#i-arrow"/></svg></a>
+    <h2 class="h2">Kostenlos anfragen. Persönlich geprüft.</h2>
+    <button class="btn btn--accent" type="button" id="to-top">Website eingeben <svg class="i"><use href="#i-arrow"/></svg></button>
   </section>
 
   <footer class="cw-lilac">

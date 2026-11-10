@@ -21,8 +21,8 @@ import { mockGoogle, mockResend, startPages, waitFor, sleep, workerAvailable, wr
 const SHOTS = process.env.PXK_SCREENSHOT_DIR || '';
 const AXE = process.env.PXK_AXE || '';
 const MEDIA_DIR = process.env.PXK_MEDIA_DIR || '';
-/* Soft-Launch mit selbst ausgelieferten Schriften: jede Anfrage an Google Fonts zählt als Fremd-Request (blocked) */
-const FONT_HOSTS = SOFT_LAUNCH ? [] : ['fonts.googleapis.com', 'fonts.gstatic.com'];
+/* Schriften selbst ausgeliefert (Website und Worker-Seiten): jede Anfrage an Google Fonts zählt als Fremd-Request (blocked) */
+const FONT_HOSTS = [];
 /* Alle 22 Seiten der Website (ohne die Seiten des API-Workers) */
 const SEITEN = ['/index.html', '/impressum.html', '/datenschutz.html', '/agb.html', '/wissen/index.html', '/wissen/seo-geo-ai-visibility.html', '/wissen/wie-ki-websites-liest.html', '/wissen/wie-websites-ausgeliefert-werden.html', '/wissen/answerability.html', '/wissen/entity-trust.html', '/wissen/agent-readiness.html', '/analyse/index.html', '/analyse/auffindbarkeit-seo.html', '/analyse/performance-technik.html', '/analyse/nutzerfuehrung-conversion.html', '/analyse/vertrauen-datenschutz.html', '/analyse/barrierefreiheit.html', '/analyse/ki-verstaendlichkeit.html', '/analyse/methodik.html', '/analyse/warum-website-analyse.html', '/analyse/ki-crawler-agenten.html', '/gibt/es/nicht'];
 const pw = await (async () => {
@@ -159,10 +159,11 @@ test('Mobile Hauptansicht: kein horizontaler Überlauf, Formular (im Soft-Launch
   t.diagnostic(SHOTS ? `Screenshots: ${SHOTS}` : 'Screenshots nicht gespeichert (PXK_SCREENSHOT_DIR nicht gesetzt)');
 });
 
-test('Hero beim Öffnen: Überschrift, Text, Website-Eingabe und AGB-Häkchen im ersten Bildschirm (ab 360×640) und kontrastreich (Desktop und Mobil)', { skip: formSkip }, async () => {
-  /* Alles inklusive AGB-Häkchen, Hinweis und Faktenzeile sichtbar. 360×640: Faktenzeile darf seit dem AGB-Häkchen (BE-02) knapp unter
-     den Rand rutschen, Häkchen und Hinweis nicht. Beim sehr kleinen 320×568 wie bisher mindestens Überschrift, Text, Eingabe und Button;
-     das Häkchen liegt dort knapp darunter (ohne Häkchen setzt „Analysieren“ den Fokus mit Fehlertext darauf). */
+test('Hero beim Öffnen: Überschrift, Text, Website-Eingabe und AGB-Häkchen im ersten Bildschirm (ab 360×640) und kontrastreich (Desktop und Mobil)', { skip: formSkip }, async t => {
+  /* Überschrift, Text, Eingabe, Schaltfläche und das erste Pflichtkästchen (AGB) sichtbar. Seit dem Go-live-Formular nach AGB § 4
+     (drei eigene Kästchen, die Werbeeinwilligung im vollen Wortlaut) liegen Hinweiszeile und Faktenzeile auch auf großen Bildschirmen
+     unter dem Rand (gemessen, als Diagnose ausgegeben; Abweichung dem PO zur Entscheidung vorgelegt). Beim sehr kleinen 320×568 wie
+     bisher mindestens Überschrift, Text, Eingabe und Button (ohne Häkchen setzt „Analyse anfragen“ den Fokus mit Fehlertext darauf). */
   const full = ['1920x1080', '1440x900', '1366x768', '1280x720', '1024x768', '768x1024', '390x844', '375x667', '360x740'];
   const compact = ['360x640'];
   const contrast = (a, b) => {
@@ -178,13 +179,14 @@ test('Hero beim Öffnen: Überschrift, Text, Website-Eingabe und AGB-Häkchen im
       const input = document.querySelector('#url');
       return {
         vh: innerHeight, nav: b('#nav'), h1Top: document.querySelector('.hero .h1').getBoundingClientRect().top,
-        h1: b('.hero .h1'), lead: b('.hero .lead'), field: b('.url-field'), button: b('.url-field .btn'), agb: b('.hero .consent'), note: b('.hero .hero-note'), facts: b('.hero .facts'),
+        h1: b('.hero .h1'), lead: b('.hero .lead'), field: b('.url-field'), button: b('.url-field .btn'), agb: b('.hero .consent'), unternehmer: b('#unternehmer'), note: b('.hero .hero-note'), facts: b('.hero .facts'),
         leadColor: getComputedStyle(document.querySelector('.hero .lead')).color, bodyBg: getComputedStyle(document.body).backgroundColor,
         placeholder: getComputedStyle(input, '::placeholder').color, fieldBg: getComputedStyle(input.closest('.url-field')).backgroundColor,
       };
     });
-    const must = full.includes(size) ? ['h1', 'lead', 'field', 'button', 'agb', 'note', 'facts'] : compact.includes(size) ? ['h1', 'lead', 'field', 'button', 'agb', 'note'] : ['h1', 'lead', 'field', 'button'];
+    const must = [...full, ...compact].includes(size) ? ['h1', 'lead', 'field', 'button', 'agb'] : ['h1', 'lead', 'field', 'button'];
     for (const k of must) assert.ok(m[k] <= m.vh, `${size}: ${k} endet bei ${Math.round(m[k])} px, sichtbar sind ${m.vh} px`);
+    t.diagnostic(`${size}: Unternehmer ${Math.round(m.unternehmer)} px, Hinweis ${Math.round(m.note)} px, Faktenzeile ${Math.round(m.facts)} px (sichtbar ${m.vh} px)`);
     assert.ok(m.h1Top >= m.nav, `${size}: Überschrift liegt nicht unter der Navigation`);
     assert.ok(contrast(m.leadColor, m.bodyBg) >= 7, `${size}: Lauftext kontrastreich`);
     assert.ok(contrast(m.placeholder, m.fieldBg) >= 7, `${size}: Platzhalter im Eingabefeld kontrastreich`);
@@ -657,8 +659,17 @@ test('Tastatur: ungültige Adresse und fehlendes AGB-Häkchen bleiben im Formula
     await page.keyboard.press('Shift+Tab');
     await page.waitForTimeout(80);
     const submit = await focusInfo(page);
-    assert.deepEqual([submit.tag, submit.text], ['BUTTON', 'Analysieren']);
-    assert.ok(submit.visible, 'Fokus auf „Analysieren“ sichtbar');
+    assert.deepEqual([submit.tag, submit.text], ['BUTTON', 'Analyse anfragen']);
+    assert.ok(submit.visible, 'Fokus auf „Analyse anfragen“ sichtbar');
+    /* AGB gesetzt, Unternehmer-Kästchen fehlt (AGB § 4 Abs. 2): Fehler dort, Fokus dorthin, nichts gesendet */
+    await page.keyboard.press('Enter');
+    assert.equal(await page.isVisible('#unternehmer-error'), true);
+    assert.deepEqual(await page.evaluate(() => [document.activeElement.id, document.activeElement.getAttribute('aria-invalid'), document.activeElement.getAttribute('aria-describedby'), location.pathname]), ['unternehmer', 'true', 'unternehmer-error', '/']);
+    assert.deepEqual(requests.filter(r => r.method === 'POST' || r.url.includes('/api/')), [], 'ohne Unternehmer-Kästchen wird nichts gesendet');
+    await page.keyboard.press('Space');
+    assert.deepEqual([await page.isChecked('#unternehmer'), await page.isVisible('#unternehmer-error'), await page.isChecked('#werbung')], [true, false, false], 'Fehler verschwindet; Werbeeinwilligung bleibt freiwillig und ungesetzt');
+    for (let i = 0; i < 8 && (await focusInfo(page)).tag !== 'BUTTON'; i++) { await page.keyboard.press('Shift+Tab'); await page.waitForTimeout(80); }
+    assert.equal((await focusInfo(page)).text, 'Analyse anfragen');
     await Promise.all([page.waitForSelector('#reference'), page.keyboard.press('Enter')]);
     assert.equal(new URL(page.url()).pathname, '/api/anfrage');
     assert.match(await page.textContent('#reference'), /^PXA-[0-9A-Z]{4}-[0-9A-Z]{4}$/);
@@ -666,12 +677,17 @@ test('Tastatur: ungültige Adresse und fehlendes AGB-Häkchen bleiben im Formula
     assert.equal(await page.locator('form, input[type=checkbox]').count(), 0, 'kein zweiter Bestätigungsschritt');
     assert.equal(google.log.auth - before, 1, 'genau eine Google-Autorisierung');
     assert.equal(google.log.lastAuth.scope, 'openid email');
-    assert.ok(await overflow(page) <= 0, `${width}: Überlauf auf der Bestätigung`);
+    /* Erst messen, wenn Stylesheets und Schriften der Bestätigungsseite geladen sind (sonst kurzzeitig ungestylte Breite) */
+    await page.waitForLoadState('load');
+    await page.evaluate(() => document.fonts.ready);
+    const breit = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth, ...[...document.querySelectorAll('body *')].filter(e => e.getBoundingClientRect().right > innerWidth + 0.5 && !e.closest('details:not([open])')).map(e => `${e.tagName}.${e.className}:${Math.round(e.getBoundingClientRect().right)}`).slice(0, 5)]);
+    assert.ok(await overflow(page) <= 0, `${width}: Überlauf auf der Bestätigung ${JSON.stringify(breit)}`);
     assert.deepEqual(app.sql('SELECT website_url, terms_version FROM orders'), [{ website_url: 'https://musterfirma.de', terms_version: TERMS_VERSION }]);
     await waitFor(() => mail.state.accepted.length === 1, { what: 'interne Benachrichtigung' });
     assert.deepEqual(mail.state.accepted[0].to, ['360@pixelkiez.de']);
     assert.deepEqual(leaks(requests, 'musterfirma'), [], 'Website-Adresse nie in einer URL');
-    assert.ok(requests.some(r => r.method === 'POST' && /website=musterfirma\.de/.test(r.body) && /agb=1/.test(r.body) && r.body.includes(`agb_version=${TERMS_VERSION}`)), 'per POST mit Häkchen und AGB-Version');
+    assert.ok(requests.some(r => r.method === 'POST' && /website=musterfirma\.de/.test(r.body) && /agb=1/.test(r.body) && /unternehmer=1/.test(r.body) && !/werbung=/.test(r.body) && r.body.includes(`agb_version=${TERMS_VERSION}`)), 'per POST mit beiden Pflichtkästchen, ohne Werbeeinwilligung, mit AGB-Version');
+    assert.deepEqual(app.sql('SELECT business_confirmed, marketing_consent FROM orders'), [{ business_confirmed: 1, marketing_consent: 0 }], 'Nachweise am Auftrag');
     const cookies = await context.cookies();
     assert.ok(cookies.every(c => c.httpOnly && c.sameSite === 'Lax'), 'Session-Cookie HttpOnly/Lax');
     const storage = await page.evaluate(() => ({ local: localStorage.length, session: sessionStorage.length, cookie: document.cookie }));
@@ -682,7 +698,7 @@ test('Tastatur: ungültige Adresse und fehlendes AGB-Häkchen bleiben im Formula
   }
 });
 
-test('Kleine Bildschirme (320×568, 360×640) in Chromium und WebKit: „Analysieren“ ohne AGB-Häkchen zeigt Häkchen und Fehlertext vollständig im Bild, Fokus am Häkchen; nichts gesendet, kein Auftrag, keine Benachrichtigung', { skip: formSkip }, async t => {
+test('Kleine Bildschirme (320×568, 360×640) in Chromium und WebKit: „Analyse anfragen“ ohne AGB-Häkchen zeigt Häkchen und Fehlertext vollständig im Bild, Fokus am Häkchen; nichts gesendet, kein Auftrag, keine Benachrichtigung', { skip: formSkip }, async t => {
   /* Gemessen wird nach dem Klick, ohne dass der Test selbst scrollt: Beide Elemente liegen zwischen Navigation und unterem Fensterrand
      und sind an ihrem Mittelpunkt nicht verdeckt. Mit und ohne „Bewegung reduzieren“ – sonst scrollt die Seite weich, daher warten, bis sie steht. */
   const settle = page => page.evaluate(() => new Promise(done => {
@@ -755,6 +771,7 @@ test('Ohne JavaScript: fehlendes Häkchen → Server-Fehlerseite mit Fokus am H�
   assert.equal((google.log.auth || 0) - before, 0, 'ohne Häkchen keine Weiterleitung zu Google');
   assert.equal(orderCount(), 0);
   await page.check('#agb');
+  await page.check('#unternehmer');
   await Promise.all([page.waitForSelector('#reference'), page.click('.url-field .btn')]);
   assert.match(await page.textContent('#reference'), /^PXA-/);
   assert.equal(orderCount(), 1);
@@ -772,6 +789,7 @@ test('Browser-Zurück und Abbruch bei Google: Formular wieder benutzbar, kein Au
     const { context, page, errors, requests } = await open('/index.html', { width: 1440, height: 900, bypassCSP: true });
     await page.fill('#url', 'musterfirma.de');
     await page.check('#agb');
+    await page.check('#unternehmer');
     await Promise.all([page.waitForURL(u => u.href.startsWith(`${google.origin}/auth`)), page.click('.url-field .btn')]);
     assert.equal(orderCount(), 0, 'Google-Seite erreicht: noch kein Auftrag');
     /* Zurück zur Startseite: Button wieder aktiv, erneutes Absenden möglich */
@@ -780,6 +798,7 @@ test('Browser-Zurück und Abbruch bei Google: Formular wieder benutzbar, kein Au
     assert.equal(await page.isDisabled('.url-field .btn'), false, 'Button nach Zurück wieder aktiv');
     await page.fill('#url', 'musterfirma.de');
     await page.check('#agb');
+    await page.check('#unternehmer');
     await Promise.all([page.waitForURL(u => u.href.startsWith(`${google.origin}/auth`)), page.click('.url-field .btn')]);
     /* Abbruch bei Google */
     await Promise.all([page.waitForURL(`${app.base}/api/auth/callback**`), page.click('#abbrechen')]);
@@ -790,6 +809,7 @@ test('Browser-Zurück und Abbruch bei Google: Formular wieder benutzbar, kein Au
     assert.equal(await page.inputValue('#url'), 'https://musterfirma.de', 'Adresse vorausgefüllt');
     assert.equal(await page.isChecked('#agb'), false, 'Häkchen muss erneut gesetzt werden');
     await page.check('#agb');
+    await page.check('#unternehmer');
     await Promise.all([page.waitForURL(u => u.href.startsWith(`${google.origin}/auth`)), page.click('.url-field .btn')]);
     await Promise.all([page.waitForSelector('#reference'), page.click('#weiter')]);
     const ref = await page.textContent('#reference');
@@ -875,13 +895,14 @@ test('Accessibility-Snapshot (axe-core): keine schweren Verstöße auf Startseit
     if (path === 'hero-fehler') await o.page.click('.url-field .btn');
     if (path === 'server-fehler') {
       /* Pflichtfeld im Browser abschalten, damit die Fehlerseite des Workers (fehlendes Häkchen) geprüft wird */
-      await o.page.$eval('#agb', e => { e.required = false; });
+      await o.page.$$eval('#agb, #unternehmer', es => es.forEach(e => { e.required = false; }));
       await o.page.fill('#url', 'musterfirma.de');
       await Promise.all([o.page.waitForSelector('#agb-error'), o.page.click('.url-field .btn')]);
     }
     if (path === 'angenommen') {
       await o.page.fill('#url', 'musterfirma.de');
       await o.page.check('#agb');
+      await o.page.check('#unternehmer');
       await Promise.all([o.page.waitForSelector('#reference'), o.page.press('#url', 'Enter')]);
     }
     await o.page.addScriptTag({ path: AXE });

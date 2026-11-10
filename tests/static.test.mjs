@@ -200,29 +200,49 @@ test('Startseite: kostenloses Angebot, sechs Bereiche, sieben PDF-Seiten, GEO & 
   if (SOFT_LAUNCH) { assert.equal(H.byTag(root, 'form').length, 0, 'Soft-Launch: kein Formular'); return; }
   const form = H.byId(root, 'analyze');
   assert.equal(form.attrs.get('action'), '/api/anfrage', 'Formular geht an den API-Worker (Cloudflare-Route /api/*)'); assert.equal(form.attrs.get('method'), 'post');
-  assert.deepEqual(H.find(form, e => e.attrs.has('name')).map(e => e.attrs.get('name')), ['action', 'agb_version', 'website', 'agb'], 'nur Website, AGB-Häkchen und angezeigte AGB-Version – per POST, nie in einer GET-URL');
+  assert.deepEqual(H.find(form, e => e.attrs.has('name')).map(e => e.attrs.get('name')), ['action', 'agb_version', 'website', 'agb', 'unternehmer', 'werbung'], 'nur Website, die drei Kästchen und angezeigte AGB-Version – per POST, nie in einer GET-URL');
 });
 
-test('Hero (PXWA-BE-02): AGB-Pflichthäkchen nicht vorausgewählt, AGB- und Datenschutz-Link, Button „Analysieren“, Hinweis „0 €, kein Abo“', { skip: SOFT_LAUNCH_SKIP }, () => {
+test('Hero (AGB § 3 und § 4, Fassung 2026-11-04): Pflichtkästchen AGB und Unternehmer, freiwillige Werbeeinwilligung, keins vorausgewählt; Wortlaut wie im Worker gespeichert; Schaltfläche „Analyse anfragen“; Hinweis „0 €, kein Abo“', { skip: SOFT_LAUNCH_SKIP }, () => {
   const { root } = H.parse(read('public/index.html'));
   const txt = el => H.norm(H.textOf(el));
   const form = H.byId(root, 'analyze');
-  const box = H.byId(form, 'agb');
-  assert.deepEqual([box.tag, box.attrs.get('type'), box.attrs.get('name'), box.attrs.get('value')], ['input', 'checkbox', 'agb', '1']);
-  assert.ok(box.attrs.has('required') && !box.attrs.has('checked'), 'Pflicht und nicht vorausgewählt');
-  const label = H.find(form, e => e.tag === 'label' && H.find(e, x => x === box).length)[0];
-  assert.ok(label, 'Häkchen steht in seinem Label (ganzer Text klickbar)');
-  assert.equal(txt(label), 'Ich akzeptiere die AGB von 360°Pixelkiez.');
-  assert.deepEqual(H.byTag(label, 'a').map(a => [a.attrs.get('href'), txt(a)]), [['agb.html', 'AGB']]);
-  assert.deepEqual(H.byTag(form, 'a').map(a => a.attrs.get('href')), ['agb.html', 'datenschutz.html'], 'AGB- und separater Datenschutz-Link');
-  assert.equal(txt(H.find(form, e => e.tag === 'button')[0]), 'Analysieren');
-  assert.equal(txt(H.byClass(form, 'hero-note')[0]), 'Kostenlose Website-Analyse – 0 €, kein Abo. Datenschutzerklärung');
-  for (const id of ['url-error', 'agb-error']) assert.ok(H.byId(form, id).attrs.has('hidden'), `${id} zunächst verborgen`);
+  const label = box => H.find(form, e => e.tag === 'label' && H.find(e, x => x === box).length)[0];
+  /* Wortlaut der Kästchen = DECLARATIONS im Worker (wird mit dem Auftrag als Nachweis gespeichert, Art. 7 Abs. 1 DSGVO) */
+  const view = read('worker/src/view.ts');
+  const declaration = key => {
+    const m = new RegExp(`^  ${key}: '([^']+)'( \\+ DATENSCHUTZ_VERWEIS \\+ '\\.')?,$`, 'm').exec(view);
+    return m[1] + (m[2] ? 'Datenschutzerklärung, Abschnitt 12.' : '');
+  };
+  for (const [id, required, text, links] of [
+    ['agb', true, declaration('terms'), [['agb.html', 'AGB'], ['datenschutz.html', 'Datenschutzerklärung']]],
+    ['unternehmer', true, declaration('business'), []],
+    ['werbung', false, 'Freiwillig: ' + declaration('marketing'), [['datenschutz.html#werbung', 'Datenschutzerklärung, Abschnitt 12']]],
+  ]) {
+    const box = H.byId(form, id);
+    assert.deepEqual([box.tag, box.attrs.get('type'), box.attrs.get('name'), box.attrs.get('value')], ['input', 'checkbox', id, '1']);
+    assert.equal(box.attrs.has('required'), required, `${id}: Pflicht nur bei AGB und Unternehmer`);
+    assert.ok(!box.attrs.has('checked'), `${id}: nicht vorausgewählt`);
+    assert.ok(label(box), `${id}: Kästchen steht in seinem Label (ganzer Text klickbar)`);
+    assert.equal(txt(label(box)), text, `${id}: Wortlaut wie im Worker (DECLARATIONS)`);
+    assert.deepEqual(H.byTag(label(box), 'a').map(a => [a.attrs.get('href'), txt(a)]), links);
+  }
+  assert.equal(txt(H.find(form, e => e.tag === 'button')[0]), 'Analyse anfragen', 'Schaltfläche wie in AGB § 3 Abs. 2');
+  assert.match(read('public/agb.html'), /klickt auf die Schaltfläche „Analyse anfragen“/);
+  assert.equal(txt(H.byClass(form, 'hero-note')[0]), 'Kostenlose Website-Analyse – 0 €, kein Abo. Den Bericht erhalten Sie auch ohne Einwilligung in werbliche E-Mails. Datenschutzerklärung');
+  /* Fehlertexte wie die Antworten des Workers ohne JavaScript */
+  const app = read('worker/src/app.ts');
+  for (const id of ['url-error', 'agb-error', 'unternehmer-error']) {
+    assert.ok(H.byId(form, id).attrs.has('hidden'), `${id} zunächst verborgen`);
+    assert.ok(app.includes(`'${txt(H.byId(form, id))}'`), `${id}: gleicher Text wie im Worker`);
+  }
   assert.equal(txt(H.byTag(H.byClass(root, 'hero')[0], 'h1')[0]), 'Sehen Sie, was Ihre Website ausbremst.', 'Original-H1');
 });
 
-/* Im Soft-Launch übernimmt diese Rolle der Test „Startseite gegenüber main“ in tests/softlaunch.test.mjs */
-test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen neu, Reihenfolge erhalten; außerhalb des Hero nur die einzeln freigegebenen Änderungen', { skip: SOFT_LAUNCH_SKIP }, () => {
+/* Ersetzt durch den Test „Startseite gegenüber main“ in tests/softlaunch.test.mjs: Er vergleicht die ganze Startseite bytegenau mit main
+   (c69cd1b) und lässt nur einzeln freigegebene Änderungen zu – im Soft-Launch und im Formular-Modus. Dieser ältere Vergleich mit dem Stand
+   vor BE-02 kennt die späteren Entscheidungen (Schriften, Partner, Logo, Videos, Rechtstexte) nicht mehr. */
+test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen neu, Reihenfolge erhalten; außerhalb des Hero nur die einzeln freigegebenen Änderungen', { skip: 'ersetzt durch tests/softlaunch.test.mjs „Startseite gegenüber main“ (bytegenau, beide Modi)' }, () => {
   const now = read('public/index.html');
   const old = git('show', `${BASE_SHA}:public/index.html`);
   const hero = html => { const i = html.indexOf('<section class="hero">'); return html.slice(i, html.indexOf('</section>', i) + '</section>'.length); };
@@ -673,7 +693,10 @@ test('Release-Grenze Website (Cloudflare Pages): Konfiguration nur für Pages, F
   assert.match(active, /^name = "pxwa"$/m);
   assert.match(active, /^pages_build_output_dir = "\.\/public"$/m);
   assert.ok(!/^\s*main\s*=/m.test(active), 'kein Worker-Einstiegspunkt in der Pages-Konfiguration');
-  assert.ok(!/^\[\[services\]\]/m.test(active), 'Soft-Launch: kein API-Service-Binding');
+  /* Service Binding API nur für die Produktion; Vorschau-Deployments erreichen weder Worker noch D1. Im Soft-Launch gar keins. */
+  assert.ok(!/^\[\[services\]\]/m.test(active), 'kein API-Service-Binding für Vorschau-Deployments');
+  if (SOFT_LAUNCH) assert.ok(!/services\]\]/.test(active), 'Soft-Launch: kein API-Service-Binding');
+  else assert.match(active, /^\[\[env\.production\.services\]\]\nbinding = "API"\nservice = "pxwa-api"$/m, 'Produktion: Service Binding API → pxwa-api');
   assert.match(active, /^compatibility_date = "2026-07-30"$/m, 'Vorschau: bisheriges Kompatibilitätsdatum');
   assert.match(active, /^\[env\.production\]\ncompatibility_date = "2026-11-01"$/m, 'Produktion: bisheriges Kompatibilitätsdatum');
   assert.match(active, /^\[\[r2_buckets\]\]\nbinding = "MEDIA"\nbucket_name = "360pixelkiez"$/m, 'bestehendes R2-Binding für Vorschau');
@@ -823,6 +846,10 @@ test('Scope des API-Workers: nur openid email, kein PDF, keine Kunden-Mail, kein
   assert.deepEqual([...src.matchAll(/\bfetch\(([^,)]+)[,)]/g)].map(m => m[1].trim()).sort(), ['this.cfg.apiUrl', 'this.g.jwksUri', 'this.g.tokenEndpoint'], 'ausgehende Aufrufe nur an Google und die Mail-API, nie an die Kundenwebsite');
   assert.ok(!/\b(?:log|console\.(?:log|error|warn))\([^)]*\b(email|website_url|websiteUrl|idToken|id_token|access_token|code|verifier)\b/.test(src), 'keine personenbezogenen Daten oder Tokens im Log');
   assert.ok(!/localStorage|sessionStorage|indexedDB|document\.cookie|fetch\(/.test(read('public/assets/app.js')), 'app.js speichert und sendet nichts selbst');
+  /* Seiten des Workers (Eingabe, Fehler, Bestätigung) wie die Website: Schriften selbst ausgeliefert, CSP nur eigene Herkunft */
+  assert.ok(!/fonts\.googleapis\.com|fonts\.gstatic\.com|preconnect/.test(read(VIEW) + read('worker/src/http.ts')), 'Worker-Seiten ohne Google Fonts');
+  assert.match(read(VIEW), /<link rel="stylesheet" href="\$\{b\}\/assets\/fonts\.css">\n<link rel="stylesheet" href="\$\{b\}\/assets\/styles\.css">/, 'fonts.css vor styles.css');
+  assert.match(read('worker/src/http.ts'), /'Content-Security-Policy': `default-src 'none'; style-src 'self'; font-src 'self'; img-src 'self'; form-action 'self' \$\{authOrigin\}; frame-ancestors 'none'; base-uri 'none'`/, 'Worker-CSP: Stile und Schriften nur von der eigenen Herkunft');
 });
 
 test('TypeScript: Worker und Pages Function ohne Typfehler (tsc --noEmit, strict)', t => {

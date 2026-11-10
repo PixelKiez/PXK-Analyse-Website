@@ -4,7 +4,7 @@ export const MAX_BODY = 16384;
 
 export function securityHeaders(secure: boolean, authOrigin: string): Headers {
   return new Headers({
-    'Content-Security-Policy': `default-src 'none'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self'; form-action 'self' ${authOrigin}; frame-ancestors 'none'; base-uri 'none'`,
+    'Content-Security-Policy': `default-src 'none'; style-src 'self'; font-src 'self'; img-src 'self'; form-action 'self' ${authOrigin}; frame-ancestors 'none'; base-uri 'none'`,
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',
     /* same-origin statt no-referrer: Bei no-referrer sendet Chrome für Formular-POSTs "Origin: null", die Same-Origin-Prüfung schlüge fehl */

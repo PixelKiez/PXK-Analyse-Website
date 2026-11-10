@@ -21,8 +21,11 @@
 /* Fehlertexte an Formularfeldern: dunkleres Rot als --bad, damit 14 px Text auch auf Papier den Kontrast 4,5:1 erreicht (WCAG AA) */
 .form-error { color: #B42318; }
 /* Hero: AGB-Häkchen (Pflicht, nie vorausgewählt) und Hinweis unter dem Eingabefeld – kompakt, der Hero bleibt im ersten Bildschirm */
-.consent--hero { min-height: 24px; gap: 10px; align-items: center; line-height: 1.4; color: var(--ink-70); text-align: left; }
+.consent--hero { min-height: 24px; gap: 10px; align-items: start; line-height: 1.4; color: var(--ink-70); text-align: left; }
 .consent--hero input { margin: 0; }
+/* Freiwillige Werbeeinwilligung (AGB § 4 Abs. 3): eigenes Kästchen, voller Wortlaut sichtbar, kleiner gesetzt */
+.consent--freiwillig { font-size: 13px; line-height: 1.45; }
+.consent--freiwillig input { width: 18px; height: 18px; margin-left: 1px; }
 .hero-note { margin-top: -4px; font-size: 14px; line-height: 1.4; color: var(--ink-70); }
 .hero-note a { text-decoration: underline; text-underline-offset: 3px; }
 
@@ -187,9 +190,3 @@ section[id] { scroll-margin-top: 88px; }
 .closing { background: linear-gradient(180deg, var(--paper) 0%, #FFE6DD 36%, #F8E3E6 66%, #EFE2F6 100%); border-top-color: transparent; }
 .closing + footer { background: linear-gradient(180deg, #EFE2F6 0%, #EBE2FC 45%); }
 .closing + footer .footer-cols, .closing + footer .footer { border-top-color: rgb(91 63 166 / .14); }
-/* Soft-Launch (bis zur Freigabe der Google-Anmeldung): Hinweis statt Anfrageformular, keine Schaltfläche für eine Anfrage */
-.bald { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 68px; margin: 0; padding: 14px 24px; background: var(--surface); border: 1px dashed var(--ink-45); border-radius: 34px; font-size: 16px; line-height: 1.45; color: var(--ink-70); text-align: left; }
-.bald > svg { flex: none; width: 20px; height: 20px; color: var(--ink-45); }
-.bald b { font-weight: 600; color: var(--ink); }
-.plan > .plan-bald { padding: 13px 16px; border: 1px dashed var(--ink-45); border-radius: var(--r-pill); font: 500 13px var(--font-mono); color: var(--ink-70); text-align: center; }
-.ende-cta .ende-cta-bald { padding: 13px 22px; border: 1px dashed var(--ink-45); border-radius: var(--r-pill); font: 500 14px var(--font-mono); color: var(--ink); }

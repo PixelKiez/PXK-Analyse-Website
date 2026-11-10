@@ -83,9 +83,7 @@ export class View {
 <meta name="robots" content="noindex,nofollow">
 <title>${h(title)} | 360°Pixelkiez</title>
 <meta name="description" content="Kostenlose Website-Analyse von 360°Pixelkiez: Anfrage mit Google-Anmeldung.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+<link rel="stylesheet" href="${b}/assets/fonts.css">
 <link rel="stylesheet" href="${b}/assets/styles.css">
 <link rel="stylesheet" href="${b}/assets/anfrage.css">
 </head>

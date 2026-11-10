@@ -1,4 +1,4 @@
-/* PXWA – Soft-Launch (statisch, vor der Freigabe der Google-Anmeldung). Ausführen im Repo-Root: node --test tests/softlaunch.test.mjs
+/* PXWA – Pages-Artefakt im Soft-Launch und nach dem Go-live (Formular-Modus, PXK-155). Ausführen im Repo-Root: node --test tests/softlaunch.test.mjs
    Prüft das Pages-Artefakt (public/): keine Anfragewege (Formular, Eingabe, POST, Google-Login), keine Schaltfläche, die eine
    funktionierende Anfrage nahelegt, sichtbarer Hinweis „Kostenlose Analyse-Anfragen in Kürze verfügbar“, nur die freigegebenen
    Videos aus R2 (PXK-159), Indexierungsregeln, Rechtstexte, keine Secrets und die Startseite gegenüber dem letzten Live-Stand. */
@@ -17,6 +17,11 @@ const read = f => readFileSync(join(PUBLIC, f), 'utf8');
 const body = html => html.slice(html.indexOf('<body'));
 const text = html => body(html).replace(/<script[\s\S]*?<\/script>/g, ' ').replace(/<!--[\s\S]*?-->/g, ' ').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ');
 const NOTICE = 'Kostenlose Analyse-Anfragen in Kürze verfügbar';
+/* Formular-Modus (Go-live PXK-155): Hero mit Anfrageformular statt Hinweis. Die Soft-Launch-Prüfungen bleiben für einen Rückfall auf den
+   Soft-Launch erhalten und laufen nur dort; im Formular-Modus prüft das Gegenstück „Einziger Anfrageweg“ ebenso streng. */
+const FORM = /<form class="analyze" id="analyze"/.test(read('index.html'));
+const NUR_SOFT_LAUNCH = FORM && 'Formular-Modus: gilt nur im Soft-Launch (Gegenstück: „Einziger Anfrageweg“)';
+const NUR_FORMULAR = !FORM && 'Soft-Launch: kein Anfrageformular';
 
 /* Videos (Entscheidung des Auftraggebers 03.11.2026 per Rückfrage, PXK-159): Die drei R2-Objekte sind über ihre Adresse abrufbar.
    Eingebunden sind das Berichtsvideo (Lavendel) und das Befund-Video (Peach). Das Berichtsvideo zeigt nach Frame-Prüfung noch
@@ -33,7 +38,7 @@ test('Artefakt: alle 22 Seiten vorhanden, in media/ nur die drei Poster, Functio
   assert.deepEqual(JSON.parse(read('_routes.json')).include, ['/api/*', ...R2_PFADE]);
 });
 
-test('Kein Anfrageweg: kein Formular, keine Eingabe, kein Ziel /api/ oder Google; CSP verbietet Formularziele und Verbindungen', () => {
+test('Kein Anfrageweg: kein Formular, keine Eingabe, kein Ziel /api/ oder Google; CSP verbietet Formularziele und Verbindungen', { skip: NUR_SOFT_LAUNCH }, () => {
   for (const p of PAGES) {
     const html = read(p);
     assert.ok(!/<(form|input|textarea|select)\b/i.test(html), `${p}: Formular oder Eingabefeld`);
@@ -49,7 +54,7 @@ test('Kein Anfrageweg: kein Formular, keine Eingabe, kein Ziel /api/ oder Google
   }
 });
 
-test('Hinweis sichtbar; keine Schaltfläche oder Überschrift legt eine funktionierende Anfrage nahe', () => {
+test('Hinweis sichtbar; keine Schaltfläche oder Überschrift legt eine funktionierende Anfrage nahe', { skip: NUR_SOFT_LAUNCH }, () => {
   const home = read('index.html');
   assert.ok(text(home).includes(`${NOTICE}.`), 'Startseite: Hinweis im Hero');
   assert.ok(!/<p class="bald"[^>]*hidden/.test(home));
@@ -67,6 +72,36 @@ test('Hinweis sichtbar; keine Schaltfläche oder Überschrift legt eine funktion
     assert.ok(!/href="[^"]*#top"[^>]*class="btn|class="btn[^"]*"[^>]*href="[^"]*#top"/.test(html), `${p}: Schaltfläche zurück zum (entfernten) Formular`);
   }
   for (const p of PAGES.filter(p => p.startsWith('wissen/') || p.startsWith('analyse/'))) assert.ok(text(read(p)).includes(`${NOTICE}.`), `${p}: Hinweis statt „Website eingeben“`);
+});
+
+test('Einziger Anfrageweg: das Hero-Formular der Startseite (POST /api/anfrage), sonst kein Formular; Skripte senden nichts; Formularziele nur eigene API und Google', { skip: NUR_FORMULAR }, () => {
+  for (const p of PAGES) {
+    const html = read(p);
+    const csp = html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)[1];
+    assert.match(csp, /form-action 'self' https:\/\/accounts\.google\.com$/, `${p}: form-action`);
+    assert.match(csp, /connect-src 'none'/, `${p}: connect-src`);
+    assert.ok(!/accounts\.google\.com/i.test(html.replace(csp, '')), `${p}: Google-Anmeldung nur über den Worker`);
+    if (p === 'index.html') continue;
+    assert.ok(!/<(form|input|textarea|select)\b/i.test(html), `${p}: Formular oder Eingabefeld`);
+    assert.ok(!/<button\b[^>]*type="submit"/i.test(html) && !/\b(action|formaction)=/i.test(html), `${p}: Absenden`);
+    assert.ok(!/(href|src|action)="\.{0,2}\/?api\//i.test(html), `${p}: Ziel /api/`);
+  }
+  const home = body(read('index.html'));
+  const forms = [...home.matchAll(/<form\b[^>]*>/g)].map(m => m[0]);
+  assert.deepEqual(forms, ['<form class="analyze" id="analyze" action="/api/anfrage" method="post" novalidate>'], 'genau ein Formular, per POST an den Worker');
+  const form = home.slice(home.indexOf(forms[0]), home.indexOf('</form>'));
+  assert.deepEqual([...form.matchAll(/<input\b[^>]*\bname="([^"]+)"/g)].map(m => m[1]), ['action', 'agb_version', 'website', 'agb', 'unternehmer', 'werbung']);
+  assert.ok(!/<input\b[^>]*\bchecked\b/.test(form), 'kein Kästchen vorausgewählt');
+  assert.ok(!/<(input|textarea|select)\b/.test(home.replace(form, '')), 'außerhalb des Hero-Formulars keine Eingabe');
+  for (const js of FILES.filter(f => f.endsWith('.js'))) {
+    const code = read(js).replace(/\/\*[\s\S]*?\*\//g, '');
+    assert.ok(!/\bfetch\(|XMLHttpRequest|sendBeacon|\.submit\(|accounts\.google|\/api\//.test(code), `${js}: sendet nichts selbst`);
+  }
+  /* Unterseiten führen wie vor dem Soft-Launch zum Formular; kein Soft-Launch-Hinweis mehr */
+  for (const p of PAGES.filter(p => p.startsWith('wissen/') || p.startsWith('analyse/'))) {
+    assert.ok(read(p).includes('<a class="btn btn--accent" href="../index.html#top">Website eingeben <svg class="i"><use href="#i-arrow"/></svg></a>'), `${p}: „Website eingeben“`);
+  }
+  assert.ok(!PAGES.some(p => text(read(p)).includes(NOTICE)), 'kein Hinweis „in Kürze verfügbar“');
 });
 
 test('Videos nur wie entschieden: Hero-Video, Berichtsvideo und Befund-Video auf der Startseite, ohne Bildunterschriften, Video-Metadaten nur dort; keine veralteten Aussagen im Seitentext', () => {
@@ -137,7 +172,8 @@ test('Schriften selbst ausgeliefert: keine externen Ressourcen, CSP nur eigene H
     const csp = html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)[1];
     assert.match(csp, /(^|; )style-src 'self';/, `${p}: style-src`);
     assert.match(csp, /(^|; )font-src 'self';/, `${p}: font-src`);
-    assert.ok(!/https?:/.test(csp), `${p}: CSP erlaubt fremde Herkunft`);
+    /* Einzige fremde Herkunft: das Formularziel der Google-Anmeldung (Weiterleitung aus dem Worker), keine geladene Ressource */
+    assert.ok(!/https?:/.test(csp.replace(/form-action 'self' https:\/\/accounts\.google\.com$/, "form-action 'self'")), `${p}: CSP erlaubt fremde Herkunft`);
     /* fonts.css vor styles.css, mit demselben Pfadpräfix */
     const pre = html.match(/<link rel="stylesheet" href="([^"]*)assets\/styles\.css">/)[1];
     const i = html.indexOf(`<link rel="stylesheet" href="${pre}assets/fonts.css">`);
@@ -161,10 +197,22 @@ test('Schriften selbst ausgeliefert: keine externen Ressourcen, CSP nur eigene H
 /* Startseite gegenüber main (c69cd1b, letzter Stand vor dem Soft-Launch): ersetzt im Soft-Launch den Hero-Schutz aus tests/static.test.mjs.
    Jede Zeile ist eine einzeln freigegebene Änderung; alles andere muss gleich bleiben. */
 const MAIN_SHA = 'c69cd1b3cb7dba1426df5006890fec3417841c9f';
-test('Startseite gegenüber main: nur Soft-Launch, Schriften-Fix, Partner, Logo, Favicon, Videos und Hintergrundbild aus R2 – sonst unverändert', () => {
+/* Go-live (PXK-155): Hero-Formular nach AGB § 3 und § 4 (Fassung 2026-11-04) – drei eigene, nicht vorausgewählte Kästchen (Beauftragung/AGB mit
+   Kenntnisnahme der Datenschutzerklärung, Unternehmer, freiwillige Werbeeinwilligung) im Wortlaut, den der Worker als Nachweis speichert
+   (worker/src/view.ts, DECLARATIONS), und die Schaltfläche „Analyse anfragen“. Sonst der Hero wie in main. */
+const FORMULAR_AENDERUNGEN = [
+  ['<button class="btn btn--accent" type="submit">Analysieren <svg class="i"><use href="#i-arrow"/></svg></button>', '<button class="btn btn--accent" type="submit">Analyse anfragen <svg class="i"><use href="#i-arrow"/></svg></button>'],
+  ['      <label class="consent consent--hero"><input id="agb" type="checkbox" name="agb" value="1" required><span>Ich akzeptiere die <a href="agb.html">AGB</a> von 360°Pixelkiez.</span></label>\n      <p class="form-error" id="agb-error" hidden>Bitte akzeptieren Sie die AGB, damit wir Ihre Website analysieren können.</p>\n      <p class="hero-note">Kostenlose Website-Analyse – 0 €, kein Abo. <a href="datenschutz.html">Datenschutzerklärung</a></p>\n',
+    '      <label class="consent consent--hero"><input id="agb" type="checkbox" name="agb" value="1" required><span>Ich beauftrage die kostenlose Website-Analyse für die angegebene Adresse. Es gelten die <a href="agb.html">AGB</a>. Die <a href="datenschutz.html">Datenschutzerklärung</a> habe ich zur Kenntnis genommen.</span></label>\n'
+    + '      <p class="form-error" id="agb-error" hidden>Bitte bestätigen Sie die Beauftragung und die AGB, damit wir Ihre Website analysieren können.</p>\n'
+    + '      <label class="consent consent--hero"><input id="unternehmer" type="checkbox" name="unternehmer" value="1" required><span>Ich frage die Analyse als Unternehmer an (gewerblich, freiberuflich, Verein oder Organisation, § 14 BGB).</span></label>\n'
+    + '      <p class="form-error" id="unternehmer-error" hidden>Die Analyse ist nur für Unternehmer möglich. Bitte bestätigen Sie, dass Sie als Unternehmer anfragen.</p>\n'
+    + '      <label class="consent consent--hero consent--freiwillig"><input id="werbung" type="checkbox" name="werbung" value="1"><span>Freiwillig: Ja, 360°Pixelkiez darf mir per E-Mail Informationen und Angebote zur Website-Analyse von 360°Pixelkiez, Fachinformationen zu Website-Technik, SEO und KI-Auffindbarkeit sowie Bitten um Feedback zu meinem Bericht senden – auch als Newsletter. Ich kann diese Einwilligung jederzeit widerrufen, z. B. über den Abmeldelink in jeder E-Mail oder per Mail an 360@pixelkiez.de. Details: <a href="datenschutz.html#werbung">Datenschutzerklärung, Abschnitt 12</a>.</span></label>\n'
+    + '      <p class="hero-note">Kostenlose Website-Analyse – 0 €, kein Abo. Den Bericht erhalten Sie auch ohne Einwilligung in werbliche E-Mails. <a href="datenschutz.html">Datenschutzerklärung</a></p>\n'],
+];
+test('Startseite gegenüber main: nur Hero-Formular nach AGB (bzw. im Soft-Launch der Hinweis), Schriften-Fix, Partner, Logo, Favicon, Videos und Hintergrundbild aus R2 – sonst unverändert', () => {
   const main = execFileSync('git', ['show', `${MAIN_SHA}:public/index.html`], { cwd: ROOT, encoding: 'utf8' });
-  const ERLAUBT = [
-    ['<meta name="robots" content="noindex,nofollow">', '<meta name="robots" content="index,follow">'],
+  const SOFT_LAUNCH_AENDERUNGEN = [
     /* Soft-Launch (c528d96): kein Formularziel, Hinweis statt Formular, Schaltflächen ohne Anfrage, Ablauf „sobald Anfragen möglich sind“ */
     ["form-action 'self' https://accounts.google.com\">", "form-action 'none'\">"],
     [/    <form class="analyze" id="analyze"[\s\S]*?<p class="hero-note">[^\n]*\n/, '    <!-- Soft-Launch: kein Anfrageformular, bis die Google-Anmeldung freigegeben ist (keine Eingabe, kein POST, kein Google-Login) -->\n    <div class="analyze">\n      <p class="bald"><svg class="i"><use href="#i-globe"/></svg><span><b>Kostenlose Analyse-Anfragen in Kürze verfügbar.</b> Bis dahin nimmt diese Website noch keine Anfragen an.</span></p>\n'],
@@ -173,6 +221,10 @@ test('Startseite gegenüber main: nur Soft-Launch, Schriften-Fix, Partner, Logo,
     ['        <a class="btn btn--accent btn--block" href="#top">Website eingeben</a>\n', '        <p class="plan-bald">In Kürze verfügbar</p>\n'],
     ['    <h2 class="h2">Kostenlos anfragen. Persönlich geprüft.</h2>\n    <button class="btn btn--accent" type="button" id="to-top">Website eingeben <svg class="i"><use href="#i-arrow"/></svg></button>\n',
       '    <h2 class="h2">Kostenlose Analyse-Anfragen in Kürze verfügbar.</h2>\n    <a class="btn btn--ghost" href="wissen/index.html">Zum Wissensbereich <svg class="i"><use href="#i-arrow"/></svg></a>\n'],
+  ];
+  const ERLAUBT = [
+    ['<meta name="robots" content="noindex,nofollow">', '<meta name="robots" content="index,follow">'],
+    ...(FORM ? FORMULAR_AENDERUNGEN : SOFT_LAUNCH_AENDERUNGEN),
     /* Datenschutz-Fix (94f0b18): Schriften selbst ausgeliefert */
     ["style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;", "style-src 'self'; font-src 'self';"],
     ['<link rel="preconnect" href="https://fonts.googleapis.com">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">\n', '<link rel="stylesheet" href="assets/fonts.css">\n'],
