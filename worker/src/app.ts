@@ -25,6 +25,7 @@ const log = (message: string): void => console.error('PXWA: ' + message);
 /* Fehlertexte der Formulare (der Hero zeigt mit JavaScript denselben Text zur Adresse) */
 const URL_ERROR = 'Bitte geben Sie eine öffentliche Website-Adresse wie beispiel.de ein.';
 const CONFIRM_ERROR = 'Bitte bestätigen Sie das Kästchen, um mit Google fortzufahren.';
+const SESSION_ERROR = 'Ihre Sitzung ist abgelaufen oder die Website-Adresse hat sich geändert. Bitte geben Sie die Adresse erneut ein.';
 
 export async function handle(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   let config: Config;
@@ -141,6 +142,12 @@ class App {
     const raw = form.get('website') ?? '';
     const url = normalizeWebsite(raw);
     if (url === null) return this.respond(422, this.view.address([...raw].slice(0, 300).join(''), URL_ERROR));
+    /* Nur die Website, die „Analysieren“ in dieser Session abgelegt und die Bestätigungsseite angezeigt hat. Ohne passende Session
+       (keine, abgelaufen, andere Website im Formular) weder Zustimmung noch Google noch eine neue Session: Adresse neu eingeben. */
+    const pending = session?.data.pending;
+    if (!session || !pending || typeof pending.url !== 'string' || !safeEqual(pending.url, url)) {
+      return this.respond(409, this.view.address('', SESSION_ERROR));
+    }
     /* Das eine Kästchen genau "1", und die abgeschickte Seite muss die aktuelle AGB-Version gezeigt haben. Ohne das weder
        Zustimmung noch Weiterleitung zu Google – die Website-Adresse verlässt den Server nicht. Andere Felder (frühere Kästchen,
        eine Werbeeinwilligung) werden nicht ausgewertet: Eine Werbeeinwilligung entsteht hier nie. */
@@ -151,15 +158,14 @@ class App {
       const error = !confirmed ? CONFIRM_ERROR : 'Die AGB wurden aktualisiert. Bitte lesen Sie die aktuelle Fassung und bestätigen Sie sie erneut.';
       return this.respond(confirmed ? 409 : 422, this.view.confirm(this.config.termsVersion, url, error));
     }
-    const s = session ?? (await this.newSession());
-    delete s.data.done;
-    s.data.pending = { url, at: this.now, login: true };
+    delete session.data.done;
+    session.data.pending = { url, at: this.now, login: true };
     const state = randomHex(32);
     const nonce = randomHex(32);
     const verifier = b64url(randomBytes(48));
     /* Ein neuer Start ersetzt einen offenen Flow samt Zustimmung: dessen state wird damit ungültig */
-    s.data.oidc = { state, nonce, verifier, at: this.now, idem: randomHex(16), consent: { url, version: this.config.termsVersion, at: this.now, business: true } };
-    await this.sessions.save(s);
+    session.data.oidc = { state, nonce, verifier, at: this.now, idem: randomHex(16), consent: { url, version: this.config.termsVersion, at: this.now, business: true } };
+    await this.sessions.save(session);
     return this.redirect(await this.oidc().authorizationUrl(state, nonce, verifier));
   }
 
@@ -249,12 +255,6 @@ class App {
     const fresh = await this.sessions.rotate(session, { done }, this.now);
     this.setSessionCookie(fresh);
     return this.redirect(this.config.baseUrl + '/api/anfrage');
-  }
-
-  private async newSession(): Promise<Session> {
-    const s = await this.sessions.create({}, this.now);
-    this.setSessionCookie(s);
-    return s;
   }
 
   private setSessionCookie(s: Session): void {

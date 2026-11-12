@@ -3,7 +3,7 @@
    node --test tests/notifier.test.mjs   Echte Provider (Google, Resend, Cloudflare-D1) werden hier NICHT getestet. */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mockGoogle, mockResend, startWorker, resendOutbound, Client, login, begin, startForm, waitFor, sleep, workerAvailable, CUSTOMER, NOTIFY_TO, MAIL_FROM, MAIL_TOKEN, PRODUCTION_BASE } from './lib/harness.mjs';
+import { mockGoogle, mockResend, startWorker, resendOutbound, Client, login, begin, analyze, startForm, waitFor, sleep, workerAvailable, CUSTOMER, NOTIFY_TO, MAIL_FROM, MAIL_TOKEN, PRODUCTION_BASE } from './lib/harness.mjs';
 
 const skip = workerAvailable ? false : 'NOT_RUN: miniflare/esbuild fehlen (npm ci)';
 let google, mail, app;
@@ -124,18 +124,20 @@ const PROD = {
 };
 /* Hero-Formular gegen die Produktionskonfiguration (dort freigegebene AGB-Version) */
 const prodStart = () => startForm({ agbVersion: PROD.TERMS_VERSION });
+/* „Analysieren“ und Bestätigungsseite wie im Browser (start gilt nur für die Website der Session) */
+const prodAnalyze = c => analyze(c, { agbVersion: PROD.TERMS_VERSION });
 
 test('Produktion: gültige Konfiguration wird angenommen – Basis-URL 360.pixelkiez.de, Google-Callback /api/auth/callback, __Host-Cookie; ohne Aufträge kein Aufruf von Resend', { skip }, async () => {
   const w = await startWorker({ base: PRODUCTION_BASE, env: PROD });
   try {
     const c = new Client(w);
     assert.equal((await c.req('GET', '/api/anfrage')).status, 200);
-    const start = await c.req('POST', '/api/anfrage', { form: prodStart() });
+    const { address, start } = await prodAnalyze(c);
     assert.equal(start.status, 303);
     const auth = new URL(start.location);
     assert.equal(auth.origin + auth.pathname, 'https://accounts.google.com/o/oauth2/v2/auth');
     assert.equal(auth.searchParams.get('redirect_uri'), 'https://360.pixelkiez.de/api/auth/callback');
-    assert.match(start.headers.getSetCookie()[0], /^__Host-pxwa=[A-Za-z0-9_-]{43}; Path=\/; Max-Age=3600; HttpOnly; SameSite=Lax; Secure$/);
+    assert.match(address.headers.getSetCookie()[0], /^__Host-pxwa=[A-Za-z0-9_-]{43}; Path=\/; Max-Age=3600; HttpOnly; SameSite=Lax; Secure$/);
     const run = await w.cron();
     assert.equal(run.outcome, 'ok');
     assert.match(run.log, /0 versendet, 0 fehlgeschlagen, 0 übersprungen\..*Löschfrist nicht aktiv/);
@@ -145,7 +147,7 @@ test('Produktion: gültige Konfiguration wird angenommen – Basis-URL 360.pixel
   /* Testbetrieb mit gültiger Liste wird ebenfalls angenommen; die Freischaltung prüft erst die Rückkehr von Google (worker.test.mjs) */
   const t = await startWorker({ base: PRODUCTION_BASE, env: { ...PROD, ACCESS_MODE: 'testnutzer', ACCESS_ALLOWLIST: 'tester@beispiel-test.de, zweit@beispiel-test.de' } });
   try {
-    assert.equal((await new Client(t).req('POST', '/api/anfrage', { form: prodStart() })).status, 303);
+    assert.equal((await prodAnalyze(new Client(t))).start.status, 303);
   } finally {
     await t.stop();
   }
@@ -230,7 +232,7 @@ test('Produktion: Groß-/Kleinschreibung von 360@pixelkiez.de wird angenommen; v
     mail.reset();
     const w = await startWorker({ base: PRODUCTION_BASE, env: { ...PROD, MAIL_NOTIFY_TO: to }, outbound: resendOutbound(mail) });
     try {
-      assert.equal((await new Client(w).req('POST', '/api/anfrage', { form: prodStart() })).status, 303, `${to}: Konfiguration angenommen`);
+      assert.equal((await prodAnalyze(new Client(w))).start.status, 303, `${to}: Konfiguration angenommen`);
       await w.run("INSERT INTO orders (reference, idempotency_key, google_sub, email, website_url, privacy_version, created_at) VALUES ('PXA-TEST-0001', 'k1', 's', ?1, 'https://firma.de', '2026-11-01', '2026-11-01 10:00:00')", CUSTOMER);
       await w.run("INSERT INTO notifications (order_id, next_attempt_at, created_at) SELECT id, '2000-01-01 00:00:00', created_at FROM orders");
       assert.match((await w.cron()).log, /PXWA: 1 versendet, 0 fehlgeschlagen/, to);

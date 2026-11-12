@@ -7,7 +7,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  mockGoogle, mockResend, startWorker, Client, login, begin, startForm, addressForm, referenceOf, field, waitFor, sleep, workerAvailable,
+  mockGoogle, mockResend, startWorker, Client, login, begin, analyze, startForm, addressForm, referenceOf, field, waitFor, sleep, workerAvailable,
   CLIENT_ID, CUSTOMER, NOTIFY_TO, MAIL_FROM, MAIL_TOKEN, TERMS_VERSION, MIGRATION,
 } from './lib/harness.mjs';
 
@@ -209,23 +209,23 @@ test('Bestätigung ohne Häkchen: kein Auftrag, keine Zustimmung, keine Weiterle
   const tokens = google.log.token.length;
   for (const [i, bestaetigung] of [false, '0', '', 'on', 'true', 'ja', '1 '].entries()) {
     const c = new Client(app, { ip: `198.51.100.${120 + i}` });
-    const r = await c.req('POST', '/api/anfrage', { form: startForm({ website: "musterfirma.de/a'b", bestaetigung }) });
+    const { start: r } = await analyze(c, { website: "musterfirma.de/a'b", bestaetigung });
     assert.equal(r.status, 422, `bestaetigung=${JSON.stringify(bestaetigung)}`);
     assert.equal(r.location, null, 'keine Weiterleitung zu Google');
-    assert.deepEqual(r.headers.getSetCookie(), [], 'keine Session');
+    assert.deepEqual(r.headers.getSetCookie(), [], 'keine neue Session');
     assert.match(r.text, /<p class="form-error" id="bestaetigung-error" role="alert">Bitte bestätigen Sie das Kästchen, um mit Google fortzufahren\.<\/p>/);
     assert.deepEqual(checkboxes(r.text), ['<input id="bestaetigung" type="checkbox" name="bestaetigung" value="1" autocomplete="off" required aria-invalid="true" aria-describedby="bestaetigung-error" autofocus>'], 'Kästchen markiert, Fokus darauf, nicht vorausgewählt');
     assert.ok(r.text.includes('<input type="hidden" name="website" value="https://musterfirma.de/a&#039;b">'), 'Adresse bleibt erhalten und ist escaped');
   }
   /* Die früheren Felder (Hero mit drei Kästchen, alte Seite im Cache) ersetzen das eine Kästchen nicht */
-  const alt = await new Client(app, { ip: '198.51.100.140' }).req('POST', '/api/anfrage', { form: startForm({ bestaetigung: false, extra: { agb: '1', unternehmer: '1', werbung: '1' } }) });
+  const alt = (await analyze(new Client(app, { ip: '198.51.100.140' }), { bestaetigung: false, extra: { agb: '1', unternehmer: '1', werbung: '1' } })).start;
   assert.equal(alt.status, 422);
   /* Ungültige Adresse im Formular (manipuliert): Adresseingabe mit Fehler, Fokus auf dem Feld */
   const bad = await new Client(app, { ip: '198.51.100.141' }).req('POST', '/api/anfrage', { form: startForm({ website: 'keine adresse' }) });
   assert.equal(bad.status, 422);
   assert.match(bad.text, /aria-describedby="url-error" autofocus/);
   assert.deepEqual(await counts(), NOTHING);
-  assert.equal((await app.sql('SELECT COUNT(*) AS n FROM sessions'))[0].n, 0);
+  assert.deepEqual(await flowOf(), [], 'keine Zustimmung, keine Google-Anmeldung');
   assert.equal(google.log.token.length, tokens, 'Google wird nicht kontaktiert');
 });
 
@@ -248,14 +248,14 @@ test('Manipulierte Zustimmung: falsche, fehlende oder veraltete AGB-Version im F
   /* Varianten, die tatsächlich von der aktuellen Version abweichen (eine reine Datumsversion hat keine Kleinbuchstaben-Variante) */
   const variants = ['ALT-2026-01-01', '', null, TERMS_VERSION + ' ', TERMS_VERSION.toLowerCase(), TERMS_VERSION.replaceAll('-', '.'), TERMS_VERSION + 'x'].filter(v => v !== TERMS_VERSION);
   for (const [i, agbVersion] of variants.entries()) {
-    const r = await new Client(app, { ip: `198.51.100.${150 + i}` }).req('POST', '/api/anfrage', { form: startForm({ agbVersion }) });
+    const { start: r } = await analyze(new Client(app, { ip: `198.51.100.${150 + i}` }), { agbVersion });
     assert.equal(r.status, 409, `agb_version=${JSON.stringify(agbVersion)}`);
     assert.equal(r.location, null);
     assert.match(r.text, /AGB wurden aktualisiert/);
     assert.equal(field(r.text, 'agb_version'), TERMS_VERSION, 'Formular bietet die aktuelle Version an');
     assert.ok(!/checked/.test(r.text), 'Häkchen muss neu gesetzt werden');
   }
-  assert.equal((await app.sql('SELECT COUNT(*) AS n FROM sessions'))[0].n, 0);
+  assert.deepEqual(await flowOf(), [], 'keine Zustimmung gespeichert');
   /* Zustimmung in der Session nachträglich verändert (Datenbankebene): der Callback löst den Google-Code gar nicht erst ein */
   const tampered = [
     ['Zustimmung entfernt', "json_remove(data, '$.oidc.consent')"],
@@ -282,7 +282,7 @@ test('Manipulierte Zustimmung: falsche, fehlende oder veraltete AGB-Version im F
   assert.match(app.logs(), /Google-Rückkehr ohne gültige AGB-Zustimmung/);
 });
 
-test('Zustimmung gehört zu genau einer Session und Website: andere Session, andere URL ohne Häkchen und ersetzter Flow → kein fremder Auftrag', { skip }, async () => {
+test('Zustimmung gehört zu genau einer Session und Website: andere Session, andere URL im Formular und ersetzter Flow → kein fremder Auftrag', { skip }, async () => {
   await reset();
   /* Callback in einer anderen Session (anderer Browser): abgelehnt, der Flow der eigentlichen Session bleibt unberührt */
   const owner = new Client(app);
@@ -290,9 +290,10 @@ test('Zustimmung gehört zu genau einer Session und Website: andere Session, and
   const stranger = new Client(app, { ip: '198.51.100.171' });
   assert.equal((await stranger.req('GET', a.callbackPath)).status, 400, 'fremde Session');
   assert.deepEqual(await counts(), NOTHING);
-  /* Zweite Website im selben Browser ohne Häkchen: abgelehnt, ändert die Zustimmung für A nicht */
-  const b = await owner.req('POST', '/api/anfrage', { form: startForm({ website: 'firma-b.de', bestaetigung: false }) });
-  assert.equal(b.status, 422);
+  /* Zweite Website im selben Browser, ohne „Analysieren“ (verstecktes Feld manipuliert), sogar mit Häkchen: abgelehnt, ändert die
+     Zustimmung für A nicht */
+  const b = await owner.req('POST', '/api/anfrage', { form: startForm({ website: 'firma-b.de' }) });
+  assert.deepEqual([b.status, b.location], [409, null]);
   assert.equal((await flowOf())[0].consent.url, 'https://firma-a.de', 'Zustimmung bleibt an Website A gebunden');
   assert.equal((await owner.req('GET', a.callbackPath)).status, 303);
   assert.deepEqual((await orders()).map(o => o.website_url), ['https://firma-a.de'], 'Auftrag nur für die Website mit Zustimmung');
@@ -305,6 +306,64 @@ test('Zustimmung gehört zu genau einer Session und Website: andere Session, and
   assert.deepEqual((await orders()).map(o => o.website_url), ['https://firma-a.de', 'https://firma-d.de'], 'Website C ohne gültige Zustimmung nie angelegt');
   await settled();
   assert.equal(mail.state.accepted.length, 2);
+});
+
+test('Bestätigung nur für die Website dieser Sitzung: ohne „Analysieren“, mit erfundener oder abgelaufener Sitzung oder mit anderer Website als angezeigt → keine Sitzung, keine Zustimmung, kein Google, Adresse neu eingeben; angezeigte Website mit Häkchen → Google, Auftrag nur für sie', { skip }, async () => {
+  await reset();
+  const tokens = google.log.token.length;
+  const sessions = async () => (await app.sql('SELECT COUNT(*) AS n FROM sessions'))[0].n;
+  const rejected = (r, what) => {
+    assert.deepEqual([r.status, r.location, r.headers.getSetCookie()], [409, null, []], `${what}: keine Weiterleitung, keine neue Sitzung`);
+    assert.match(r.text, /<h1 class="anfrage-titel">Welche Website sollen wir analysieren\?<\/h1>/, `${what}: Adresseingabe`);
+    assert.match(r.text, /<p class="form-error" id="url-error" role="alert">Ihre Sitzung ist abgelaufen oder die Website-Adresse hat sich geändert\. Bitte geben Sie die Adresse erneut ein\.<\/p>/, what);
+    assert.match(r.text, /<input type="hidden" name="action" value="adresse">/, `${what}: zurück zu „Analysieren“`);
+    assert.deepEqual(checkboxes(r.text), [], `${what}: kein Kästchen`);
+  };
+  /* Ohne Sitzung, auch mit Häkchen und aktueller AGB-Version: start legt keine Sitzung an */
+  rejected(await new Client(app, { ip: '198.51.100.230' }).req('POST', '/api/anfrage', { form: startForm({ website: 'firma-b.de' }) }), 'ohne Sitzung');
+  const invented = new Client(app, { ip: '198.51.100.231' });
+  invented.cookies.set('pxwa', 'A'.repeat(43));
+  rejected(await invented.req('POST', '/api/anfrage', { form: startForm() }), 'erfundene Session-ID');
+  assert.equal(await sessions(), 0, 'start erzeugt keine Sitzung');
+  /* Sitzung zeigt Website A; das versteckte Feld wird auf eine andere Website geändert */
+  const c = new Client(app, { ip: '198.51.100.232' });
+  await c.req('POST', '/api/anfrage', { form: addressForm('firma-a.de') });
+  const page = await c.req('GET', '/api/anfrage');
+  assert.equal(field(page.text, 'website'), 'https://firma-a.de');
+  for (const website of ['firma-b.de', 'https://firma-a.de/andere-seite', 'https://www.firma-a.de', 'http://firma-a.de', 'firma-a.de.andere-firma.de']) {
+    rejected(await c.req('POST', '/api/anfrage', { form: startForm({ website }) }), `angezeigt https://firma-a.de, abgeschickt ${website}`);
+  }
+  assert.deepEqual(await flowOf(), [], 'keine Zustimmung gespeichert');
+  assert.deepEqual(await app.sql("SELECT json_extract(data, '$.pending.url') AS url FROM sessions"), [{ url: 'https://firma-a.de' }], 'Sitzung zeigt weiter Website A');
+  /* Angezeigte Website ohne Häkchen: Fehler am Kästchen, kein Google */
+  const noBox = await c.req('POST', '/api/anfrage', { form: startForm({ website: field(page.text, 'website'), bestaetigung: false }) });
+  assert.deepEqual([noBox.status, noBox.location], [422, null]);
+  assert.match(noBox.text, /Bitte bestätigen Sie das Kästchen/);
+  assert.deepEqual(await flowOf(), []);
+  /* Angezeigte Website (gleiche normalisierte Adresse) mit Häkchen: Google; Zustimmung an diese Website, AGB-Version und diesen state */
+  const ok = await c.req('POST', '/api/anfrage', { form: startForm({ website: 'HTTPS://Firma-A.de/' }) });
+  assert.equal(ok.status, 303);
+  assert.ok(ok.location.startsWith(app.authEndpoint));
+  const p = new URL(ok.location).searchParams;
+  const [flow] = await flowOf();
+  assert.deepEqual([flow.consent.url, flow.consent.version, flow.state], ['https://firma-a.de', TERMS_VERSION, p.get('state')]);
+  /* Während der Google-Anmeldung: manipuliertes Formular für Website B ersetzt die Anmeldung für A nicht */
+  rejected(await c.req('POST', '/api/anfrage', { form: startForm({ website: 'firma-b.de' }) }), 'bei Google, andere Website');
+  assert.deepEqual((await flowOf()).map(f => [f.state, f.consent.url]), [[flow.state, 'https://firma-a.de']], 'laufende Anmeldung unberührt');
+  /* Abgelaufene Sitzung: die offene Bestätigungsseite startet nichts */
+  const e = new Client(app, { ip: '198.51.100.233' });
+  await e.req('POST', '/api/anfrage', { form: addressForm('firma-ablauf.de') });
+  const open = await e.req('GET', '/api/anfrage');
+  await app.run("UPDATE sessions SET expires_at = ?1 WHERE json_extract(data, '$.pending.url') = 'https://firma-ablauf.de'", Math.floor(Date.now() / 1000) - 1);
+  rejected(await e.req('POST', '/api/anfrage', { form: startForm({ website: field(open.text, 'website') }) }), 'abgelaufene Sitzung');
+  assert.equal(google.log.token.length, tokens, 'bis hier kein Code-Austausch');
+  assert.deepEqual(await counts(), NOTHING);
+  /* Rückkehr von Google: genau ein Auftrag, nur für die angezeigte und bestätigte Website */
+  const code = google.issueCode({ nonce: p.get('nonce'), challenge: p.get('code_challenge'), redirectUri: p.get('redirect_uri') });
+  assert.equal((await c.req('GET', `/api/auth/callback?code=${encodeURIComponent(code)}&state=${p.get('state')}`)).status, 303);
+  assert.deepEqual((await orders()).map(o => [o.website_url, o.terms_version]), [['https://firma-a.de', TERMS_VERSION]]);
+  await settled();
+  assert.deepEqual(await counts(), { orders: 1, outbox: 1, mails: 1 });
 });
 
 /* ---------- Google-Anmeldung: Abbruch, ungültige Antworten ---------- */
@@ -336,7 +395,7 @@ test('Google-Anmeldung abgebrochen, ohne Code oder mit unbekanntem Code: kein Au
   assert.deepEqual(await counts(), NOTHING);
 });
 
-test('Sitzung abgelaufen: GET zeigt wieder die Adresseingabe (ohne Adresse); die offene Bestätigungsseite startet mit neuer Sitzung sauber; Rückkehr von Google nach Ablauf legt nichts an', { skip }, async () => {
+test('Sitzung abgelaufen: GET zeigt wieder die Adresseingabe (ohne Adresse); die offene Bestätigungsseite startet nichts (keine neue Sitzung, kein Google), Adresse neu eingeben; Rückkehr von Google nach Ablauf legt nichts an', { skip }, async () => {
   await reset();
   const expire = () => app.run('UPDATE sessions SET expires_at = ?1', Math.floor(Date.now() / 1000) - 1);
   const c = new Client(app);
@@ -346,11 +405,11 @@ test('Sitzung abgelaufen: GET zeigt wieder die Adresseingabe (ohne Adresse); die
   const gone = await c.req('GET', '/api/anfrage');
   assert.match(gone.text, /<h1 class="anfrage-titel">Welche Website sollen wir analysieren\?<\/h1>/);
   assert.ok(!gone.text.includes('firma-ablauf'), 'abgelaufene Sitzung zeigt die Adresse nicht mehr');
-  /* Die noch offene Bestätigungsseite abschicken: Zustimmung aus genau dieser Absendung, neue Sitzung */
+  /* Die noch offene Bestätigungsseite abschicken (mit Häkchen): keine Zustimmung, keine neue Sitzung, kein Google – Adresse neu eingeben */
   const restart = await c.req('POST', '/api/anfrage', { form: startForm({ website: field(page.text, 'website') }) });
-  assert.equal(restart.status, 303);
-  assert.ok(restart.location.startsWith(app.authEndpoint));
-  assert.equal(restart.headers.getSetCookie().length, 1, 'neue Session statt der abgelaufenen');
+  assert.deepEqual([restart.status, restart.location, restart.headers.getSetCookie()], [409, null, []]);
+  assert.match(restart.text, /<h1 class="anfrage-titel">Welche Website sollen wir analysieren\?<\/h1>/);
+  assert.deepEqual(await flowOf(), []);
   /* Bei Google, währenddessen läuft die Sitzung ab: Rückkehr ohne Code-Austausch und ohne Auftrag */
   const tokens = google.log.token.length;
   const f = await begin(c, google, { website: 'firma-ablauf.de' });
@@ -490,7 +549,7 @@ test('Doppelklick, Replay und parallele Rückkehr: keine doppelten Aufträge ode
   await reset();
   /* Doppelklick auf „Analysieren“ in einer Session: nur der zuletzt gespeicherte Flow ist gültig */
   const c = new Client(app);
-  await c.req('POST', '/api/anfrage', { form: startForm() });
+  await analyze(c);
   const starts = await Promise.all([0, 1].map(() => c.req('POST', '/api/anfrage', { form: startForm() })));
   assert.deepEqual(starts.map(s => s.status), [303, 303]);
   const callbacks = [];
@@ -651,11 +710,11 @@ test('Kein Identitäts-, Zustimmungs- oder Session-Spoofing: Formularfelder übe
   const invented = 'A'.repeat(43);
   const v1 = new Client(app);
   v1.cookies.set('pxwa', invented);
-  await v1.req('POST', '/api/anfrage', { form: startForm() });
+  await v1.req('POST', '/api/anfrage', { form: addressForm() });
   assert.notEqual(v1.cookies.get('pxwa'), invented, 'erfundene Session-ID wird ersetzt');
   /* Session-Fixation: Angreifer schiebt eine echte, gültige Session-ID unter; nach dem Login gilt sie nicht mehr */
   const attacker = new Client(app);
-  await attacker.req('POST', '/api/anfrage', { form: startForm({ website: 'angreifer-seite.de' }) });
+  await analyze(attacker, { website: 'angreifer-seite.de' });
   const victim = new Client(app);
   victim.cookies.set('pxwa', attacker.cookies.get('pxwa'));
   /* Untergeschobene Formularfelder ändern weder E-Mail, Google-Kennung, Website, Referenz noch AGB-Daten */
@@ -728,8 +787,8 @@ test('HTTPS-Basis-URL: __Host-Session-Cookie (Secure, HttpOnly, SameSite=Lax, Pa
     assert.equal(h.get('access-control-allow-origin'), null, 'keine CORS-Freigabe');
     const plain = await new Client(s, { origin: s.base.replace('https:', 'http:') }).req('POST', '/api/anfrage', { form: startForm() });
     assert.equal(plain.status, 403, 'Formular-POST mit http-Origin passt nicht zur https-Basis-URL');
-    const { start, callback } = await login(c, g);
-    const [cookie] = start.headers.getSetCookie();
+    const { address, callback } = await login(c, g);
+    const [cookie] = address.headers.getSetCookie();
     assert.match(cookie, /^__Host-pxwa=[A-Za-z0-9_-]{43};/);
     for (const attr of [/;\s*Path=\/(;|$)/i, /;\s*Secure(;|$)/i, /;\s*HttpOnly(;|$)/i, /;\s*SameSite=Lax(;|$)/i, /;\s*Max-Age=3600(;|$)/i]) assert.match(cookie, attr);
     assert.ok(!/domain=|expires=/i.test(cookie), 'kein Domain-Attribut');
@@ -768,10 +827,11 @@ test('Hauptnavigation: Anfrageseiten haben denselben Kopf wie die übrigen Seite
 test('Rate-Limiting: zu viele Anfragestarts von einer IP werden mit 429 gebremst, andere IPs nicht', { skip }, async () => {
   await reset();
   const c = new Client(app, { ip: '203.0.113.9' });
+  await c.req('POST', '/api/anfrage', { form: addressForm() });
   const codes = [];
   for (let i = 0; i < 22; i++) codes.push((await c.req('POST', '/api/anfrage', { form: startForm() })).status);
   assert.deepEqual(codes, [...Array(20).fill(303), 429, 429]);
-  assert.equal((await new Client(app, { ip: '203.0.113.10' }).req('POST', '/api/anfrage', { form: startForm() })).status, 303);
+  assert.equal((await analyze(new Client(app, { ip: '203.0.113.10' }))).start.status, 303);
   const v6 = ip => new Client(app, { ip }).req('POST', '/api/anfrage', { form: startForm() });
   for (let i = 0; i < 20; i++) await v6(`2001:db8:1:2::${i.toString(16)}`);
   assert.equal((await v6('2001:db8:1:2:ffff::1')).status, 429, 'IPv6 wird je /64 gezählt');

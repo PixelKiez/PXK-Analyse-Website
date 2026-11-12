@@ -448,10 +448,10 @@ test('Lokales Pages mit Worker über das Service Binding: Hero „Analysieren“
     const c = new Client(site, { ip: '198.51.100.20' });
     const home = await c.req('GET', '/');
     assert.equal(home.status, 200);
-    /* Ohne Häkchen lehnt der Worker auch hinter der Function ab: keine Weiterleitung, keine Session */
-    const noBox = await c.req('POST', '/api/anfrage', { form: startForm({ bestaetigung: false }) });
-    assert.deepEqual([noBox.status, noBox.location, noBox.headers.getSetCookie().length], [422, null, 0]);
-    assert.match(noBox.text, /Bitte bestätigen Sie das Kästchen/);
+    /* Ohne „Analysieren“ (keine Session) lehnt der Worker auch hinter der Function ab: keine Weiterleitung, keine Session */
+    const noSession = await c.req('POST', '/api/anfrage', { form: startForm() });
+    assert.deepEqual([noSession.status, noSession.location, noSession.headers.getSetCookie().length], [409, null, 0]);
+    assert.match(noSession.text, /Bitte geben Sie die Adresse erneut ein/);
     const crossSite = await c.req('POST', '/api/anfrage', { form: startForm(), headers: { origin: 'https://evil.example' } });
     assert.equal(crossSite.status, 403, 'Origin-Prüfung des Workers greift auch hinter der Function');
     assert.deepEqual(site.sql('SELECT COUNT(*) AS n FROM orders'), [{ n: 0 }]);
@@ -464,6 +464,10 @@ test('Lokales Pages mit Worker über das Service Binding: Hero „Analysieren“
     assert.match(confirm.text, /<h1 class="anfrage-titel">Analyse anfragen<\/h1>/);
     assert.equal((confirm.text.match(/type="checkbox"/g) || []).length, 1, 'genau ein Kästchen');
     assert.match(confirm.text, /Mit Google fortfahren/);
+    /* Ohne Häkchen lehnt der Worker auch hinter der Function ab: keine Weiterleitung, keine neue Session */
+    const noBox = await c.req('POST', '/api/anfrage', { form: startForm({ website: field(confirm.text, 'website'), bestaetigung: false }) });
+    assert.deepEqual([noBox.status, noBox.location, noBox.headers.getSetCookie().length], [422, null, 0]);
+    assert.match(noBox.text, /Bitte bestätigen Sie das Kästchen/);
     const { start, auth, callback, callbackPath } = await login(c, google, { website: field(confirm.text, 'website') });
     assert.equal(start.status, 303, start.text.slice(0, 200));
     assert.equal(auth.searchParams.get('redirect_uri'), `${site.base}/api/auth/callback`);

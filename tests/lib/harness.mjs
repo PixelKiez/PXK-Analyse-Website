@@ -475,19 +475,27 @@ export const startForm = ({ website = 'musterfirma.de', bestaetigung = true, agb
   action: 'start', website, ...box('bestaetigung', bestaetigung), ...(agbVersion === null ? {} : { agb_version: agbVersion }), ...extra,
 });
 
-/* Bestätigungsseite absenden und – wenn der Worker zu Google weiterleitet – den Google-Teil bis zum Code nachbilden */
-export async function begin(client, google, opts = {}) {
+/* Wie im Browser: „Analysieren“ mit der Website (legt sie in der Session ab), dann die Bestätigungsseite absenden. start gilt
+   nur für die Website dieser Session. */
+export async function analyze(client, opts = {}) {
+  const address = await client.req('POST', '/api/anfrage', { form: addressForm(opts.website) });
   const start = await client.req('POST', '/api/anfrage', { form: startForm(opts) });
-  if (start.status !== 303 || !start.location?.startsWith(client.app.authEndpoint)) return { start };
+  return { address, start };
+}
+
+/* „Analysieren“ und Bestätigungsseite absenden und – wenn der Worker zu Google weiterleitet – den Google-Teil bis zum Code nachbilden */
+export async function begin(client, google, opts = {}) {
+  const { address, start } = await analyze(client, opts);
+  if (start.status !== 303 || !start.location?.startsWith(client.app.authEndpoint)) return { address, start };
   const auth = new URL(start.location);
   const p = auth.searchParams;
   const code = google.issueCode({ nonce: p.get('nonce'), challenge: p.get('code_challenge'), redirectUri: p.get('redirect_uri'), claims: opts.claims, mode: opts.mode });
   const callbackPath = `/api/auth/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(opts.state ?? p.get('state'))}&scope=email+openid`;
-  return { start, auth, code, callbackPath };
+  return { address, start, auth, code, callbackPath };
 }
 
-/* Ablauf ab der Bestätigungsseite: Kästchen → Google → Rückkehr. Die Rückkehr legt bei gültiger Zustimmung den Auftrag an (kein
-   weiterer Klick). claims/mode steuern das ID-Token des Mock-Google. Den Schritt davor (Hero, „Analysieren“) prüfen eigene Tests. */
+/* Ablauf Hero („Analysieren“) → Kästchen → Google → Rückkehr. Die Rückkehr legt bei gültiger Zustimmung den Auftrag an (kein
+   weiterer Klick). claims/mode steuern das ID-Token des Mock-Google. */
 export async function login(client, google, opts = {}) {
   const flow = await begin(client, google, opts);
   if (!flow.callbackPath) return flow;
