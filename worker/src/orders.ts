@@ -8,19 +8,18 @@ import { DECLARATIONS } from './view';
    bleibt der Auftrag erhalten und die Benachrichtigung wird später erneut versucht.
    D1 führt Schreibzugriffe nacheinander aus; Duplikat- und Tageslimit stehen deshalb als Bedingung im INSERT selbst,
    parallele Anmeldungen können sie nicht umgehen. Jeder Auftrag speichert die akzeptierte AGB-Version und den
-   serverseitigen Zeitpunkt der Zustimmung (Migration 0002) sowie die Unternehmer-Bestätigung, die Werbeeinwilligung und den
-   Wortlaut der bestätigten Kästchen (Migration 0003). Eine Werbeeinwilligung steht zusätzlich in marketing_consents: Sie gilt
-   bis zum Widerruf und überdauert die Löschung des Auftrags (Nachweis nach Art. 7 Abs. 1 DSGVO), ohne Website-Adresse. */
+   serverseitigen Zeitpunkt der Zustimmung (Migration 0002) sowie die Unternehmer-Bestätigung und den Wortlaut des bestätigten
+   Kästchens (Migration 0003). Seit der Bestätigungsseite mit genau einem Kästchen (PO-Entscheidung 12.11.2026) wird keine
+   Werbeeinwilligung abgefragt: marketing_consent ist immer 0, marketing_consents bekommt keine neuen Zeilen. Bestehende
+   Aufträge und Nachweise bleiben unverändert. */
 
 export interface AcceptedTerms {
   version: string;
   at: number;
-  marketing: boolean;
 }
 
-/* Gespeicherter Wortlaut: Pflichtkästchen immer, Werbung nur bei Einwilligung */
-export const declarationsText = (marketing: boolean): string =>
-  [DECLARATIONS.terms, DECLARATIONS.business, ...(marketing ? [DECLARATIONS.marketing] : [])].join('\n');
+/* Gespeicherter Wortlaut: genau das eine Pflichtkästchen der Bestätigungsseite */
+export const declarationsText = (): string => DECLARATIONS.confirmation;
 
 export type OrderResult =
   | { result: 'created' | 'idempotent' | 'duplicate'; reference: string; orderId: number }
@@ -46,19 +45,15 @@ export class OrderService {
         const [inserted] = await this.db.batch<{ id: number }>([
           [`INSERT INTO orders (reference, idempotency_key, google_sub, email, website_url, privacy_version, terms_version, terms_accepted_at, status, created_at,
               business_confirmed, marketing_consent, declarations)
-            SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?11, ?12, 'received', ?7, 1, ?13, ?14
+            SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?11, ?12, 'received', ?7, 1, 0, ?13
             WHERE NOT EXISTS (SELECT 1 FROM orders WHERE idempotency_key = ?2)
               AND NOT EXISTS (SELECT 1 FROM orders WHERE google_sub = ?3 AND website_url = ?5 AND created_at >= ?8)
               AND (SELECT COUNT(*) FROM orders WHERE google_sub = ?3 AND created_at >= ?9) < ?10
             RETURNING id`,
           [reference, idempotencyKey, sub, email, websiteUrl, privacyVersion, utcText(now), dupSince, daySince, this.maxPerDay, terms.version, utcText(terms.at),
-            terms.marketing ? 1 : 0, declarationsText(terms.marketing)]],
+            declarationsText()]],
           [`INSERT INTO notifications (order_id, status, attempts, next_attempt_at, created_at)
             SELECT id, 'pending', 0, ?2, ?2 FROM orders WHERE reference = ?1`, [reference, utcText(now)]],
-          /* Werbeeinwilligung nur, wenn der Auftrag eben angelegt wurde und eingewilligt ist */
-          [`INSERT INTO marketing_consents (google_sub, email, wording, privacy_version, given_at, order_reference)
-            SELECT google_sub, email, ?2, privacy_version, terms_accepted_at, reference FROM orders WHERE reference = ?1 AND marketing_consent = 1`,
-          [reference, DECLARATIONS.marketing]],
         ]);
         const id = inserted?.[0]?.id;
         if (id !== undefined) return { result: 'created', reference, orderId: id };

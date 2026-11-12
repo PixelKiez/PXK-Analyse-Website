@@ -37,13 +37,14 @@ export const ACCESS_MODES = ['testnutzer', 'offen'] as const;
 export const MAX_TEST_ACCOUNTS = 20;
 
 export const LIMITS = {
-  startPerIp: [20, 600],         // Anfragestarts je IP: 20 in 10 Minuten
+  addressPerIp: [20, 600],       // „Analysieren“ (Adresse für die Bestätigungsseite) je IP: 20 in 10 Minuten
+  startPerIp: [20, 600],         // Anfragestarts (Bestätigung → Google) je IP: 20 in 10 Minuten
   callbackPerIp: [30, 600],
   orderPerIp: [10, 3600],        // angelegte Aufträge je IP: 10 pro Stunde
   ordersPerAccountDay: 5,
   duplicateDays: 30,             // gleiche Website + gleiches Google-Konto gilt so lange als Duplikat
   stateTtl: 600,
-  consentTtl: 600,               // AGB-Zustimmung aus dem Hero gilt 10 Minuten für die Google-Anmeldung
+  consentTtl: 600,               // Bestätigung (AGB-Zustimmung) gilt 10 Minuten für die Google-Anmeldung
   sessionTtl: 3600,              // Session (Cookie und D1-Zeile) läuft nach einer Stunde ab
 } as const;
 
@@ -155,7 +156,7 @@ export function loadConfig(env: Env): Config {
   const privacyVersion = str(env.PRIVACY_VERSION);
   /* Jeder Auftrag speichert die Version der Datenschutzerklärung. Ein Entwurf ist keine Grundlage für echte Aufträge. */
   if (!privacyVersion || (production && /^entwurf/i.test(privacyVersion))) missing.push('PRIVACY_VERSION');
-  /* Version der AGB, die der Hero zur Zustimmung zeigt (Feld agb_version) und jeder Auftrag speichert. Ohne rechtlich
+  /* Version der AGB, die die Bestätigungsseite zur Zustimmung zeigt (Feld agb_version) und jeder Auftrag speichert. Ohne rechtlich
      freigegebene Fassung ist sie ein „ENTWURF-…“: dann nimmt die Produktion keine Aufträge an (fail closed). */
   const termsVersion = str(env.TERMS_VERSION);
   if (!/^[A-Za-z0-9._-]{1,64}$/.test(termsVersion) || (production && /^entwurf/i.test(termsVersion))) missing.push('TERMS_VERSION');

@@ -200,43 +200,33 @@ test('Startseite: kostenloses Angebot, sechs Bereiche, sieben PDF-Seiten, GEO & 
   if (SOFT_LAUNCH) { assert.equal(H.byTag(root, 'form').length, 0, 'Soft-Launch: kein Formular'); return; }
   const form = H.byId(root, 'analyze');
   assert.equal(form.attrs.get('action'), '/api/anfrage', 'Formular geht an den API-Worker (Cloudflare-Route /api/*)'); assert.equal(form.attrs.get('method'), 'post');
-  assert.deepEqual(H.find(form, e => e.attrs.has('name')).map(e => e.attrs.get('name')), ['action', 'agb_version', 'website', 'agb', 'unternehmer', 'werbung'], 'nur Website, die drei Kästchen und angezeigte AGB-Version – per POST, nie in einer GET-URL');
+  assert.deepEqual(H.find(form, e => e.attrs.has('name')).map(e => e.attrs.get('name')), ['action', 'website'], 'nur die Website-Adresse – per POST, nie in einer GET-URL');
 });
 
-test('Hero (AGB § 3 und § 4, Fassung 2026-11-04): Pflichtkästchen AGB und Unternehmer, freiwillige Werbeeinwilligung, keins vorausgewählt; Wortlaut wie im Worker gespeichert; Schaltfläche „Analyse anfragen“; Hinweis „0 €, kein Abo“', { skip: SOFT_LAUNCH_SKIP }, () => {
+test('Hero (PO-Entscheidung 12.11.2026): nur Website-Adresse und „Analysieren“, kein Kästchen, keine Google-Weiterleitung; die Bestätigungsseite des Workers hat genau ein Kästchen im Wortlaut von AGB § 4 Abs. 1', { skip: SOFT_LAUNCH_SKIP }, () => {
   const { root } = H.parse(read('public/index.html'));
   const txt = el => H.norm(H.textOf(el));
   const form = H.byId(root, 'analyze');
-  const label = box => H.find(form, e => e.tag === 'label' && H.find(e, x => x === box).length)[0];
-  /* Wortlaut der Kästchen = DECLARATIONS im Worker (wird mit dem Auftrag als Nachweis gespeichert, Art. 7 Abs. 1 DSGVO) */
-  const view = read('worker/src/view.ts');
-  const declaration = key => {
-    const m = new RegExp(`^  ${key}: '([^']+)'( \\+ DATENSCHUTZ_VERWEIS \\+ '\\.')?,$`, 'm').exec(view);
-    return m[1] + (m[2] ? 'Datenschutzerklärung, Abschnitt 12.' : '');
-  };
-  for (const [id, required, text, links] of [
-    ['agb', true, declaration('terms'), [['agb.html', 'AGB'], ['datenschutz.html', 'Datenschutzerklärung']]],
-    ['unternehmer', true, declaration('business'), []],
-    ['werbung', false, 'Freiwillig: ' + declaration('marketing'), [['datenschutz.html#werbung', 'Datenschutzerklärung, Abschnitt 12']]],
-  ]) {
-    const box = H.byId(form, id);
-    assert.deepEqual([box.tag, box.attrs.get('type'), box.attrs.get('name'), box.attrs.get('value')], ['input', 'checkbox', id, '1']);
-    assert.equal(box.attrs.has('required'), required, `${id}: Pflicht nur bei AGB und Unternehmer`);
-    assert.ok(!box.attrs.has('checked'), `${id}: nicht vorausgewählt`);
-    assert.ok(label(box), `${id}: Kästchen steht in seinem Label (ganzer Text klickbar)`);
-    assert.equal(txt(label(box)), text, `${id}: Wortlaut wie im Worker (DECLARATIONS)`);
-    assert.deepEqual(H.byTag(label(box), 'a').map(a => [a.attrs.get('href'), txt(a)]), links);
-  }
-  assert.equal(txt(H.find(form, e => e.tag === 'button')[0]), 'Analyse anfragen', 'Schaltfläche wie in AGB § 3 Abs. 2');
-  assert.match(read('public/agb.html'), /klickt auf die Schaltfläche „Analyse anfragen“/);
-  assert.equal(txt(H.byClass(form, 'hero-note')[0]), 'Kostenlose Website-Analyse – 0 €, kein Abo. Den Bericht erhalten Sie auch ohne Einwilligung in werbliche E-Mails. Datenschutzerklärung');
-  /* Fehlertexte wie die Antworten des Workers ohne JavaScript */
-  const app = read('worker/src/app.ts');
-  for (const id of ['url-error', 'agb-error', 'unternehmer-error']) {
-    assert.ok(H.byId(form, id).attrs.has('hidden'), `${id} zunächst verborgen`);
-    assert.ok(app.includes(`'${txt(H.byId(form, id))}'`), `${id}: gleicher Text wie im Worker`);
-  }
+  assert.equal(H.find(form, e => e.attrs.get('name') === 'action')[0].attrs.get('value'), 'adresse', 'Hero sendet nur die Adresse (Aktion „adresse“)');
+  assert.deepEqual(H.find(root, e => e.tag === 'input' && e.attrs.get('type') === 'checkbox'), [], 'kein Kästchen auf der Startseite');
+  assert.ok(!/agb_version|bestaetigung|unternehmer|werbung/.test(read('public/index.html')), 'keine Zustimmungsfelder im Hero');
+  assert.equal(txt(H.find(form, e => e.tag === 'button')[0]), 'Analysieren', 'primärer CTA exakt „Analysieren“');
+  assert.equal(txt(H.byClass(form, 'hero-note')[0]), 'Kostenlose Website-Analyse – 0 €, kein Abo. Datenschutzerklärung');
+  /* Fehlertext wie die Antwort des Workers ohne JavaScript */
+  const url = H.byId(form, 'url-error');
+  assert.ok(url.attrs.has('hidden'), 'url-error zunächst verborgen');
+  assert.ok(read('worker/src/app.ts').includes(`'${txt(url)}'`), 'url-error: gleicher Text wie im Worker');
   assert.equal(txt(H.byTag(H.byClass(root, 'hero')[0], 'h1')[0]), 'Sehen Sie, was Ihre Website ausbremst.', 'Original-H1');
+  /* Bestätigungsseite (worker/src/view.ts): genau ein Kästchen; sein Wortlaut wird gespeichert und steht wörtlich in AGB § 4 Abs. 1;
+     Schaltflächen wie in AGB § 3 Abs. 2 */
+  const view = read(VIEW);
+  const wortlaut = /^ {2}confirmation: '([^']+)',$/m.exec(view)[1];
+  assert.equal(wortlaut, 'Ich handle geschäftlich oder für eine Organisation, akzeptiere die AGB und habe die Datenschutzerklärung zur Kenntnis genommen.');
+  assert.equal((view.match(/type="checkbox"/g) || []).length, 1, 'view.ts: genau ein Kästchen');
+  assert.ok(!/DECLARATIONS\.(terms|business|marketing)|werbung|Newsletter/.test(view), 'view.ts: keine weiteren Erklärungen, kein Werbe-Opt-in');
+  const agb = H.norm(H.textOf(H.byTag(H.parse(read('public/agb.html')).root, 'main')[0]));
+  assert.ok(agb.includes(`mit dem Wortlaut „${wortlaut}“`), 'AGB § 4 Abs. 1 nennt genau den Wortlaut');
+  for (const s of ['klickt auf die Schaltfläche „Analysieren“', 'Seite „Analyse anfragen“', 'klickt auf die Schaltfläche „Mit Google fortfahren“']) assert.ok(agb.includes(s), `AGB § 3 Abs. 2: „${s}“`);
 });
 
 /* Ersetzt durch den Test „Startseite gegenüber main“ in tests/softlaunch.test.mjs: Er vergleicht die ganze Startseite bytegenau mit main
@@ -305,19 +295,24 @@ test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen n
   assert.match(now, /<span>02<\/span><h3>AGB akzeptieren und anmelden<\/h3>/);
 });
 
-test('AGB-Seite: Fassung 2026-11-04 (Variante A, nur Unternehmer), ohne Platzhalter; Worker und Startseite verlangen genau diese Fassung', () => {
-  /* Entscheidung des Auftraggebers 04.11.2026: AGB aus 03_agb.md übernommen – Werbeeinwilligung freiwillig (Variante A), nur Unternehmer
-     (§ 14 BGB), daher ohne Widerrufsbelehrung für Verbraucher; § 10 bis § 13 rücken auf */
+test('AGB-Seite: Fassung 2026-11-12 (ein Kästchen, nur Unternehmer, keine Werbeeinwilligung bei der Anfrage), ohne Platzhalter; Worker bis zur Freigabe fail-closed', () => {
+  /* PO-Entscheidung 12.11.2026: Bestätigungsseite mit genau einem Kästchen. §§ 3, 4 und 6 Abs. 2 gegenüber der Fassung 2026-11-04 angepasst;
+     nur Unternehmer (§ 14 BGB) bleibt, daher weiter ohne Widerrufsbelehrung für Verbraucher */
   const { root } = H.parse(read('public/agb.html'));
   const main = H.norm(H.textOf(H.byTag(root, 'main')[0]));
-  assert.ok(main.includes('Stand: 4. November 2026 · Version 2026-11-04'), 'Version');
+  assert.ok(main.includes('Stand: 12. November 2026 · Version 2026-11-12'), 'Version');
   assert.ok(!/ENTWURF|in Vorbereitung|Variante|\[|Widerrufsbelehrung|Muster-Widerrufsformular/.test(main), 'keine Entwurfs-, Varianten- oder Verbraucher-Widerrufsreste');
-  for (const s of ['ausschließlich an Unternehmer', 'Verbraucher können die Analyse nicht anfragen', 'Die Einwilligung nach § 6 ist freiwillig', 'keine Rechtsberatung', 'Analyse anfragen', '§ 36 VSBG']) assert.ok(main.includes(s), `AGB: „${s}“`);
+  for (const s of ['ausschließlich an Unternehmer', 'Verbraucher können die Analyse nicht anfragen', 'durch ein einziges, nicht vorausgewähltes Kästchen',
+    'Bei der Anfrage wird keine Einwilligung in werbliche E-Mails (§ 6) abgefragt', 'eine solche Einwilligung wird aus ihr auch nicht abgeleitet', 'keine Rechtsberatung', '§ 36 VSBG']) assert.ok(main.includes(s), `AGB: „${s}“`);
+  assert.ok(!/drei Kästchen|eigenes Kästchen|Analyse anfragen“;|Kästchentext bei der Anfrage/.test(main), 'keine Reste des Ablaufs mit drei Kästchen');
   assert.deepEqual(H.byClass(root, 'legal-h').map(e => H.norm(H.textOf(e)).split(' ').slice(0, 2).join(' ')), Array.from({ length: 13 }, (_, i) => `§ ${i + 1}`), '§ 1 bis § 13');
-  /* Aktivierung (PXK-155): Formular und D1 entsprechen den Texten; der Worker verlangt genau die veröffentlichte Fassung, und die
-     Startseite zeigt dieselbe Version (sonst lehnt der Worker jede Anfrage mit 409 ab). config.ts lehnt Entwürfe weiter ab. */
-  assert.equal(/^TERMS_VERSION = "([^"]+)"$/m.exec(read('worker/wrangler.toml'))[1], '2026-11-04');
-  assert.ok(read('public/index.html').includes('<input type="hidden" name="agb_version" value="2026-11-04">'), 'Startseite zeigt die AGB-Version des Workers');
+  /* Die Fassung 2026-11-12 ist noch nicht rechtlich freigegeben (Human Gate): Der Worker führt sie als Entwurf, die Produktion nimmt
+     damit keine Aufträge an (config.ts). Der Aktivierungs-Commit setzt nach der Freigabe TERMS_VERSION und PRIVACY_VERSION auf genau
+     die Fassung der Seiten. Die Startseite trägt keine AGB-Version mehr (die Bestätigungsseite zeigt sie). */
+  const fassung = /Stand: [^·]+ · Version (\d{4}-\d{2}-\d{2})/.exec(main)[1];
+  assert.equal(/^TERMS_VERSION = "([^"]+)"$/m.exec(read('worker/wrangler.toml'))[1], `ENTWURF-${fassung}`);
+  assert.equal(/^PRIVACY_VERSION = "([^"]+)"$/m.exec(read('worker/wrangler.toml'))[1], `ENTWURF-${fassung}`);
+  assert.ok(!read('public/index.html').includes('agb_version'), 'Startseite ohne AGB-Version');
   assert.ok(read('worker/src/config.ts').includes("(production && /^entwurf/i.test(termsVersion))) missing.push('TERMS_VERSION');"), 'Produktion lehnt AGB-Entwürfe ab');
 });
 
@@ -338,9 +333,12 @@ test('Wahrheitsgemäße Aussagen: kein Premium/Checkout/Abo/Dashboard/Score, kei
   assert.ok(analyse.length >= 2 && !analyse.some(x => /Score/.test(x.split('(')[0])), 'Analyseseiten: Score erlaubt, Premium und Garantie bleiben verboten');
   assert.ok(claimProblems([['Probe', 'Ihr Pixelkiez Score.']]).length >= 1, 'Angebotsseiten: Score bleibt verboten');
   assert.deepEqual(claimProblems([['view.ts', viewText()]]), []);
-  for (const s of ['Kostenlose Website-Analyse – 0 €, kein Abo', 'PDF mit sieben Seiten', 'keinen Zugriff auf Ihr Postfach', 'nicht automatisch abgerufen oder gescannt', 'Wortlaut, Version und Zeitpunkt Ihrer Bestätigungen', 'vier Monate nach Eingang', 'Analyse anfragen']) {
+  for (const s of ['Kostenlos · 0 € · kein Abonnement', 'Analyse anfragen', 'Mit Google fortfahren', 'Adresse ändern', 'Vielen Dank für Ihre Anfrage.',
+    'Ihre Anfrage ist bei uns eingegangen. Wir melden uns per E-Mail bei Ihnen.', 'Diese Website ist bereits angefragt.']) {
     assert.ok(viewText().includes(s), `view.ts enthält "${s}"`);
   }
+  /* Eingangsbestätigung: keine zugesagte Lieferfrist, keine Behauptung einer Vertragsannahme */
+  assert.ok(!/angenommen|Vertrag|Lieferfrist|Werktag|innerhalb von/i.test(viewText()), 'view.ts: keine Frist, keine behauptete Annahme');
   /* Negativprobe: der alte Stand mit Free/Premium wird erkannt */
   const old = git('show', '98d21094619a53c28f56609ecbef13f94859ae58:index.html');
   const found = claimProblems(surfaces(old)).join('\n');
@@ -525,8 +523,15 @@ test('Eigenständige Website 360°Pixelkiez: Name in Titel, Logo und Footer; Imp
   /* Entscheidung des Auftraggebers 04.11.2026: keine Umsatzsteuer-ID (noch nicht erteilt), keine Platzhalter */
   assert.ok(!/Umsatzsteuer|USt-?Id|Wirtschafts-Identifikationsnummer|Telefon|\[/.test(imprint), 'Impressum ohne USt-ID, W-IdNr., Telefon-Platzhalter');
   const privacy = H.norm(H.textOf(H.byTag(H.parse(read('public/datenschutz.html')).root, 'main')[0]));
-  /* Veröffentlichte Fassung (04.11.2026, § 7 präzisiert 11.11.2026): ohne Entwurfsvermerk, ohne offene Platzhalter */
-  assert.ok(privacy.includes('Version 2026-11-11') && !/ENTWURF|in Vorbereitung|\[/.test(privacy), 'Datenschutzerklärung: Fassung 2026-11-11 ohne Entwurfsvermerk und Platzhalter');
+  /* Fassung 2026-11-12 (Bestätigungsseite mit einem Kästchen; zur rechtlichen Freigabe): ohne Entwurfsvermerk im Text, ohne Platzhalter */
+  assert.ok(privacy.includes('Version 2026-11-12') && !/ENTWURF|in Vorbereitung|\[/.test(privacy), 'Datenschutzerklärung: Fassung 2026-11-12 ohne Entwurfsvermerk und Platzhalter');
+  /* Abschnitt 8 beschreibt den tatsächlichen Ablauf: Website-Adresse schon vor der Google-Anmeldung in der Sitzung, nicht an Google;
+     keine Werbeeinwilligung bei der Anfrage (Abschnitte 12 und 18) */
+  for (const s of ['Wenn Sie auf „Analysieren“ klicken, prüfen wir die eingegebene Website-Adresse und speichern sie in Ihrer serverseitigen Sitzung',
+    'Die Website-Adresse wird dabei nicht an Google übermittelt', 'Die Adresse der zu analysierenden Website übermitteln wir dabei nicht an Google',
+    'Ihre Bestätigung, dass Sie geschäftlich oder für eine Organisation handeln', 'Bei der Anfrage über diese Website fragen wir keine solche Einwilligung ab',
+    'Ihre Bestätigung der AGB ist keine Einwilligung in werbliche E-Mails']) assert.ok(privacy.includes(s), `Datenschutzerklärung: „${s}“`);
+  assert.ok(!/Angaben aus den Kästchen|nicht vorangekreuzte Kästchen eingewilligt|ob Sie in werbliche E-Mails eingewilligt haben/.test(privacy), 'keine Reste des Ablaufs mit drei Kästchen');
   /* § 7: Googles Bestätigung (email_verified) belegt bei fremden Domains keinen aktuellen Postfachzugriff – keine Zusicherung des Besitzes */
   assert.ok(!privacy.includes('tatsächlich Ihnen gehört') && privacy.includes('belegt sie nicht in jedem Fall, dass Sie aktuell Zugriff auf das zugehörige Postfach haben'), 'Datenschutz § 7 ohne Besitzzusicherung');
   assert.ok(privacy.includes('Vincent Schnetzer') && privacy.includes('360@pixelkiez.de'), 'Verantwortlicher genannt');
@@ -780,9 +785,10 @@ test('Release-Grenze API (privater Worker): keine Route, keine workers.dev-Adres
   assert.match(active, /^BASE_URL = "https:\/\/360\.pixelkiez\.de"$/m);
   assert.match(active, /^MAIL_API_URL = "https:\/\/api\.resend\.com\/emails"$/m);
   assert.match(active, /^MAIL_FROM = "anfrage@360\.pixelkiez\.de"$/m, 'freigegebener Absender auf der verifizierten Versanddomain');
-  /* Aktivierung (PXK-155): veröffentlichte Fassungen der Rechtstexte (Datenschutz 2026-11-11, AGB 2026-11-04) */
-  assert.match(active, /^PRIVACY_VERSION = "2026-11-11"$/m, 'Version der veröffentlichten Datenschutzerklärung');
-  assert.match(active, /^TERMS_VERSION = "2026-11-04"$/m, 'Version der veröffentlichten AGB');
+  /* Rechtstexte 2026-11-12 (Bestätigungsseite mit einem Kästchen) warten auf die Freigabe: bis zum Aktivierungs-Commit als Entwurf,
+     die Produktion nimmt damit keine Aufträge an (fail closed) */
+  assert.match(active, /^PRIVACY_VERSION = "ENTWURF-2026-11-12"$/m, 'Datenschutzerklärung 2026-11-12 noch nicht freigegeben');
+  assert.match(active, /^TERMS_VERSION = "ENTWURF-2026-11-12"$/m, 'AGB 2026-11-12 noch nicht freigegeben');
   assert.match(active, /^MAIL_NOTIFY_TO = "360@pixelkiez\.de"$/m);
   /* Entscheidung des Auftraggebers 04.11.2026: Anfragedaten vier Monate nach Eingang löschen (Datenschutzerklärung Abschnitte 8 und 16) */
   assert.match(active, /^ORDER_RETENTION_DAYS = "120"$/m, 'Löschfrist vier Monate');

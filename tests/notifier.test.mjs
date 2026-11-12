@@ -30,7 +30,7 @@ test('Fehlgeschlagener Mailversand: Auftrag bleibt gespeichert und bestätigt; C
   mail.state.mode = 'fail';
   const c = new Client(app);
   assert.equal((await login(c, google)).callback.status, 303);
-  assert.match((await c.req('GET', '/api/anfrage')).text, /Ihre Anfrage liegt bei uns/, 'Annahme hängt an der Speicherung, nicht am Mailversand');
+  assert.match((await c.req('GET', '/api/anfrage')).text, /Vielen Dank für Ihre Anfrage\./, 'Annahme hängt an der Speicherung, nicht am Mailversand');
   await settled();
   assert.deepEqual(await app.sql('SELECT status, attempts, last_error FROM notifications'), [{ status: 'pending', attempts: 1, last_error: 'temporary:503:service_unavailable' }]);
   mail.state.mode = 'ok';
@@ -76,7 +76,7 @@ test('Mail-API lehnt dauerhaft ab (401, 403, 422): sofort „failed“ ohne auto
     const before = app.logs().length;
     const c = new Client(app, { ip: `198.51.100.${60 + i}` });
     assert.equal((await login(c, google, { website: `firma-${mode}.de` })).callback.status, 303, mode);
-    assert.match((await c.req('GET', '/api/anfrage')).text, /Ihre Anfrage liegt bei uns/, `${mode}: Annahme hängt nicht an Resend`);
+    assert.match((await c.req('GET', '/api/anfrage')).text, /Vielen Dank für Ihre Anfrage\./, `${mode}: Annahme hängt nicht an Resend`);
     await settled();
     assert.deepEqual(await app.sql('SELECT status, attempts, last_error, sent_at FROM notifications'), [{ status: 'failed', attempts: 1, last_error: code, sent_at: null }], `${mode}: überprüfbarer Status in D1`);
     assert.match(app.logs().slice(before), /Versuch 1, dauerhaft abgelehnt – keine automatische Wiederholung, Konfiguration prüfen\)/, mode);
@@ -108,7 +108,7 @@ test('Benachrichtigung scheitert nach der Speicherung an der Datenbank: Annahme 
     await app.run('DROP TRIGGER pxwa_test_block');
   }
   assert.equal(res.status, 303, 'Auftrag ist gespeichert – keine Fehlerseite, die zu erneutem Absenden verleitet');
-  assert.match((await c.req('GET', '/api/anfrage')).text, /Ihre Anfrage liegt bei uns/);
+  assert.match((await c.req('GET', '/api/anfrage')).text, /Vielen Dank für Ihre Anfrage\./);
   assert.equal((await orders()).length, 1);
   assert.deepEqual(await app.sql('SELECT status, attempts FROM notifications'), [{ status: 'pending', attempts: 0 }], 'Benachrichtigung bleibt fällig');
   assert.ok(!app.logs().includes(CUSTOMER) && !app.logs().includes('musterfirma'));
@@ -288,7 +288,7 @@ test('Resend-Fehler: vorübergehende Fehler mit Backoff wiederholt, dauerhafte s
     mail.state.mode = mode;
     const c = new Client(app, { ip: `198.51.100.${150 + i}` });
     assert.equal((await login(c, google, { website: `firma-${mode}.de` })).callback.status, 303, mode);
-    assert.match((await c.req('GET', '/api/anfrage')).text, /Ihre Anfrage liegt bei uns/, `${mode}: Annahme hängt nicht an Resend`);
+    assert.match((await c.req('GET', '/api/anfrage')).text, /Vielen Dank für Ihre Anfrage\./, `${mode}: Annahme hängt nicht an Resend`);
     await settled();
     const [n] = await app.sql("SELECT status, attempts, last_error, next_attempt_at > datetime('now', '+4 minutes') AS later FROM notifications");
     assert.deepEqual(n, { status, attempts: 1, last_error: code, later: 1 }, mode);

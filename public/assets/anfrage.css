@@ -1,31 +1,58 @@
 /* Pixelkiez Analyse – Ergänzungen für Anfrageablauf und Hinweise. Baut auf den Tokens aus styles.css auf. */
-.request .section-head { margin-bottom: clamp(28px, 4vw, 40px); }
-.request-form { justify-items: start; margin-top: 0; }
-.request-notice { margin-bottom: 20px; padding: 14px 16px; border-radius: 12px; background: var(--accent-soft); font-size: 15px; color: var(--ink-70); }
-.request-grid { display: grid; grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); gap: clamp(28px, 5vw, 64px); align-items: start; }
-@media (max-width: 960px) { .request-grid { grid-template-columns: minmax(0, 1fr); } }
-.request-side { display: grid; gap: 18px; align-content: start; }
-.request-h { font-size: 22px; letter-spacing: -.02em; line-height: 1.25; }
+/* Rechtsseiten: Links und Aufzählungen im Fließtext */
 .request-notes { display: grid; gap: 10px; margin: 0; padding: 0 0 0 18px; font-size: 15px; color: var(--ink-70); }
-.request-small { font-size: 14px; color: var(--ink-45); }
 .request-link { text-decoration: underline; text-underline-offset: 3px; }
 .request-link:hover { color: var(--accent-text); }
-.request-break { overflow-wrap: anywhere; }
-.request-ref { font-size: 17px; }
-.request-ref b { font-weight: 500; letter-spacing: .04em; }
-.consent { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; font-size: 15px; cursor: pointer; }
+
+/* Anfrageablauf (Seiten des API-Workers, PO-Entscheidung 12.11.2026): eine schmale Karte mittig auf dem verwaschenen Grund der
+   Startseite – Adresseingabe, Bestätigung mit genau einem Kästchen, Eingangsbestätigung und Hinweise. Viel Weißraum, ruhige
+   Typografie, keine Seitenleiste und keine Infokästen. */
+.request { display: grid; justify-items: center; align-content: start; min-height: calc(100svh - 86px); padding-block: clamp(36px, 9svh, 112px) clamp(56px, 10svh, 128px); border-top: 0; }
+.anfrage { display: grid; gap: 24px; justify-items: stretch; width: 100%; max-width: 520px; padding: clamp(24px, 6vw, 48px); background: var(--surface); border: 1px solid var(--line-soft); border-radius: clamp(20px, 3vw, 28px); box-shadow: 0 30px 80px -42px rgb(12 12 12 / .3); }
+.anfrage-titel { font-size: clamp(28px, 3.4vw, 38px); line-height: 1.12; letter-spacing: -.03em; }
+.anfrage-text { color: var(--ink-70); }
+.anfrage-notiz { padding: 12px 14px; border-radius: 12px; background: var(--accent-soft); font-size: 15px; line-height: 1.5; color: var(--ink-70); }
+/* Eingegebene Adresse gut sichtbar, darunter „Adresse ändern“ (zurück zum Hero) */
+.anfrage-adresse { display: grid; gap: 4px; padding: 16px 18px; border: 1px solid var(--line-soft); border-radius: 16px; background: var(--paper); }
+.anfrage-label { font: 500 12px/1.4 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-45); }
+.anfrage-url { font-size: 18px; font-weight: 500; line-height: 1.4; overflow-wrap: anywhere; }
+.anfrage-aendern { justify-self: start; margin-top: 4px; font-size: 14px; color: var(--ink-70); text-decoration: underline; text-underline-offset: 3px; }
+.anfrage-aendern:hover { color: var(--accent-text); }
+.anfrage-form { display: grid; gap: 18px; }
+.anfrage-form .url-field { height: auto; min-height: 60px; padding-left: 20px; }
+.anfrage-form .url-field .btn { height: 46px; padding: 0 22px; }
+.anfrage-hinweis { font: 400 13px/1.4 var(--font-mono); letter-spacing: .02em; color: var(--ink-45); text-align: center; }
+.anfrage > .btn { justify-self: start; }
+/* Eingangsbestätigung: Zeichen, Dank, kurzer Text, Website, E-Mail und Referenz dezent als Liste, zurück zur Startseite */
+.anfrage-fertig { display: grid; gap: 20px; justify-items: center; text-align: center; }
+.anfrage-zeichen { width: 64px; height: 64px; }
+.anfrage-zeichen-kreis { fill: rgb(30 158 90 / .1); stroke: var(--good); stroke-width: 2; }
+.anfrage-zeichen-strich { fill: none; stroke: var(--good); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+.anfrage-zeichen--info .anfrage-zeichen-kreis { fill: var(--paper); stroke: var(--line); }
+.anfrage-zeichen--info .anfrage-zeichen-strich { stroke: var(--ink-70); }
+/* Der Haken zeichnet sich nur bei erlaubter Bewegung (dezent, einmal); sonst steht er sofort fertig da */
+@media (prefers-reduced-motion: no-preference) {
+  .anfrage-zeichen:not(.anfrage-zeichen--info) .anfrage-zeichen-kreis { transform-box: fill-box; transform-origin: center; animation: anfrage-kreis .5s var(--ease) both; }
+  .anfrage-zeichen:not(.anfrage-zeichen--info) .anfrage-zeichen-strich { stroke-dasharray: 1; stroke-dashoffset: 1; animation: anfrage-strich .45s .28s var(--ease) forwards; }
+}
+@keyframes anfrage-kreis { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+@keyframes anfrage-strich { to { stroke-dashoffset: 0; } }
+.anfrage-daten { display: grid; width: 100%; margin: 0; border-top: 1px solid var(--line-soft); font-size: 14px; text-align: left; }
+.anfrage-daten div { display: grid; grid-template-columns: 6.5em minmax(0, 1fr); gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line-soft); }
+.anfrage-daten dt { color: var(--ink-45); }
+.anfrage-daten dd { margin: 0; color: var(--ink-70); overflow-wrap: anywhere; }
+.anfrage-daten .mono { letter-spacing: .02em; }
+
+/* Kästchen (Bestätigungsseite): ganzer Text klickbar, Links unterstrichen */
+.consent { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; font-size: 15px; line-height: 1.5; color: var(--ink-70); cursor: pointer; }
 .consent input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--ink); }
 .consent input:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 .consent a { text-decoration: underline; text-underline-offset: 3px; }
 .consent a:hover, .hero-note a:hover { color: var(--accent-text); }
-/* Fehlertexte an Formularfeldern: dunkleres Rot als --bad, damit 14 px Text auch auf Papier den Kontrast 4,5:1 erreicht (WCAG AA) */
-.form-error { color: #B42318; }
-/* Hero: AGB-Häkchen (Pflicht, nie vorausgewählt) und Hinweis unter dem Eingabefeld – kompakt, der Hero bleibt im ersten Bildschirm */
-.consent--hero { min-height: 24px; gap: 10px; align-items: start; line-height: 1.4; color: var(--ink-70); text-align: left; }
-.consent--hero input { margin: 0; }
-/* Freiwillige Werbeeinwilligung (AGB § 4 Abs. 3): eigenes Kästchen, voller Wortlaut sichtbar, kleiner gesetzt */
-.consent--freiwillig { font-size: 13px; line-height: 1.45; }
-.consent--freiwillig input { width: 18px; height: 18px; margin-left: 1px; }
+/* Fehlertexte an Formularfeldern: dunkleres Rot als --bad, damit 14 px Text auch auf Papier den Kontrast 4,5:1 erreicht (WCAG AA);
+   beim Einblenden per scrollIntoView mit etwas Abstand zum unteren Fensterrand */
+.form-error { color: #B42318; scroll-margin-bottom: 24px; }
+/* Hero: Hinweis unter dem Eingabefeld – kompakt, der Hero bleibt im ersten Bildschirm */
 .hero-note { margin-top: -4px; font-size: 14px; line-height: 1.4; color: var(--ink-70); }
 .hero-note a { text-decoration: underline; text-underline-offset: 3px; }
 
@@ -45,8 +72,8 @@
    erste Ebene führt die Rahmenlinien neben der Menüleiste bis zum oberen Rand fort (nur mit Rahmenlinien, ab 1321 px). Lila als
    Hintergrundfarbe unter einer Papiergrau-Ebene über die ganze Seite: Zu sehen bleibt Papiergrau, aber Safari ab iOS 26 färbt die
    Statusleiste nach der Hintergrundfarbe der Seite (theme-color gilt dort nicht mehr) – sonst stünde dort ein grauer Streifen über
-   dem Lila. Ersetzt die Farbflecken im Hero. */
-body:has(main.frame > .hero) {
+   dem Lila. Ersetzt die Farbflecken im Hero. Die Seiten des Anfrageablaufs (.request) tragen denselben Grund. */
+body:has(main.frame > .hero), body:has(main.frame > .request) {
   background-color: #EBE2FC;
   background-image: linear-gradient(90deg, var(--line-soft) 1px, transparent 1px calc(100% - 1px), var(--line-soft) calc(100% - 1px)),
     linear-gradient(180deg, #EBE2FC 0%, #EFE2F6 9%, #F8E3E6 20%, #FFE6DD 34%, rgb(255 230 221 / .6) 58%, rgb(255 230 221 / 0) 100%),
@@ -55,7 +82,7 @@ body:has(main.frame > .hero) {
   background-position: center top;
   background-repeat: no-repeat;
 }
-@media (max-width: 1320px) { body:has(main.frame > .hero) { background-size: 0 0, 100% 1150px, 100% 100%; } }
+@media (max-width: 1320px) { body:has(main.frame > .hero), body:has(main.frame > .request) { background-size: 0 0, 100% 1150px, 100% 100%; } }
 .hero::before { content: none; }
 @media (max-width: 620px) {
   .hero .h1 { font-size: clamp(34px, min(12vw, 6.2svh), 46px); }

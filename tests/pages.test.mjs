@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { randomBytes, createHash } from 'node:crypto';
 import {
   ROOT, CUSTOMER, NOTIFY_TO, mockGoogle, mockResend, startPages, startPagesFunction, buildPagesFunctions, uploadFiles,
-  Client, login, startForm, referenceOf, waitFor, workerAvailable, wranglerAvailable, TERMS_VERSION, SOFT_LAUNCH, R2_VIDEOS, R2_BILDER, R2_MEDIEN,
+  Client, login, startForm, addressForm, field, referenceOf, waitFor, workerAvailable, wranglerAvailable, TERMS_VERSION, SOFT_LAUNCH, R2_VIDEOS, R2_BILDER, R2_MEDIEN,
 } from './lib/harness.mjs';
 import { execFileSync } from 'node:child_process';
 
@@ -440,7 +440,7 @@ test('Lokales Pages: alle drei Videos und das Hintergrundbild aus lokalem R2 mit
   }
 });
 
-test('Lokales Pages mit Worker über das Service Binding: Website + AGB → Function → Worker → Google-Mock → Callback legt an (D1) → Bestätigung → Resend-Mock', { skip }, async () => {
+test('Lokales Pages mit Worker über das Service Binding: Hero „Analysieren“ → Bestätigungsseite → Kästchen → Function → Worker → Google-Mock → Callback legt an (D1) → Eingangsbestätigung → Resend-Mock', { skip }, async () => {
   const google = await mockGoogle().start();
   const mail = await mockResend().start();
   const site = await startPages({ google, mail });
@@ -448,19 +448,27 @@ test('Lokales Pages mit Worker über das Service Binding: Website + AGB → Func
     const c = new Client(site, { ip: '198.51.100.20' });
     const home = await c.req('GET', '/');
     assert.equal(home.status, 200);
-    /* Ohne AGB-Häkchen lehnt der Worker auch hinter der Function ab: keine Weiterleitung, keine Session */
-    const noAgb = await c.req('POST', '/api/anfrage', { form: startForm({ agb: false }) });
-    assert.deepEqual([noAgb.status, noAgb.location, noAgb.headers.getSetCookie().length], [422, null, 0]);
-    assert.match(noAgb.text, /Bitte bestätigen Sie die Beauftragung und die AGB/);
+    /* Ohne Häkchen lehnt der Worker auch hinter der Function ab: keine Weiterleitung, keine Session */
+    const noBox = await c.req('POST', '/api/anfrage', { form: startForm({ bestaetigung: false }) });
+    assert.deepEqual([noBox.status, noBox.location, noBox.headers.getSetCookie().length], [422, null, 0]);
+    assert.match(noBox.text, /Bitte bestätigen Sie das Kästchen/);
     const crossSite = await c.req('POST', '/api/anfrage', { form: startForm(), headers: { origin: 'https://evil.example' } });
     assert.equal(crossSite.status, 403, 'Origin-Prüfung des Workers greift auch hinter der Function');
     assert.deepEqual(site.sql('SELECT COUNT(*) AS n FROM orders'), [{ n: 0 }]);
-    const { start, auth, callback, callbackPath } = await login(c, google, { website: 'https://www.musterfirma.de/leistungen' });
+    /* Hero: „Analysieren“ → feste Weiterleitung zur Bestätigungsseite; Session-Cookie kommt über die Binding-Grenze */
+    const hero = await c.req('POST', '/api/anfrage', { form: addressForm('https://www.musterfirma.de/leistungen') });
+    assert.deepEqual([hero.status, hero.location], [303, `${site.base}/api/anfrage`]);
+    const [first] = hero.headers.getSetCookie();
+    assert.match(first, /^pxwa=[A-Za-z0-9_-]{43}; Path=\/; Max-Age=3600; HttpOnly; SameSite=Lax$/, 'Session-Cookie kommt über die Binding-Grenze');
+    const confirm = await c.req('GET', '/api/anfrage');
+    assert.match(confirm.text, /<h1 class="anfrage-titel">Analyse anfragen<\/h1>/);
+    assert.equal((confirm.text.match(/type="checkbox"/g) || []).length, 1, 'genau ein Kästchen');
+    assert.match(confirm.text, /Mit Google fortfahren/);
+    const { start, auth, callback, callbackPath } = await login(c, google, { website: field(confirm.text, 'website') });
     assert.equal(start.status, 303, start.text.slice(0, 200));
     assert.equal(auth.searchParams.get('redirect_uri'), `${site.base}/api/auth/callback`);
     assert.equal(auth.searchParams.get('scope'), 'openid email');
-    const [first] = start.headers.getSetCookie();
-    assert.match(first, /^pxwa=[A-Za-z0-9_-]{43}; Path=\/; Max-Age=3600; HttpOnly; SameSite=Lax$/, 'Session-Cookie kommt über die Binding-Grenze');
+    assert.ok(!/musterfirma/.test(start.location) && !/musterfirma/.test(hero.location), 'Website-Adresse in keiner Weiterleitung');
     assert.equal(callback.status, 303);
     assert.equal(callback.location, `${site.base}/api/anfrage`);
     assert.notEqual(callback.headers.getSetCookie()[0].split(';')[0], first.split(';')[0], 'Session-Wechsel nach dem Login');

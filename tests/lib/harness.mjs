@@ -27,10 +27,9 @@ export const NOTIFY_TO = '360@pixelkiez.de';
 export const CUSTOMER = 'kunde@beispiel-kunde.de';
 export const GOOGLE_AUTH = 'https://accounts.google.com/o/oauth2/v2/auth';
 export const PRODUCTION_BASE = 'https://360.pixelkiez.de';
-/* AGB-Version, die der Hero zur Zustimmung anbietet (Feld agb_version); lokale Tests nutzen genau diesen Entwurf.
-   Soft-Launch (Hero ohne Formular): dieselbe Version aus der Worker-Konfiguration */
-export const TERMS_VERSION = (/<input type="hidden" name="agb_version" value="([^"]+)">/.exec(readFileSync(join(ROOT, 'public/index.html'), 'utf8'))
-  ?? /^TERMS_VERSION = "([^"]+)"$/m.exec(readFileSync(join(ROOT, 'worker/wrangler.toml'), 'utf8')))[1];
+/* AGB-Version, die die Bestätigungsseite des Workers zur Zustimmung anbietet (Feld agb_version): TERMS_VERSION aus der
+   Worker-Konfiguration; lokale Tests nutzen genau diesen Wert (auch einen Entwurf, den nur die Produktion ablehnt) */
+export const TERMS_VERSION = /^TERMS_VERSION = "([^"]+)"$/m.exec(readFileSync(join(ROOT, 'worker/wrangler.toml'), 'utf8'))[1];
 /* Soft-Launch (Branch release/pxwa-soft-launch*): Hero mit Hinweis statt Anfrageformular, bis die Google-Anmeldung freigegeben ist.
    Tests des Formulars werden dann als übersprungen gemeldet (nicht als bestanden); tests/softlaunch.test.mjs prüft den Hinweis */
 export const SOFT_LAUNCH = /<p class="bald">/.test(readFileSync(join(ROOT, 'public/index.html'), 'utf8'));
@@ -466,14 +465,17 @@ export class Client {
 
 export const field = (html, name) => (html.match(new RegExp(`name="${name}" value="([^"]*)"`)) || [])[1];
 
-/* Anfrageformular: Website, AGB-Häkchen und Unternehmer-Häkchen (false lässt sie weg, ein String setzt den Wert), freiwillige
-   Werbeeinwilligung (werbung: true setzt "1") und die angezeigte AGB-Version */
+/* Hero absenden („Analysieren“): nur die Website-Adresse */
+export const addressForm = (website = 'musterfirma.de') => ({ action: 'adresse', website });
+
+/* Bestätigungsseite absenden („Mit Google fortfahren“): Website, das eine Kästchen (true setzt "1", false lässt es weg, ein String
+   setzt den Wert) und die angezeigte AGB-Version */
 const box = (name, v) => (v === true ? { [name]: '1' } : v === false ? {} : { [name]: v });
-export const startForm = ({ website = 'musterfirma.de', agb = true, unternehmer = true, werbung = false, agbVersion = TERMS_VERSION, extra = {} } = {}) => ({
-  action: 'start', website, ...box('agb', agb), ...box('unternehmer', unternehmer), ...box('werbung', werbung), ...(agbVersion === null ? {} : { agb_version: agbVersion }), ...extra,
+export const startForm = ({ website = 'musterfirma.de', bestaetigung = true, agbVersion = TERMS_VERSION, extra = {} } = {}) => ({
+  action: 'start', website, ...box('bestaetigung', bestaetigung), ...(agbVersion === null ? {} : { agb_version: agbVersion }), ...extra,
 });
 
-/* Hero absenden („Analysieren“) und – wenn der Worker zu Google weiterleitet – den Google-Teil bis zum Code nachbilden */
+/* Bestätigungsseite absenden und – wenn der Worker zu Google weiterleitet – den Google-Teil bis zum Code nachbilden */
 export async function begin(client, google, opts = {}) {
   const start = await client.req('POST', '/api/anfrage', { form: startForm(opts) });
   if (start.status !== 303 || !start.location?.startsWith(client.app.authEndpoint)) return { start };
@@ -484,8 +486,8 @@ export async function begin(client, google, opts = {}) {
   return { start, auth, code, callbackPath };
 }
 
-/* Kompletter Ablauf: Hero mit AGB → Google → Rückkehr. Die Rückkehr legt bei gültiger Zustimmung den Auftrag an (kein zweiter Klick).
-   claims/mode steuern das ID-Token des Mock-Google. */
+/* Ablauf ab der Bestätigungsseite: Kästchen → Google → Rückkehr. Die Rückkehr legt bei gültiger Zustimmung den Auftrag an (kein
+   weiterer Klick). claims/mode steuern das ID-Token des Mock-Google. Den Schritt davor (Hero, „Analysieren“) prüfen eigene Tests. */
 export async function login(client, google, opts = {}) {
   const flow = await begin(client, google, opts);
   if (!flow.callbackPath) return flow;

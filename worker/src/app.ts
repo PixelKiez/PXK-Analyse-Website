@@ -11,16 +11,20 @@ import { type Session, Sessions } from './session';
 import { normalizeWebsite } from './url';
 import { View } from './view';
 
-/* Ablauf: Website-Adresse und AGB-Häkchen im Hero, „Analysieren“ (start) → Google-Anmeldung → Rückkehr (callback) legt den
-   Auftrag an → Eingangsbestätigung mit Referenz. Kein zweiter Bestätigungsklick.
-   start erfasst die AGB-Zustimmung serverseitig (Version, Zeitpunkt, normalisierte Website) und bindet sie an genau diese
-   Google-Anmeldung (state) in dieser Session. Nur ein gültiger Callback mit gültiger, aktueller Zustimmung speichert
-   höchstens einen Auftrag samt Outbox-Eintrag; die Google-Anmeldung allein erzeugt weder Auftrag noch Mail.
+/* Ablauf (PO-Entscheidung 12.11.2026): Website-Adresse im Hero, „Analysieren“ (adresse) → Bestätigungsseite mit genau einem
+   Pflichtkästchen, „Mit Google fortfahren“ (start) → Google-Anmeldung → Rückkehr (callback) legt den Auftrag an →
+   Eingangsbestätigung mit Referenz. adresse prüft die Website und hält sie nur für die Bestätigungsseite in der Session (POST,
+   nie in einer URL, nie an Google). start erfasst die Zustimmung serverseitig (Version, Zeitpunkt, normalisierte Website) und
+   bindet sie an genau diese Google-Anmeldung (state) in dieser Session. Nur ein gültiger Callback mit gültiger, aktueller
+   Zustimmung speichert höchstens einen Auftrag samt Outbox-Eintrag; die Google-Anmeldung allein erzeugt weder Auftrag noch Mail.
    Zustand liegt ausschließlich in der serverseitigen Session (D1); Tokens werden nie gespeichert.
    Routen (über die Pages Function /api/* und das Service Binding): /api/anfrage (GET, POST) und /api/auth/callback (GET).
    Die Anfrage-URL ist die Original-URL der Website (https://360.pixelkiez.de/…); andere Hosts werden abgewiesen. */
 
 const log = (message: string): void => console.error('PXWA: ' + message);
+/* Fehlertexte der Formulare (der Hero zeigt mit JavaScript denselben Text zur Adresse) */
+const URL_ERROR = 'Bitte geben Sie eine öffentliche Website-Adresse wie beispiel.de ein.';
+const CONFIRM_ERROR = 'Bitte bestätigen Sie das Kästchen, um mit Google fortzufahren.';
 
 export async function handle(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   let config: Config;
@@ -89,6 +93,7 @@ class App {
     const session = await this.sessions.load(readCookie(this.request, cookieName(this.config.secure)), this.now);
     if (method === 'GET') return this.show(session);
     switch (form.get('action') ?? 'start') {
+      case 'adresse': return this.address(session, form);
       case 'start': return this.start(session, form);
       case 'logout': return this.logout(session, form);
       /* Unbekannte Aktionen (auch das frühere „confirm“) legen nie etwas an */
@@ -96,43 +101,64 @@ class App {
     }
   }
 
+  /* GET: Eingangsbestätigung, sonst Bestätigungsseite zur eingegebenen Website, sonst Adresseingabe (z. B. Sitzung abgelaufen) */
   private show(session: Session | null): Response {
     const done = session?.data.done;
     if (done) return this.respond(200, this.view.accepted(done.reference, done.url, done.email, done.kind));
     const pending = session?.data.pending;
-    return this.respond(200, this.view.input(this.config.termsVersion, pending?.url ?? '', {},
-      pending ? 'Die Google-Anmeldung wurde nicht abgeschlossen. Es wurde keine Anfrage gespeichert. Bitte bestätigen Sie die Kästchen erneut und klicken Sie auf „Analyse anfragen“.' : null));
+    if (!pending) return this.respond(200, this.view.address());
+    return this.respond(200, this.view.confirm(this.config.termsVersion, pending.url, null,
+      pending.login ? 'Die Google-Anmeldung wurde nicht abgeschlossen. Es wurde keine Anfrage gespeichert. Bitte bestätigen Sie erneut und fahren Sie mit Google fort.' : null));
   }
 
+  /* „Analysieren“ im Hero: Website prüfen und für die Bestätigungsseite in der Session halten, dann dorthin (POST-Redirect-GET:
+     Neuladen und Zurück aus Google senden nichts erneut). Keine Zustimmung, keine Google-Weiterleitung. Ein offener Flow samt
+     Zustimmung zu einer früheren Adresse verfällt. */
+  private async address(session: Session | null, form: URLSearchParams): Promise<Response> {
+    if (!(await this.limiter().allow('adresse', clientIp(this.request), LIMITS.addressPerIp, this.now))) {
+      return this.respond(429, this.view.error('Zu viele Versuche', 'Bitte warten Sie einige Minuten und versuchen Sie es dann erneut.'));
+    }
+    const raw = form.get('website') ?? '';
+    const url = normalizeWebsite(raw);
+    if (url === null) return this.respond(422, this.view.address([...raw].slice(0, 300).join(''), URL_ERROR));
+    const pending = { url, at: this.now };
+    if (session) {
+      delete session.data.done;
+      delete session.data.oidc;
+      session.data.pending = pending;
+      await this.sessions.save(session);
+    } else {
+      this.setSessionCookie(await this.sessions.create({ pending }, this.now));
+    }
+    return this.redirect(this.config.baseUrl + '/api/anfrage');
+  }
+
+  /* „Mit Google fortfahren“ auf der Bestätigungsseite */
   private async start(session: Session | null, form: URLSearchParams): Promise<Response> {
     if (!(await this.limiter().allow('start', clientIp(this.request), LIMITS.startPerIp, this.now))) {
       return this.respond(429, this.view.error('Zu viele Versuche', 'Bitte warten Sie einige Minuten und versuchen Sie es dann erneut.'));
     }
     const raw = form.get('website') ?? '';
     const url = normalizeWebsite(raw);
-    /* AGB und Unternehmer: Häkchen genau "1", und die abgeschickte Seite muss die aktuelle AGB-Version gezeigt haben.
-       Ohne das weder Session noch Weiterleitung zu Google – die Website-Adresse verlässt den Server nicht. Werbung ist freiwillig:
-       nur genau "1" gilt als Einwilligung, alles andere als keine. */
-    const accepted = form.get('agb') === '1';
-    const business = form.get('unternehmer') === '1';
-    const marketing = form.get('werbung') === '1';
+    if (url === null) return this.respond(422, this.view.address([...raw].slice(0, 300).join(''), URL_ERROR));
+    /* Das eine Kästchen genau "1", und die abgeschickte Seite muss die aktuelle AGB-Version gezeigt haben. Ohne das weder
+       Zustimmung noch Weiterleitung zu Google – die Website-Adresse verlässt den Server nicht. Andere Felder (frühere Kästchen,
+       eine Werbeeinwilligung) werden nicht ausgewertet: Eine Werbeeinwilligung entsteht hier nie. */
+    const confirmed = form.get('bestaetigung') === '1';
     const shown = form.get('agb_version');
     const current = shown !== null && safeEqual(shown, this.config.termsVersion);
-    if (url === null || !accepted || !business || !current) {
-      const agb = !accepted ? 'Bitte bestätigen Sie die Beauftragung und die AGB, damit wir Ihre Website analysieren können.'
-        : !current ? 'Die AGB wurden aktualisiert. Bitte lesen Sie die aktuelle Fassung und bestätigen Sie sie erneut.' : null;
-      const errors = { url: url === null ? 'Bitte geben Sie eine öffentliche Website-Adresse wie beispiel.de ein.' : null, agb,
-        business: business ? null : 'Die Analyse ist nur für Unternehmer möglich. Bitte bestätigen Sie, dass Sie als Unternehmer anfragen.' };
-      return this.respond(url !== null && accepted && business ? 409 : 422, this.view.input(this.config.termsVersion, [...raw].slice(0, 300).join(''), errors));
+    if (!confirmed || !current) {
+      const error = !confirmed ? CONFIRM_ERROR : 'Die AGB wurden aktualisiert. Bitte lesen Sie die aktuelle Fassung und bestätigen Sie sie erneut.';
+      return this.respond(confirmed ? 409 : 422, this.view.confirm(this.config.termsVersion, url, error));
     }
     const s = session ?? (await this.newSession());
     delete s.data.done;
-    s.data.pending = { url, at: this.now };
+    s.data.pending = { url, at: this.now, login: true };
     const state = randomHex(32);
     const nonce = randomHex(32);
     const verifier = b64url(randomBytes(48));
     /* Ein neuer Start ersetzt einen offenen Flow samt Zustimmung: dessen state wird damit ungültig */
-    s.data.oidc = { state, nonce, verifier, at: this.now, idem: randomHex(16), consent: { url, version: this.config.termsVersion, at: this.now, business: true, marketing } };
+    s.data.oidc = { state, nonce, verifier, at: this.now, idem: randomHex(16), consent: { url, version: this.config.termsVersion, at: this.now, business: true } };
     await this.sessions.save(s);
     return this.redirect(await this.oidc().authorizationUrl(state, nonce, verifier));
   }
@@ -184,7 +210,7 @@ class App {
     if (!consent || typeof consent.url !== 'string' || normalizeWebsite(consent.url) !== consent.url
       || typeof consent.version !== 'string' || !safeEqual(consent.version, this.config.termsVersion)
       || !Number.isInteger(consent.at) || consent.at < this.now - LIMITS.consentTtl
-      || consent.business !== true || typeof consent.marketing !== 'boolean'
+      || consent.business !== true
       || typeof flow.idem !== 'string' || !/^[0-9a-f]{32}$/.test(flow.idem)) {
       log('Google-Rückkehr ohne gültige AGB-Zustimmung');
       return this.respond(409, this.view.error('Zustimmung nicht mehr gültig', 'Ihre Zustimmung zu den AGB ist abgelaufen oder die AGB wurden geändert. Es wurde keine Anfrage gespeichert. Bitte starten Sie die Anfrage erneut.', 'Neu starten', '/api/anfrage'));
@@ -206,7 +232,7 @@ class App {
       return this.respond(429, this.view.error('Zu viele Versuche', 'Bitte warten Sie und versuchen Sie es später erneut.'));
     }
     const orders = new OrderService(this.db, LIMITS.duplicateDays, LIMITS.ordersPerAccountDay);
-    const r = await orders.submit(user.sub, user.email, consent.url, flow.idem, this.config.privacyVersion, { version: consent.version, at: consent.at, marketing: consent.marketing }, this.now);
+    const r = await orders.submit(user.sub, user.email, consent.url, flow.idem, this.config.privacyVersion, { version: consent.version, at: consent.at }, this.now);
     if (r.result === 'limit') {
       return this.respond(429, this.view.error('Tageslimit erreicht', 'Mit diesem Google-Konto sind heute bereits mehrere Anfragen eingegangen. Bitte versuchen Sie es morgen erneut.'));
     }

@@ -90,8 +90,8 @@ test('Einziger Anfrageweg: das Hero-Formular der Startseite (POST /api/anfrage),
   const forms = [...home.matchAll(/<form\b[^>]*>/g)].map(m => m[0]);
   assert.deepEqual(forms, ['<form class="analyze" id="analyze" action="/api/anfrage" method="post" novalidate>'], 'genau ein Formular, per POST an den Worker');
   const form = home.slice(home.indexOf(forms[0]), home.indexOf('</form>'));
-  assert.deepEqual([...form.matchAll(/<input\b[^>]*\bname="([^"]+)"/g)].map(m => m[1]), ['action', 'agb_version', 'website', 'agb', 'unternehmer', 'werbung']);
-  assert.ok(!/<input\b[^>]*\bchecked\b/.test(form), 'kein Kästchen vorausgewählt');
+  assert.deepEqual([...form.matchAll(/<input\b[^>]*\bname="([^"]+)"/g)].map(m => m[1]), ['action', 'website'], 'nur die Website-Adresse');
+  assert.ok(!/type="checkbox"/.test(form), 'kein Kästchen im Hero (Bestätigungsseite des Workers)');
   assert.ok(!/<(input|textarea|select)\b/.test(home.replace(form, '')), 'außerhalb des Hero-Formulars keine Eingabe');
   for (const js of FILES.filter(f => f.endsWith('.js'))) {
     const code = read(js).replace(/\/\*[\s\S]*?\*\//g, '');
@@ -133,8 +133,8 @@ test('Indexierung: reguläre Seiten freigegeben, Fehlerseite und Vorschau ausges
   assert.ok(FILES.includes('sitemap.xml'), 'Sitemap vorhanden');
 });
 
-test('Rechtstexte: Fassung 2026-11-04 (Datenschutzerklärung 2026-11-11, § 7 präzisiert) ohne Entwurfsvermerk und ohne offene Platzhalter, keine behauptete Freigabe', () => {
-  for (const [p, stand] of [['impressum.html', '4. November 2026'], ['datenschutz.html', '11. November 2026'], ['agb.html', '4. November 2026']]) {
+test('Rechtstexte: Impressum 2026-11-04, AGB und Datenschutzerklärung 2026-11-12 (ein Kästchen, zur Freigabe) ohne Entwurfsvermerk und ohne offene Platzhalter, keine behauptete Freigabe', () => {
+  for (const [p, stand] of [['impressum.html', '4. November 2026'], ['datenschutz.html', '12. November 2026'], ['agb.html', '12. November 2026']]) {
     const t = text(read(p));
     assert.ok(t.includes(`Stand: ${stand}`) && !/ENTWURF|\[[^\]]*\]/.test(t), `${p}: veröffentlichte Fassung ohne Platzhalter`);
   }
@@ -197,20 +197,12 @@ test('Schriften selbst ausgeliefert: keine externen Ressourcen, CSP nur eigene H
 /* Startseite gegenüber main (c69cd1b, letzter Stand vor dem Soft-Launch): ersetzt im Soft-Launch den Hero-Schutz aus tests/static.test.mjs.
    Jede Zeile ist eine einzeln freigegebene Änderung; alles andere muss gleich bleiben. */
 const MAIN_SHA = 'c69cd1b3cb7dba1426df5006890fec3417841c9f';
-/* Go-live (PXK-155): Hero-Formular nach AGB § 3 und § 4 (Fassung 2026-11-04) – drei eigene, nicht vorausgewählte Kästchen (Beauftragung/AGB mit
-   Kenntnisnahme der Datenschutzerklärung, Unternehmer, freiwillige Werbeeinwilligung) im Wortlaut, den der Worker als Nachweis speichert
-   (worker/src/view.ts, DECLARATIONS), und die Schaltfläche „Analyse anfragen“. Sonst der Hero wie in main. */
+/* Go-live (PXK-155, PO-Entscheidung 12.11.2026): Hero nur mit Website-Adresse und „Analysieren“; das Formular sendet die Adresse
+   (Aktion „adresse“) an den Worker, der die Bestätigungsseite mit genau einem Kästchen zeigt. Gegenüber main entfallen das AGB-Feld
+   und das Kästchen samt Fehlertext; Schaltfläche, Fehlertext zur Adresse und Hinweiszeile bleiben wie in main. */
 const FORMULAR_AENDERUNGEN = [
-  /* Aktivierung (PXK-155): das Formular zeigt die freigegebene AGB-Fassung, gleich TERMS_VERSION im Worker */
-  ['<input type="hidden" name="agb_version" value="ENTWURF-2026-10-31">', '<input type="hidden" name="agb_version" value="2026-11-04">'],
-  ['<button class="btn btn--accent" type="submit">Analysieren <svg class="i"><use href="#i-arrow"/></svg></button>', '<button class="btn btn--accent" type="submit">Analyse anfragen <svg class="i"><use href="#i-arrow"/></svg></button>'],
-  ['      <label class="consent consent--hero"><input id="agb" type="checkbox" name="agb" value="1" required><span>Ich akzeptiere die <a href="agb.html">AGB</a> von 360°Pixelkiez.</span></label>\n      <p class="form-error" id="agb-error" hidden>Bitte akzeptieren Sie die AGB, damit wir Ihre Website analysieren können.</p>\n      <p class="hero-note">Kostenlose Website-Analyse – 0 €, kein Abo. <a href="datenschutz.html">Datenschutzerklärung</a></p>\n',
-    '      <label class="consent consent--hero"><input id="agb" type="checkbox" name="agb" value="1" required><span>Ich beauftrage die kostenlose Website-Analyse für die angegebene Adresse. Es gelten die <a href="agb.html">AGB</a>. Die <a href="datenschutz.html">Datenschutzerklärung</a> habe ich zur Kenntnis genommen.</span></label>\n'
-    + '      <p class="form-error" id="agb-error" hidden>Bitte bestätigen Sie die Beauftragung und die AGB, damit wir Ihre Website analysieren können.</p>\n'
-    + '      <label class="consent consent--hero"><input id="unternehmer" type="checkbox" name="unternehmer" value="1" required><span>Ich frage die Analyse als Unternehmer an (gewerblich, freiberuflich, Verein oder Organisation, § 14 BGB).</span></label>\n'
-    + '      <p class="form-error" id="unternehmer-error" hidden>Die Analyse ist nur für Unternehmer möglich. Bitte bestätigen Sie, dass Sie als Unternehmer anfragen.</p>\n'
-    + '      <label class="consent consent--hero consent--freiwillig"><input id="werbung" type="checkbox" name="werbung" value="1"><span>Freiwillig: Ja, 360°Pixelkiez darf mir per E-Mail Informationen und Angebote zur Website-Analyse von 360°Pixelkiez, Fachinformationen zu Website-Technik, SEO und KI-Auffindbarkeit sowie Bitten um Feedback zu meinem Bericht senden – auch als Newsletter. Ich kann diese Einwilligung jederzeit widerrufen, z. B. über den Abmeldelink in jeder E-Mail oder per Mail an 360@pixelkiez.de. Details: <a href="datenschutz.html#werbung">Datenschutzerklärung, Abschnitt 12</a>.</span></label>\n'
-    + '      <p class="hero-note">Kostenlose Website-Analyse – 0 €, kein Abo. Den Bericht erhalten Sie auch ohne Einwilligung in werbliche E-Mails. <a href="datenschutz.html">Datenschutzerklärung</a></p>\n'],
+  ['      <input type="hidden" name="action" value="start">\n      <input type="hidden" name="agb_version" value="ENTWURF-2026-10-31">\n', '      <input type="hidden" name="action" value="adresse">\n'],
+  ['      <label class="consent consent--hero"><input id="agb" type="checkbox" name="agb" value="1" required><span>Ich akzeptiere die <a href="agb.html">AGB</a> von 360°Pixelkiez.</span></label>\n      <p class="form-error" id="agb-error" hidden>Bitte akzeptieren Sie die AGB, damit wir Ihre Website analysieren können.</p>\n', ''],
 ];
 test('Startseite gegenüber main: nur Hero-Formular nach AGB (bzw. im Soft-Launch der Hinweis), Schriften-Fix, Partner, Logo, Favicon, Videos und Hintergrundbild aus R2 – sonst unverändert', () => {
   const main = execFileSync('git', ['show', `${MAIN_SHA}:public/index.html`], { cwd: ROOT, encoding: 'utf8' });

@@ -85,21 +85,15 @@
     <h1 class="h1">Sehen Sie, was Ihre Website <em>ausbremst</em>.</h1>
     <p class="lead">Pixelkiez prüft Ihre Website persönlich in sechs Bereichen, inklusive GEO &amp; AI Visibility. Den Bericht erhalten Sie kostenlos als PDF mit sieben Seiten per E-Mail.</p>
     <form class="analyze" id="analyze" action="/api/anfrage" method="post" novalidate>
-      <input type="hidden" name="action" value="start">
-      <input type="hidden" name="agb_version" value="2026-11-04">
+      <input type="hidden" name="action" value="adresse">
       <label class="sr-only" for="url">Adresse Ihrer Website</label>
       <div class="url-field">
         <svg class="i"><use href="#i-globe"/></svg>
         <input id="url" name="website" type="text" inputmode="url" autocomplete="url" maxlength="2048" placeholder="ihre-website.de">
-        <button class="btn btn--accent" type="submit">Analyse anfragen <svg class="i"><use href="#i-arrow"/></svg></button>
+        <button class="btn btn--accent" type="submit">Analysieren <svg class="i"><use href="#i-arrow"/></svg></button>
       </div>
       <p class="form-error" id="url-error" hidden>Bitte geben Sie eine öffentliche Website-Adresse wie beispiel.de ein.</p>
-      <label class="consent consent--hero"><input id="agb" type="checkbox" name="agb" value="1" required><span>Ich beauftrage die kostenlose Website-Analyse für die angegebene Adresse. Es gelten die <a href="agb.html">AGB</a>. Die <a href="datenschutz.html">Datenschutzerklärung</a> habe ich zur Kenntnis genommen.</span></label>
-      <p class="form-error" id="agb-error" hidden>Bitte bestätigen Sie die Beauftragung und die AGB, damit wir Ihre Website analysieren können.</p>
-      <label class="consent consent--hero"><input id="unternehmer" type="checkbox" name="unternehmer" value="1" required><span>Ich frage die Analyse als Unternehmer an (gewerblich, freiberuflich, Verein oder Organisation, § 14 BGB).</span></label>
-      <p class="form-error" id="unternehmer-error" hidden>Die Analyse ist nur für Unternehmer möglich. Bitte bestätigen Sie, dass Sie als Unternehmer anfragen.</p>
-      <label class="consent consent--hero consent--freiwillig"><input id="werbung" type="checkbox" name="werbung" value="1"><span>Freiwillig: Ja, 360°Pixelkiez darf mir per E-Mail Informationen und Angebote zur Website-Analyse von 360°Pixelkiez, Fachinformationen zu Website-Technik, SEO und KI-Auffindbarkeit sowie Bitten um Feedback zu meinem Bericht senden – auch als Newsletter. Ich kann diese Einwilligung jederzeit widerrufen, z. B. über den Abmeldelink in jeder E-Mail oder per Mail an 360@pixelkiez.de. Details: <a href="datenschutz.html#werbung">Datenschutzerklärung, Abschnitt 12</a>.</span></label>
-      <p class="hero-note">Kostenlose Website-Analyse – 0 €, kein Abo. Den Bericht erhalten Sie auch ohne Einwilligung in werbliche E-Mails. <a href="datenschutz.html">Datenschutzerklärung</a></p>
+      <p class="hero-note">Kostenlose Website-Analyse – 0 €, kein Abo. <a href="datenschutz.html">Datenschutzerklärung</a></p>
       <div class="facts">
         <span><svg class="i"><use href="#i-check"/></svg>0 €</span>
         <span><svg class="i"><use href="#i-check"/></svg>Sechs Bereiche</span>

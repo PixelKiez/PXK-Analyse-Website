@@ -254,8 +254,10 @@ eingebundenen Videos.
 ## 8. Daten, Backup, Aufbewahrung
 
 - Je Auftrag: Referenz, Google-Kennung, bestätigte E-Mail, Website, Datenschutz- und AGB-Version, Zeitpunkte, Unternehmer-Bestätigung,
-  Werbeeinwilligung (ja/nein), Wortlaut der bestätigten Kästchen (Migration 0003), Bearbeitungs- und Zustellstatus. Werbeeinwilligungen
-  zusätzlich in `marketing_consents` (ohne Website-Adresse; bis zum Widerruf, dann `revoked_at` setzen – Sperrliste).
+  Werbeeinwilligung (ja/nein), Wortlaut der bestätigten Kästchen (Migration 0003), Bearbeitungs- und Zustellstatus. Seit der
+  Bestätigungsseite mit einem Kästchen (PO-Entscheidung 12.11.2026) wird keine Werbeeinwilligung abgefragt: neue Aufträge speichern
+  `marketing_consent = 0` und den Wortlaut des einen Kästchens; `marketing_consents` bekommt keine neuen Zeilen (bestehende Zeilen
+  bleiben bis zum Widerruf, dann `revoked_at` setzen – Sperrliste).
   Sessions (Hash der Cookie-ID, Ablauf nach 1 h) und pseudonymisierte Rate-Limits löscht der Cron. Keine Tokens.
 - Backup: D1 Time Travel; vor jeder Schemaänderung zusätzlich `npx wrangler d1 export pxwa --remote --output pxwa-<datum>.sql`
   (enthält personenbezogene Daten: verschlüsselt ablegen, nie ins Repository).
@@ -328,8 +330,9 @@ Tabellen `orders`, `notifications`, `sessions`, `rate_limits`, `marketing_consen
 ### 11.3 Reihenfolge
 
 0. **Aktivierungs-Commit** (nach Freigabe der Rechtstexte; `MAIL_FROM` = `anfrage@360.pixelkiez.de` seit `5f94a07`):
-   `TERMS_VERSION`/`PRIVACY_VERSION` in `worker/wrangler.toml` ohne „ENTWURF“, gleiche AGB-Version im Feld `agb_version` der
-   Startseite, ggf. korrigierte Datenschutzerklärung mit neuer Version. `ACCESS_MODE` bleibt `"testnutzer"`. Danach CI am
+   `TERMS_VERSION`/`PRIVACY_VERSION` in `worker/wrangler.toml` ohne „ENTWURF“ (seit der Bestätigungsseite mit einem Kästchen:
+   genau die Fassung `2026-11-12` aus `public/agb.html` und `public/datenschutz.html`; das Feld `agb_version` steht nur noch auf der
+   Bestätigungsseite des Workers), ggf. korrigierte Rechtstexte mit neuer Version. `ACCESS_MODE` bleibt `"testnutzer"`. Danach CI am
    exakten SHA, `npm ci`, `npm run typecheck`, `npm test`, `npm run test:release` im frischen Klon.
 1. **D1-Migration** (in `worker/`): `npx wrangler d1 time-travel info pxwa` (Bookmark notieren),
    `npx wrangler d1 migrations list pxwa --remote` (erwartet 0001–0003 offen), `npx wrangler d1 migrations apply pxwa --remote`.
@@ -347,7 +350,8 @@ Tabellen `orders`, `notifications`, `sessions`, `rate_limits`, `marketing_consen
    Testnutzer zu, und der Worker (`ACCESS_MODE = "testnutzer"`) legt nur für Konten aus `ACCESS_ALLOWLIST` einen Auftrag an;
    jedes andere Konto erhält 403 ohne Auftrag und ohne Mail.
    Readback: 200 auf `/api/anfrage`, statische Dateien bytegleich, `/api/*` ohne Binding auf `*.pages.dev`-Vorschau 503.
-   Kontrollierter Test mit dem Google-Testkonto: Website eingeben, Kästchen, Google → Referenz `PXA-…`; D1: genau 1 Auftrag,
+   Kontrollierter Test mit dem Google-Testkonto: Website eingeben, „Analysieren“, auf der Bestätigungsseite das eine Kästchen,
+   „Mit Google fortfahren“ → „Vielen Dank für Ihre Anfrage.“ mit Referenz `PXA-…`; D1: genau 1 Auftrag, `marketing_consent = 0`,
    `notifications.status = 'sent'`; genau 1 Mail in `360@pixelkiez.de` (Absender, Message-ID, SPF/DKIM notieren); zweiter
    Rücksprung und erneute Anfrage derselben Website erzeugen keinen zweiten Auftrag; ohne Kästchen 422 und kein Auftrag.
    Danach Testdaten löschen (Abschnitt 9).
@@ -355,7 +359,8 @@ Tabellen `orders`, `notifications`, `sessions`, `rate_limits`, `marketing_consen
 5. **Öffentliche Aktivierung**: eigener Commit `ACCESS_MODE = "offen"` (CI wie 0), Worker aus genau diesem SHA deployen
    (`ACCESS_ALLOWLIST` danach mit `npx wrangler secret delete ACCESS_ALLOWLIST` entfernen), dann Pages aus demselben SHA
    (wie 3, aber `public/` und `functions/` des Kandidaten). Readback:
-   22 Seiten bytegleich zum Tree, Hero-Formular mit drei Kästchen, CSP `form-action 'self' https://accounts.google.com`,
+   22 Seiten bytegleich zum Tree, Hero mit Adressfeld und „Analysieren“ (ohne Kästchen), Bestätigungsseite mit genau einem
+   Kästchen, CSP `form-action 'self' https://accounts.google.com`,
    Videos 206, Konsolenfehler 0 (Chromium/WebKit, mobil/Desktop). Ein kontrollierter Auftrag wie in 3, danach löschen.
 
 ### 11.4 Rollback und geschlossenes Anfrage-Gate
