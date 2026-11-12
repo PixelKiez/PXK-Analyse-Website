@@ -226,7 +226,13 @@ test('Hero (PO-Entscheidung 12.11.2026): nur Website-Adresse und „Analysieren�
   assert.ok(!/DECLARATIONS\.(terms|business|marketing)|werbung|Newsletter/.test(view), 'view.ts: keine weiteren Erklärungen, kein Werbe-Opt-in');
   const agb = H.norm(H.textOf(H.byTag(H.parse(read('public/agb.html')).root, 'main')[0]));
   assert.ok(agb.includes(`mit dem Wortlaut „${wortlaut}“`), 'AGB § 4 Abs. 1 nennt genau den Wortlaut');
-  for (const s of ['klickt auf die Schaltfläche „Analysieren“', 'Seite „Analyse anfragen“', 'klickt auf die Schaltfläche „Mit Google fortfahren“']) assert.ok(agb.includes(s), `AGB § 3 Abs. 2: „${s}“`);
+  /* Die Schaltfläche der Bestätigungsseite heißt in AGB § 3 Abs. 2 und in der Datenschutzerklärung genau wie in view.ts */
+  const knopf = /aria-describedby="google-hinweis">([^<]+)<\/button>/.exec(view)[1];
+  assert.equal(knopf, 'Mit Google anmelden');
+  for (const s of ['klickt auf die Schaltfläche „Analysieren“', 'Seite „Analyse anfragen“', `klickt auf die Schaltfläche „${knopf}“`]) assert.ok(agb.includes(s), `AGB § 3 Abs. 2: „${s}“`);
+  const ds = H.norm(H.textOf(H.byTag(H.parse(read('public/datenschutz.html')).root, 'main')[0]));
+  assert.ok(ds.includes(`klicken auf „${knopf}“`), 'Datenschutzerklärung nennt dieselbe Schaltfläche');
+  assert.ok(![view, agb, ds].some(t => t.includes('Mit Google fortfahren')), 'alte Beschriftung nirgends mehr');
 });
 
 /* Ersetzt durch den Test „Startseite gegenüber main“ in tests/softlaunch.test.mjs: Er vergleicht die ganze Startseite bytegenau mit main
@@ -333,7 +339,7 @@ test('Wahrheitsgemäße Aussagen: kein Premium/Checkout/Abo/Dashboard/Score, kei
   assert.ok(analyse.length >= 2 && !analyse.some(x => /Score/.test(x.split('(')[0])), 'Analyseseiten: Score erlaubt, Premium und Garantie bleiben verboten');
   assert.ok(claimProblems([['Probe', 'Ihr Pixelkiez Score.']]).length >= 1, 'Angebotsseiten: Score bleibt verboten');
   assert.deepEqual(claimProblems([['view.ts', viewText()]]), []);
-  for (const s of ['Kostenlos · 0 € · kein Abonnement', 'Analyse anfragen', 'Mit Google fortfahren', 'Adresse ändern', 'Vielen Dank für Ihre Anfrage.',
+  for (const s of ['Kostenlos · 0 € · kein Abonnement', 'Analyse anfragen', 'Mit Google anmelden', 'Wir senden die PDF an die angemeldete Google E-Mail-Adresse.', 'Adresse ändern', 'Vielen Dank für Ihre Anfrage.',
     'Ihre Anfrage ist bei uns eingegangen. Wir melden uns per E-Mail bei Ihnen.', 'Diese Website ist bereits angefragt.']) {
     assert.ok(viewText().includes(s), `view.ts enthält "${s}"`);
   }

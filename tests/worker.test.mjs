@@ -77,7 +77,8 @@ test('Hero → Bestätigung → Google: „Analysieren“ führt zur Bestätigun
   assert.equal(textOf(label), ERKLAERUNG, 'Wortlaut wie gespeichert (DECLARATIONS)');
   assert.equal(ERKLAERUNG, 'Ich handle geschäftlich oder für eine Organisation, akzeptiere die AGB und habe die Datenschutzerklärung zur Kenntnis genommen.');
   assert.deepEqual([...label.matchAll(/<a href="([^"]+)">([^<]+)<\/a>/g)].map(m => [m[1], m[2]]), [['/agb.html', 'AGB'], ['/datenschutz.html', 'Datenschutzerklärung']]);
-  assert.match(page.text, /<button class="btn btn--accent btn--block" type="submit">Mit Google fortfahren<\/button>/);
+  assert.match(page.text, /<button class="btn btn--accent btn--block" type="submit" aria-describedby="google-hinweis">Mit Google anmelden<\/button><p class="anfrage-google" id="google-hinweis">Wir senden die PDF an die angemeldete Google E-Mail-Adresse\.<\/p><\/form>/, 'Schaltfläche, direkt darunter der Hinweis zur PDF');
+  assert.ok(!/fortfahren<\/button>/.test(page.text), 'alte Beschriftung entfernt');
   assert.match(page.text, /<p class="anfrage-hinweis">Kostenlos · 0 € · kein Abonnement<\/p>/);
   assert.match(page.text, /<a class="anfrage-aendern" href="\/index\.html#top">Adresse ändern<\/a>/);
   assert.equal(field(page.text, 'agb_version'), TERMS_VERSION);

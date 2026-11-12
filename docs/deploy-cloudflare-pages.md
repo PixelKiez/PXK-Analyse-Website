@@ -351,7 +351,7 @@ Tabellen `orders`, `notifications`, `sessions`, `rate_limits`, `marketing_consen
    jedes andere Konto erhält 403 ohne Auftrag und ohne Mail.
    Readback: 200 auf `/api/anfrage`, statische Dateien bytegleich, `/api/*` ohne Binding auf `*.pages.dev`-Vorschau 503.
    Kontrollierter Test mit dem Google-Testkonto: Website eingeben, „Analysieren“, auf der Bestätigungsseite das eine Kästchen,
-   „Mit Google fortfahren“ → „Vielen Dank für Ihre Anfrage.“ mit Referenz `PXA-…`; D1: genau 1 Auftrag, `marketing_consent = 0`,
+   „Mit Google anmelden“ → „Vielen Dank für Ihre Anfrage.“ mit Referenz `PXA-…`; D1: genau 1 Auftrag, `marketing_consent = 0`,
    `notifications.status = 'sent'`; genau 1 Mail in `360@pixelkiez.de` (Absender, Message-ID, SPF/DKIM notieren); zweiter
    Rücksprung und erneute Anfrage derselben Website erzeugen keinen zweiten Auftrag; ohne Kästchen 422 und kein Auftrag.
    Danach Testdaten löschen (Abschnitt 9).

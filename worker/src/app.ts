@@ -12,7 +12,7 @@ import { normalizeWebsite } from './url';
 import { View } from './view';
 
 /* Ablauf (PO-Entscheidung 12.11.2026): Website-Adresse im Hero, „Analysieren“ (adresse) → Bestätigungsseite mit genau einem
-   Pflichtkästchen, „Mit Google fortfahren“ (start) → Google-Anmeldung → Rückkehr (callback) legt den Auftrag an →
+   Pflichtkästchen, „Mit Google anmelden“ (start) → Google-Anmeldung → Rückkehr (callback) legt den Auftrag an →
    Eingangsbestätigung mit Referenz. adresse prüft die Website und hält sie nur für die Bestätigungsseite in der Session (POST,
    nie in einer URL, nie an Google). start erfasst die Zustimmung serverseitig (Version, Zeitpunkt, normalisierte Website) und
    bindet sie an genau diese Google-Anmeldung (state) in dieser Session. Nur ein gültiger Callback mit gültiger, aktueller
@@ -134,7 +134,7 @@ class App {
     return this.redirect(this.config.baseUrl + '/api/anfrage');
   }
 
-  /* „Mit Google fortfahren“ auf der Bestätigungsseite */
+  /* „Mit Google anmelden“ auf der Bestätigungsseite */
   private async start(session: Session | null, form: URLSearchParams): Promise<Response> {
     if (!(await this.limiter().allow('start', clientIp(this.request), LIMITS.startPerIp, this.now))) {
       return this.respond(429, this.view.error('Zu viele Versuche', 'Bitte warten Sie einige Minuten und versuchen Sie es dann erneut.'));

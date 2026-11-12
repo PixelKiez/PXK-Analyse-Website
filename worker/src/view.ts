@@ -37,8 +37,9 @@ export class View {
   }
 
   /* Bestätigungsseite (AGB § 3 Abs. 2 b, § 4 Abs. 1): eingegebene Adresse, genau ein Pflichtkästchen, nicht vorausgewählt, mit
-     funktionierenden Links zu AGB und Datenschutzerklärung, dann „Mit Google fortfahren“. Das Formular trägt Adresse und AGB-Version
-     dieser Seite; der Worker prüft beides und das Häkchen verbindlich, bevor er zu Google weiterleitet. Ohne JavaScript bedienbar. */
+     funktionierenden Links zu AGB und Datenschutzerklärung, dann „Mit Google anmelden“ und direkt darunter der Hinweis, wohin die PDF
+     geht. Das Formular trägt Adresse und AGB-Version dieser Seite; der Worker prüft beides und das Häkchen verbindlich, bevor er zu
+     Google weiterleitet. Ohne JavaScript bedienbar. */
   confirm(termsVersion: string, url: string, error: string | null = null, notice: string | null = null): string {
     const base = h(this.base);
     const invalid = error !== null ? ' aria-invalid="true" aria-describedby="bestaetigung-error" autofocus' : '';
@@ -55,7 +56,8 @@ export class View {
       /* autocomplete="off": Browser stellen das Häkchen beim Zurückblättern nicht wieder her – es ist nie vorausgewählt */
       + `<label class="consent"><input id="bestaetigung" type="checkbox" name="bestaetigung" value="1" autocomplete="off" required${invalid}><span>${label}</span></label>`
       + (error !== null ? `<p class="form-error" id="bestaetigung-error" role="alert">${h(error)}</p>` : '')
-      + '<button class="btn btn--accent btn--block" type="submit">Mit Google fortfahren</button>'
+      + '<button class="btn btn--accent btn--block" type="submit" aria-describedby="google-hinweis">Mit Google anmelden</button>'
+      + '<p class="anfrage-google" id="google-hinweis">Wir senden die PDF an die angemeldete Google E-Mail-Adresse.</p>'
       + '</form>'
       + HINWEIS;
     return this.page('Analyse anfragen', body);

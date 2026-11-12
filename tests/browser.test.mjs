@@ -640,6 +640,9 @@ const bestaetigung = page => page.evaluate(() => {
     links: [...document.querySelectorAll('label.consent a')].map(a => [new URL(a.href).pathname, a.textContent]),
     label: document.querySelector('label.consent').textContent,
     button: document.querySelector('.anfrage-form button[type=submit]').textContent.trim(), hinweis: document.querySelector('.anfrage-hinweis').textContent,
+    google: document.querySelector('.anfrage-form .btn + .anfrage-google').textContent, googleRect: r('.anfrage-google'),
+    googleStil: (st => ({ size: parseFloat(st.fontSize), align: st.textAlign, font: st.fontFamily }))(getComputedStyle(document.querySelector('.anfrage-google'))),
+    beschrieben: document.querySelector('.anfrage-form .btn').getAttribute('aria-describedby'),
     karte: r('.anfrage'), knopf: r('.anfrage-form .btn'), vw: document.documentElement.clientWidth, vh: innerHeight,
   };
 });
@@ -658,9 +661,11 @@ const settle = page => page.evaluate(() => new Promise(done => {
   const tick = () => { if (scrollY === last) same++; else { same = 0; last = scrollY; } if (same >= 10) done(scrollY); else requestAnimationFrame(tick); };
   requestAnimationFrame(tick);
 }));
-/* Fokus per autofocus nach dem Laden (WebKit setzt ihn mit kurzer Verzögerung). Abfrage im festen Takt statt per
-   requestAnimationFrame: das wird unter Last im kopflosen Browser gedrosselt (Gesamtlauf), der Fokus selbst ist dann längst gesetzt */
-const fokusAuf = (page, id) => page.waitForFunction(i => document.activeElement && document.activeElement.id === i, id, { timeout: 5000, polling: 100 });
+/* Fokus per autofocus nach dem Laden (WebKit setzt ihn mit kurzer Verzögerung, Chromium erst nach den Stylesheets). Abfrage
+   Node-seitig: page.waitForFunction pollt mit javaScriptEnabled: false im Seitenkontext nicht (weder Takt noch
+   requestAnimationFrame), dann zählte nur die erste Prüfung. Gleiche Bedingung, gleiches Limit von 5 s */
+const fokusAuf = (page, id) => waitFor(async () => (await page.evaluate(() => document.activeElement && document.activeElement.id).catch(() => null)) === id,
+  { timeout: 5000, what: `Fokus auf #${id}` });
 /* Die Fehlerseite (422) melden Browser für das Dokument selbst als Konsolenfehler; das ist die gewollte Antwort des Workers */
 const ohne422 = errors => errors.filter(e => !/status of 422/.test(e));
 
@@ -687,13 +692,19 @@ test('Nutzerreise im Browser (Chromium und WebKit, 320/390/768/1440): Hero „An
           /* Bestätigungsseite */
           const b = await bestaetigung(page);
           assert.deepEqual([b.h1, b.url, b.boxes, b.checked, b.required, b.button, b.hinweis],
-            ['Analyse anfragen', 'https://musterfirma.de', 1, false, true, 'Mit Google fortfahren', 'Kostenlos · 0 € · kein Abonnement'], `${what}: Inhalt der Bestätigungsseite`);
+            ['Analyse anfragen', 'https://musterfirma.de', 1, false, true, 'Mit Google anmelden', 'Kostenlos · 0 € · kein Abonnement'], `${what}: Inhalt der Bestätigungsseite`);
+          /* Hinweis direkt unter der Schaltfläche: genauer Wortlaut, dezent (Archivo, 14 px), mittig, Abstand 8–16 px, ganz in der Karte */
+          const gAbstand = b.googleRect.top - b.knopf.bottom, gMitte = (b.googleRect.left + b.googleRect.right) / 2 - (b.knopf.left + b.knopf.right) / 2;
+          assert.deepEqual([b.google, b.beschrieben, b.googleStil.align, b.googleStil.size >= 14, /Archivo/.test(b.googleStil.font)],
+            ['Wir senden die PDF an die angemeldete Google E-Mail-Adresse.', 'google-hinweis', 'center', true, true], `${what}: Hinweis unter der Schaltfläche`);
+          assert.ok(gAbstand >= 8 && gAbstand <= 16 && Math.abs(gMitte) <= 1.5, `${what}: Hinweis ${Math.round(gAbstand)} px unter der Schaltfläche, mittig (${gMitte.toFixed(1)})`);
+          assert.ok(b.googleRect.left >= b.karte.left && b.googleRect.right <= b.karte.right && b.googleRect.bottom <= b.karte.bottom, `${what}: Hinweis innerhalb der Karte`);
           assert.equal(b.label.replace(/\s+/g, ' ').trim(), 'Ich handle geschäftlich oder für eine Organisation, akzeptiere die AGB und habe die Datenschutzerklärung zur Kenntnis genommen.');
           assert.deepEqual(b.links, [['/agb.html', 'AGB'], ['/datenschutz.html', 'Datenschutzerklärung']], `${what}: AGB und Datenschutzerklärung verlinkt`);
           assert.ok(await overflow(page) <= 0, `${what}: kein seitlicher Überlauf`);
           assert.ok(b.karte.width <= 520.5 && b.karte.left >= 0 && b.karte.right <= b.vw, `${what}: Karte schmal (${Math.round(b.karte.width)} px) und im Bild`);
           assert.ok(Math.abs(b.karte.left - (b.vw - b.karte.right)) <= 1.5, `${what}: Karte mittig (${Math.round(b.karte.left)} | ${Math.round(b.vw - b.karte.right)})`);
-          assert.ok(b.knopf.bottom <= b.vh, `${what}: „Mit Google fortfahren“ im ersten Bildschirm (${Math.round(b.knopf.bottom)} von ${b.vh} px)`);
+          assert.ok(b.knopf.bottom <= b.vh, `${what}: „Mit Google anmelden“ im ersten Bildschirm (${Math.round(b.knopf.bottom)} von ${b.vh} px)`);
           st.diagnostic(`${what}: Karte ${Math.round(b.karte.width)} px breit, Schaltfläche endet bei ${Math.round(b.knopf.bottom)} von ${b.vh} px`);
           await shot('2-bestaetigung');
           /* Ohne Häkchen: Fehler am Kästchen (Server, auch ohne JavaScript), Fokus dorthin, kein Google, kein Auftrag */
@@ -765,11 +776,11 @@ test('Tastatur: ungültige Adresse bleibt im Hero (Fokus, nichts gesendet); Best
     await Promise.all([page.waitForURL(`${app.base}/api/anfrage`), page.keyboard.press('Enter')]);
     await page.waitForLoadState('load');
     assert.equal(await page.textContent('h1'), 'Analyse anfragen');
-    /* Tab-Reihenfolge auf der Bestätigungsseite: … Adresse ändern → Kästchen → AGB → Datenschutzerklärung → Mit Google fortfahren */
+    /* Tab-Reihenfolge auf der Bestätigungsseite: … Adresse ändern → Kästchen → AGB → Datenschutzerklärung → Mit Google anmelden */
     const box = await tabTo(page, f => f.id === 'bestaetigung');
     assert.ok(box.visible, 'Fokus auf dem Kästchen sichtbar');
     const knopf = await tabTo(page, f => f.tag === 'BUTTON', 4);
-    assert.deepEqual([knopf.text, knopf.visible], ['Mit Google fortfahren', true], 'Fokus auf der Schaltfläche sichtbar');
+    assert.deepEqual([knopf.text, knopf.visible], ['Mit Google anmelden', true], 'Fokus auf der Schaltfläche sichtbar');
     await Promise.all([page.waitForSelector('#bestaetigung-error'), page.keyboard.press('Enter')]);
     await fokusAuf(page, 'bestaetigung');
     assert.deepEqual(await page.evaluate(() => [document.activeElement.getAttribute('aria-invalid'), document.activeElement.getAttribute('aria-describedby'), document.querySelector('#bestaetigung-error').getAttribute('role')]), ['true', 'bestaetigung-error', 'alert']);
@@ -799,7 +810,7 @@ test('Tastatur: ungültige Adresse bleibt im Hero (Fokus, nichts gesendet); Best
   }
 });
 
-test('Kleine Bildschirme (320×568, 360×640) in Chromium und WebKit: ungültige Adresse zeigt Feld und Fehlertext im Bild; auf der Bestätigungsseite zeigt „Mit Google fortfahren“ ohne Häkchen Kästchen und Fehlertext vollständig im Bild, Fokus am Kästchen; nichts gesendet, kein Auftrag', { skip: formSkip }, async t => {
+test('Kleine Bildschirme (320×568, 360×640) in Chromium und WebKit: ungültige Adresse zeigt Feld und Fehlertext im Bild; auf der Bestätigungsseite zeigt „Mit Google anmelden“ ohne Häkchen Kästchen und Fehlertext vollständig im Bild, Fokus am Kästchen; nichts gesendet, kein Auftrag', { skip: formSkip }, async t => {
   let wk = null;
   try { wk = await pw.webkit.launch(); } catch { /* unten als NOT_RUN gemeldet */ }
   try {

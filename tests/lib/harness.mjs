@@ -468,7 +468,7 @@ export const field = (html, name) => (html.match(new RegExp(`name="${name}" valu
 /* Hero absenden („Analysieren“): nur die Website-Adresse */
 export const addressForm = (website = 'musterfirma.de') => ({ action: 'adresse', website });
 
-/* Bestätigungsseite absenden („Mit Google fortfahren“): Website, das eine Kästchen (true setzt "1", false lässt es weg, ein String
+/* Bestätigungsseite absenden („Mit Google anmelden“): Website, das eine Kästchen (true setzt "1", false lässt es weg, ein String
    setzt den Wert) und die angezeigte AGB-Version */
 const box = (name, v) => (v === true ? { [name]: '1' } : v === false ? {} : { [name]: v });
 export const startForm = ({ website = 'musterfirma.de', bestaetigung = true, agbVersion = TERMS_VERSION, extra = {} } = {}) => ({

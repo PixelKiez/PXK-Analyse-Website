@@ -22,6 +22,8 @@
 .anfrage-form .url-field { height: auto; min-height: 60px; padding-left: 20px; }
 .anfrage-form .url-field .btn { height: 46px; padding: 0 22px; }
 .anfrage-hinweis { font: 400 13px/1.4 var(--font-mono); letter-spacing: .02em; color: var(--ink-45); text-align: center; }
+/* Hinweis direkt unter „Mit Google anmelden“: dezent, mittig, 12 px Abstand zur Schaltfläche (Rasterabstand 18 px − 6 px) */
+.anfrage-google { margin-top: -6px; font-size: 14px; line-height: 1.5; color: var(--ink-70); text-align: center; text-wrap: pretty; }
 .anfrage > .btn { justify-self: start; }
 /* Eingangsbestätigung: Zeichen, Dank, kurzer Text, Website, E-Mail und Referenz dezent als Liste, zurück zur Startseite */
 .anfrage-fertig { display: grid; gap: 20px; justify-items: center; text-align: center; }

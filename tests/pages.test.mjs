@@ -463,7 +463,7 @@ test('Lokales Pages mit Worker über das Service Binding: Hero „Analysieren“
     const confirm = await c.req('GET', '/api/anfrage');
     assert.match(confirm.text, /<h1 class="anfrage-titel">Analyse anfragen<\/h1>/);
     assert.equal((confirm.text.match(/type="checkbox"/g) || []).length, 1, 'genau ein Kästchen');
-    assert.match(confirm.text, /Mit Google fortfahren/);
+    assert.match(confirm.text, />Mit Google anmelden<\/button><p class="anfrage-google" id="google-hinweis">Wir senden die PDF an die angemeldete Google E-Mail-Adresse\.<\/p>/);
     /* Ohne Häkchen lehnt der Worker auch hinter der Function ab: keine Weiterleitung, keine neue Session */
     const noBox = await c.req('POST', '/api/anfrage', { form: startForm({ website: field(confirm.text, 'website'), bestaetigung: false }) });
     assert.deepEqual([noBox.status, noBox.location, noBox.headers.getSetCookie().length], [422, null, 0]);
