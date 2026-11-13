@@ -615,6 +615,28 @@ test('Tageslimit je Google-Konto: höchstens fünf Aufträge in 24 Stunden', { s
   await settled();
 });
 
+test('Tagesgrenze aller Aufträge (50 in 24 Stunden, viele Konten und IPs): danach kein Auftrag, keine Outbox, keine Mail; ältere Aufträge zählen nicht', { skip }, async () => {
+  await reset();
+  /* 50 Aufträge anderer Konten in den letzten 24 Stunden, einer davon älter (zählt nicht) */
+  const now = Math.floor(Date.now() / 1000);
+  for (let i = 1; i <= 50; i++) {
+    await app.run("INSERT INTO orders (reference, idempotency_key, google_sub, email, website_url, privacy_version, created_at) VALUES (?1, ?1, ?2, 'k@beispiel-kunde.de', 'https://firma.de', 'TEST', ?3)",
+      `PXA-GLOB-${String(i).padStart(4, '0')}`, `sub-${i}`, utc(i === 1 ? now - 2 * 86400 : now - 60));
+  }
+  const frei = (await login(new Client(app, { ip: '198.51.100.120' }), google, { website: 'firma-frei.de' })).callback;
+  assert.equal(frei.status, 303, '49 Aufträge in 24 Stunden: der 50. wird angenommen');
+  await settled();
+  mail.reset();
+  const voll = (await login(new Client(app, { ip: '198.51.100.121' }), google, { website: 'firma-voll.de', claims: { sub: '100000000000000000077', email: 'neu@beispiel-kunde.de' } })).callback;
+  assert.equal(voll.status, 429);
+  assert.equal(voll.location, null, 'keine Bestätigung');
+  assert.match(textOf(voll.text), /Heute sind bereits sehr viele Anfragen eingegangen\. Es wurde keine Anfrage gespeichert\./);
+  assert.deepEqual(await counts(), { orders: 51, outbox: 1, mails: 0 });
+  await waitFor(() => app.logs().includes('Tagesgrenze aller Aufträge erreicht'), { what: 'Log Tagesgrenze' });
+  assert.ok(!app.logs().includes('neu@beispiel-kunde.de') && !app.logs().includes('firma-voll'), 'Log ohne Adressen');
+  await reset();
+});
+
 test('Testbetrieb (ACCESS_MODE testnutzer): nur freigeschaltete Google-Konten legen einen Auftrag an; andere Konten 403 ohne Auftrag, Outbox und Mail, Adresse nicht im Log', { skip }, async () => {
   /* Eigenes Mock-Google: startWorker setzt dort die Redirect-URI dieses Workers */
   const g2 = await mockGoogle().start();

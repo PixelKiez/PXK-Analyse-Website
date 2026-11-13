@@ -461,6 +461,39 @@ test('Löschfrist: ohne ORDER_RETENTION_DAYS löscht der Cron keine Aufträge; m
   await reset();
 });
 
+test('Löschfrist auch bei gesperrter API (fail closed, z. B. ENTWURF): Cron löscht alte Aufträge, Sessions und Rate-Limits, versendet nichts und endet als Ausnahme; ungültige Frist löscht keine Aufträge', { skip }, async () => {
+  const seed = async w => {
+    const jetzt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    for (const [ref, created] of [['PXA-SPER-0001', '2000-01-01 00:00:00'], ['PXA-SPER-0002', jetzt]]) {
+      await w.run("INSERT INTO orders (reference, idempotency_key, google_sub, email, website_url, privacy_version, created_at) VALUES (?1, ?1, 's', 'k@beispiel-kunde.de', 'https://firma.de', 'TEST', ?2)", ref, created);
+      await w.run("INSERT INTO notifications (order_id, status, attempts, next_attempt_at, created_at) SELECT id, 'pending', 0, '2000-01-01 00:00:00', created_at FROM orders WHERE reference = ?1", ref);
+    }
+    await w.run("INSERT INTO sessions (id_hash, data, version, created_at, expires_at) VALUES ('alt', '{\"csrf\":\"x\"}', 0, 1, 2)");
+    await w.run("INSERT INTO rate_limits (bucket, window_start, hits) VALUES ('start:alt', 1, 1)");
+  };
+  for (const [name, retention, refs, purged] of [
+    ['gültige Frist', '120', ['PXA-SPER-0002'], /Versand pausiert \(Konfiguration ungültig\)\. 1 Sessions und 1 Rate-Limit-Fenster gelöscht\. 1 Aufträge nach Ablauf der Löschfrist gelöscht\./],
+    ['ungültige Frist', '0', ['PXA-SPER-0001', 'PXA-SPER-0002'], /Versand pausiert \(Konfiguration ungültig\)\. 1 Sessions und 1 Rate-Limit-Fenster gelöscht\. Löschfrist ungültig, nichts gelöscht\./],
+  ]) {
+    mail.reset();
+    const w = await startWorker({ base: PRODUCTION_BASE, env: { ...PROD, PRIVACY_VERSION: 'ENTWURF-2026-11-13', ORDER_RETENTION_DAYS: retention }, outbound: resendOutbound(mail) });
+    try {
+      assert.equal((await new Client(w).req('POST', '/api/anfrage', { form: prodStart() })).status, 503, `${name}: API gesperrt`);
+      await seed(w);
+      const run = await w.cron();
+      assert.equal(run.outcome, 'exception', `${name}: Konfigurationsfehler bleibt im Cron-Status sichtbar`);
+      assert.match(run.log, purged, name);
+      assert.deepEqual((await w.sql('SELECT reference FROM orders ORDER BY id')).map(r => r.reference), refs, name);
+      assert.equal((await w.sql("SELECT COUNT(*) AS n FROM sessions WHERE id_hash = 'alt'"))[0].n, 0, `${name}: abgelaufene Session gelöscht`);
+      assert.equal((await w.sql("SELECT COUNT(*) AS n FROM rate_limits WHERE bucket = 'start:alt'"))[0].n, 0, `${name}: altes Fenster gelöscht`);
+      assert.equal(mail.state.attempts, 0, `${name}: kein Aufruf der Mail-API`);
+      assert.equal((await w.sql("SELECT COUNT(*) AS n FROM notifications WHERE status = 'pending' AND attempts = 0"))[0].n, refs.length, `${name}: Benachrichtigungen bleiben unberührt`);
+    } finally {
+      await w.stop();
+    }
+  }
+});
+
 test('Worker-Log: keine unbehandelten Ausnahmen über alle Abläufe', { skip }, async () => {
   await sleep(100);
   assert.deepEqual(app.logs().split('\n').filter(l => /Uncaught|Unerwarteter Fehler|TypeError|ReferenceError/.test(l)), []);

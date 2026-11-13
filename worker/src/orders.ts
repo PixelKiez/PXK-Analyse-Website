@@ -21,9 +21,11 @@ export interface AcceptedTerms {
 /* Gespeicherter Wortlaut: genau das eine Pflichtkästchen der Bestätigungsseite */
 export const declarationsText = (): string => DECLARATIONS.confirmation;
 
+/* limit: Tageslimit des Google-Kontos; capacity: Tagesgrenze aller Aufträge zusammen erreicht */
 export type OrderResult =
   | { result: 'created' | 'idempotent' | 'duplicate'; reference: string; orderId: number }
-  | { result: 'limit'; reference: null; orderId: null };
+  | { result: 'limit'; reference: null; orderId: null }
+  | { result: 'capacity'; reference: null; orderId: null };
 
 interface Row {
   id: number;
@@ -32,7 +34,7 @@ interface Row {
 }
 
 export class OrderService {
-  constructor(private db: Db, private duplicateDays: number, private maxPerDay: number) {}
+  constructor(private db: Db, private duplicateDays: number, private maxPerDay: number, private maxTotalPerDay: number) {}
 
   async submit(sub: string, email: string, websiteUrl: string, idempotencyKey: string, privacyVersion: string, terms: AcceptedTerms, now: number): Promise<OrderResult> {
     const same = await this.byKey(idempotencyKey, sub);
@@ -49,9 +51,10 @@ export class OrderService {
             WHERE NOT EXISTS (SELECT 1 FROM orders WHERE idempotency_key = ?2)
               AND NOT EXISTS (SELECT 1 FROM orders WHERE google_sub = ?3 AND website_url = ?5 AND created_at >= ?8)
               AND (SELECT COUNT(*) FROM orders WHERE google_sub = ?3 AND created_at >= ?9) < ?10
+              AND (SELECT COUNT(*) FROM orders WHERE created_at >= ?9) < ?14
             RETURNING id`,
           [reference, idempotencyKey, sub, email, websiteUrl, privacyVersion, utcText(now), dupSince, daySince, this.maxPerDay, terms.version, utcText(terms.at),
-            declarationsText()]],
+            declarationsText(), this.maxTotalPerDay]],
           [`INSERT INTO notifications (order_id, status, attempts, next_attempt_at, created_at)
             SELECT id, 'pending', 0, ?2, ?2 FROM orders WHERE reference = ?1`, [reference, utcText(now)]],
         ]);
@@ -64,13 +67,15 @@ export class OrderService {
         throw e;
       }
     }
-    /* Nicht angelegt: gleiche Absendung (parallel), Duplikat oder Tageslimit */
+    /* Nicht angelegt: gleiche Absendung (parallel), Duplikat, Tageslimit des Kontos oder Tagesgrenze insgesamt */
     const raced = await this.byKey(idempotencyKey, sub);
     if (raced !== null) return raced;
     const dup = await this.db.first<Row>(
       'SELECT id, reference FROM orders WHERE google_sub = ?1 AND website_url = ?2 AND created_at >= ?3 ORDER BY id DESC LIMIT 1', [sub, websiteUrl, dupSince]);
     if (dup !== null) return { result: 'duplicate', reference: dup.reference, orderId: dup.id };
-    return { result: 'limit', reference: null, orderId: null };
+    const own = await this.db.first<{ n: number }>('SELECT COUNT(*) AS n FROM orders WHERE google_sub = ?1 AND created_at >= ?2', [sub, daySince]);
+    if ((own?.n ?? 0) >= this.maxPerDay) return { result: 'limit', reference: null, orderId: null };
+    return { result: 'capacity', reference: null, orderId: null };
   }
 
   /* Gleiche Absendung erneut (Doppelklick, Neuladen): gleiche Referenz, nichts Neues */

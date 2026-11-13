@@ -1,6 +1,7 @@
 import { handle } from './app';
-import { type Env, loadConfig } from './config';
+import { type Config, type Env, loadConfig, parseRetentionDays } from './config';
 import { Db, nowSec } from './db';
+import { ConfigError } from './errors';
 import { MailApi, Notifier } from './notifier';
 import { purgeOrders } from './orders';
 
@@ -11,14 +12,30 @@ import { purgeOrders } from './orders';
 export default {
   fetch: (request, env, ctx) => handle(request, env, ctx),
 
+  /* Aufräumen und Löschfrist brauchen nur D1 und ORDER_RETENTION_DAYS: Sie laufen auch bei sonst ungültiger Konfiguration
+     (API gesperrt, z. B. Rückfallversion mit ENTWURF), damit kein Auftrag länger als zugesagt gespeichert bleibt. Mails gehen nur mit
+     gültiger Konfiguration hinaus; deren Fehler beendet den Lauf danach weiter als Ausnahme (sichtbar im Cron-Status). */
   async scheduled(_event, env, _ctx) {
-    const config = loadConfig(env);
-    const db = new Db(config.db);
+    if (!env.DB) throw new ConfigError('Ungültige oder fehlende Werte: DB');
+    let config: Config | null = null;
+    let configError: ConfigError | null = null;
+    try {
+      config = loadConfig(env);
+    } catch (e) {
+      if (!(e instanceof ConfigError)) throw e;
+      configError = e;
+    }
+    const db = new Db(env.DB);
     const now = nowSec();
-    const result = await new Notifier(db, new MailApi(config.mail), config.mail.notifyTo).deliverDue(now);
+    const result = config ? await new Notifier(db, new MailApi(config.mail), config.mail.notifyTo).deliverDue(now) : null;
     const sessions = await db.run('DELETE FROM sessions WHERE expires_at <= ?1', [now]);
     const limits = await db.run('DELETE FROM rate_limits WHERE window_start < ?1', [now - 86400]);
-    const purged = config.retentionDays === null ? 'Löschfrist nicht aktiv' : `${await purgeOrders(db, config.retentionDays, now)} Aufträge nach Ablauf der Löschfrist gelöscht`;
-    console.log(`PXWA: ${result.sent} versendet, ${result.failed} fehlgeschlagen, ${result.busy} übersprungen. ${sessions} Sessions und ${limits} Rate-Limit-Fenster gelöscht. ${purged}.`);
+    const retentionDays = config ? config.retentionDays : parseRetentionDays(env.ORDER_RETENTION_DAYS);
+    const purged = retentionDays === null ? 'Löschfrist nicht aktiv'
+      : Number.isNaN(retentionDays) ? 'Löschfrist ungültig, nichts gelöscht'
+      : `${await purgeOrders(db, retentionDays, now)} Aufträge nach Ablauf der Löschfrist gelöscht`;
+    const delivery = result ? `${result.sent} versendet, ${result.failed} fehlgeschlagen, ${result.busy} übersprungen` : 'Versand pausiert (Konfiguration ungültig)';
+    console.log(`PXWA: ${delivery}. ${sessions} Sessions und ${limits} Rate-Limit-Fenster gelöscht. ${purged}.`);
+    if (configError) throw configError;
   },
 } satisfies ExportedHandler<Env>;

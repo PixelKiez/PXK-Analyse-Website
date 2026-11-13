@@ -237,10 +237,14 @@ class App {
     if (!(await this.limiter().allow('order', clientIp(this.request), LIMITS.orderPerIp, this.now))) {
       return this.respond(429, this.view.error('Zu viele Versuche', 'Bitte warten Sie und versuchen Sie es später erneut.'));
     }
-    const orders = new OrderService(this.db, LIMITS.duplicateDays, LIMITS.ordersPerAccountDay);
+    const orders = new OrderService(this.db, LIMITS.duplicateDays, LIMITS.ordersPerAccountDay, LIMITS.ordersPerDay);
     const r = await orders.submit(user.sub, user.email, consent.url, flow.idem, this.config.privacyVersion, { version: consent.version, at: consent.at }, this.now);
     if (r.result === 'limit') {
       return this.respond(429, this.view.error('Tageslimit erreicht', 'Mit diesem Google-Konto sind heute bereits mehrere Anfragen eingegangen. Bitte versuchen Sie es morgen erneut.'));
+    }
+    if (r.result === 'capacity') {
+      log('Tagesgrenze aller Aufträge erreicht, kein Auftrag');
+      return this.respond(429, this.view.error('Gerade keine Anfragen möglich', 'Heute sind bereits sehr viele Anfragen eingegangen. Es wurde keine Anfrage gespeichert. Bitte versuchen Sie es morgen erneut.'));
     }
     if (r.result === 'created') {
       /* Auftrag ist gespeichert. Mail- oder Datenbankfehler beim Versand ändern daran nichts und dürfen keine

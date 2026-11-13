@@ -43,6 +43,7 @@ export const LIMITS = {
   callbackPerIp: [30, 600],
   orderPerIp: [10, 3600],        // angelegte Aufträge je IP: 10 pro Stunde
   ordersPerAccountDay: 5,
+  ordersPerDay: 50,              // alle Aufträge zusammen in 24 Stunden (je Auftrag eine interne Mail): bremst Massenanfragen aus vielen Konten und IPs
   duplicateDays: 30,             // gleiche Website + gleiches Google-Konto gilt so lange als Duplikat
   stateTtl: 600,
   consentTtl: 600,               // Bestätigung (AGB-Zustimmung) gilt 10 Minuten für die Google-Anmeldung
@@ -113,6 +114,14 @@ export interface Config {
 }
 
 const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
+
+/* Löschfrist in Tagen aus ORDER_RETENTION_DAYS: null = nicht gesetzt, NaN = ungültig. Eigene Funktion, weil der Cron die Löschfrist
+   auch bei sonst ungültiger Konfiguration einhält (index.ts). */
+export function parseRetentionDays(v: unknown): number | null {
+  const s = str(v);
+  if (s === '') return null;
+  return /^\d{1,4}$/.test(s) && Number(s) >= 1 ? Number(s) : NaN;
+}
 
 const parseUrl = (v: string): URL | null => {
   try {
@@ -187,9 +196,8 @@ export function loadConfig(env: Env): Config {
   if (!isEmail(mail.notifyTo) || (production && notifyTo !== PRODUCTION_NOTIFY_TO)) missing.push('MAIL_NOTIFY_TO');
   if (production) mail.notifyTo = PRODUCTION_NOTIFY_TO;
 
-  const retention = str(env.ORDER_RETENTION_DAYS);
-  const retentionDays = retention === '' ? null : Number(retention);
-  if (retentionDays !== null && !(/^\d{1,4}$/.test(retention) && retentionDays >= 1)) missing.push('ORDER_RETENTION_DAYS');
+  const retentionDays = parseRetentionDays(env.ORDER_RETENTION_DAYS);
+  if (Number.isNaN(retentionDays)) missing.push('ORDER_RETENTION_DAYS');
 
   const accessMode = str(env.ACCESS_MODE) || (local ? 'offen' : '');
   const allowlist = new Set<string>();

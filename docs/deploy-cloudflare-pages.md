@@ -265,8 +265,10 @@ eingebundenen Videos.
   (enthält personenbezogene Daten: verschlüsselt ablegen, nie ins Repository).
 - Aufbewahrung (Entscheidung des Auftraggebers 04.11.2026): `ORDER_RETENTION_DAYS = "120"` – der Cron löscht jeden Auftrag samt
   Benachrichtigung vier Monate nach Eingang, unabhängig vom Status (Datenschutzerklärung Abschnitte 8 und 16). Automatisch ist nur
-  diese D1-Löschung, und nur solange die Konfiguration gültig ist: Im fail-closed-Zustand (z. B. ENTWURF-Version, fehlendes Secret)
-  bricht `loadConfig` auch den Cron ab, die Löschung pausiert. Bericht und Mails dazu im Postfach 360@pixelkiez.de (interne
+  diese D1-Löschung. Sie läuft auch im fail-closed-Zustand (z. B. ENTWURF-Version, fehlendes Secret): Der Cron löscht dann weiter
+  Sessions, Rate-Limits und Aufträge nach Frist, pausiert nur den Mailversand und endet als Ausnahme (sichtbar im Cron-Status).
+  Nur ohne D1-Binding oder mit ungültigem `ORDER_RETENTION_DAYS` löscht er keine Aufträge. Achtung Rollback: Worker-Versionen vor
+  diesem Stand (u. a. `5b2856da`, `42364751`, `106fcabd`) pausieren im fail-closed-Zustand die Löschung noch. Bericht und Mails dazu im Postfach 360@pixelkiez.de (interne
   Benachrichtigung „Neue Analyse-Anfrage PXA-…“, Berichtsversand) werden **von Hand** nach derselben Frist gelöscht, soweit keine
   Aufbewahrungspflicht besteht (Fassung 2026-11-13 der Datenschutzerklärung; ob § 147 AO für den Berichtsversand gilt, ist
   rechtlich offen). Vorschlag für den Betrieb: monatlich alle Mails mit Referenz `PXA-…` älter als vier Monate prüfen. Werbeeinwilligungen
