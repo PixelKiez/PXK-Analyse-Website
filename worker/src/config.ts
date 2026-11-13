@@ -31,8 +31,9 @@ export const PRODUCTION_NOTIFY_TO = '360@pixelkiez.de';
 
 /* Zugang (PXK-155): „testnutzer“ lässt nach der Google-Anmeldung nur die Konten aus dem Secret ACCESS_ALLOWLIST einen Auftrag
    anlegen – serverseitig, auch wenn /api/anfrage direkt aufgerufen wird und unabhängig vom Google-Testmodus. „offen“ ist der
-   öffentliche Betrieb (nur mit eigener Release-Freigabe). Ohne gültigen Wert sperrt die Produktion die API; lokal gilt ohne
-   Angabe „offen“. Die Liste steht nie im (öffentlichen) Repository und nie im Log. */
+   öffentliche Betrieb (nur mit eigener Release-Freigabe). Ohne gültigen Wert sperrt die Produktion die API; im Testbetrieb
+   (ENV = staging) ist nur „testnutzer“ zulässig; lokal gilt ohne Angabe „offen“. Die Liste steht nie im (öffentlichen) Repository
+   und nie im Log. */
 export const ACCESS_MODES = ['testnutzer', 'offen'] as const;
 export const MAX_TEST_ACCOUNTS = 20;
 
@@ -124,15 +125,21 @@ const parseUrl = (v: string): URL | null => {
 export function loadConfig(env: Env): Config {
   const missing: string[] = [];
   const mode = str(env.ENV);
-  if (mode !== 'production' && mode !== 'local') missing.push('ENV');
+  if (mode !== 'production' && mode !== 'staging' && mode !== 'local') missing.push('ENV');
   const production = mode === 'production';
+  /* Geschützter Testbetrieb (PXK-155, Gates S2–S5): eigene HTTPS-Adresse (nie die produktive), eigener Worker und eigene D1. Es gelten
+     dieselben festen Grenzen wie in Produktion (echte Google-Endpunkte, nur Resend, Absender aus 360.pixelkiez.de) und zwingend
+     ACCESS_MODE = testnutzer. Nur hier dürfen Rechtstexte als ENTWURF laufen; die Produktion lehnt sie weiter ab. */
+  const staging = mode === 'staging';
+  const strict = production || staging;
   const local = mode === 'local';
 
   const baseUrl = str(env.BASE_URL);
   const base = parseUrl(baseUrl);
   if (!base || baseUrl.endsWith('/') || base.search || base.hash || base.username || base.password
     || !(base.protocol === 'https:' || (local && base.protocol === 'http:'))
-    || (production && baseUrl !== PRODUCTION_BASE_URL)) {
+    || (production && baseUrl !== PRODUCTION_BASE_URL)
+    || (staging && base.host === new URL(PRODUCTION_BASE_URL).host)) {
     missing.push('BASE_URL');
   }
 
@@ -146,9 +153,9 @@ export function loadConfig(env: Env): Config {
   };
   if (!google.clientId) missing.push('GOOGLE_CLIENT_ID');
   if (!google.clientSecret) missing.push('GOOGLE_CLIENT_SECRET');
-  /* In Produktion nur die echten Google-Endpunkte – verhindert, dass Codes und Client-Secret an Dritte gehen */
+  /* In Produktion und im Testbetrieb nur die echten Google-Endpunkte – verhindert, dass Codes und Client-Secret an Dritte gehen */
   for (const [key, value, real] of [['GOOGLE_AUTH_ENDPOINT', google.authEndpoint, GOOGLE_AUTH], ['GOOGLE_TOKEN_ENDPOINT', google.tokenEndpoint, GOOGLE_TOKEN], ['GOOGLE_JWKS_URI', google.jwksUri, GOOGLE_JWKS]] as const) {
-    if (production ? value !== real : !parseUrl(value)) missing.push(key);
+    if (strict ? value !== real : !parseUrl(value)) missing.push(key);
   }
 
   const secret = typeof env.SECRET === 'string' ? env.SECRET : '';
@@ -169,12 +176,12 @@ export function loadConfig(env: Env): Config {
   };
   const mailUrl = parseUrl(mail.apiUrl);
   if (!mailUrl || mailUrl.username || mailUrl.password || !(mailUrl.protocol === 'https:' || (local && mailUrl.protocol === 'http:'))
-    || (production && (!AUTHORIZED_MAIL_API_HOSTS.includes(mailUrl.hostname) || mailUrl.port || mailUrl.pathname !== '/emails' || mailUrl.search))) {
+    || (strict && (!AUTHORIZED_MAIL_API_HOSTS.includes(mailUrl.hostname) || mailUrl.port || mailUrl.pathname !== '/emails' || mailUrl.search))) {
     missing.push('MAIL_API_URL');
   }
   if (!mail.apiToken) missing.push('MAIL_API_TOKEN');
   const fromDomain = mail.from.slice(mail.from.lastIndexOf('@') + 1).toLowerCase();
-  if (!isEmail(mail.from) || (production && !AUTHORIZED_MAIL_FROM_DOMAINS.includes(fromDomain))) missing.push('MAIL_FROM');
+  if (!isEmail(mail.from) || (strict && !AUTHORIZED_MAIL_FROM_DOMAINS.includes(fromDomain))) missing.push('MAIL_FROM');
   /* Nur ASCII vergleichen: toLowerCase() bildet sonst z. B. das Kelvin-Zeichen (U+212A) auf „k“ ab */
   const notifyTo = /^[\x21-\x7e]+$/.test(mail.notifyTo) ? mail.notifyTo.toLowerCase() : '';
   if (!isEmail(mail.notifyTo) || (production && notifyTo !== PRODUCTION_NOTIFY_TO)) missing.push('MAIL_NOTIFY_TO');
@@ -186,7 +193,9 @@ export function loadConfig(env: Env): Config {
 
   const accessMode = str(env.ACCESS_MODE) || (local ? 'offen' : '');
   const allowlist = new Set<string>();
-  if (accessMode === 'testnutzer') {
+  if (staging && accessMode !== 'testnutzer') {
+    missing.push('ACCESS_MODE');
+  } else if (accessMode === 'testnutzer') {
     const entries = str(env.ACCESS_ALLOWLIST).split(/[\s,;]+/).filter(Boolean);
     /* Nur ASCII wie beim Empfänger; Google liefert die Adresse kleingeschrieben (oidc.ts) */
     const valid = entries.filter(e => /^[\x21-\x7e]+$/.test(e) && isEmail(e));

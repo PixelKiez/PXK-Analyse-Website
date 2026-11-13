@@ -314,10 +314,11 @@ test('AGB-Seite: Fassung 2026-11-12 (ein Kästchen, nur Unternehmer, keine Werbe
   assert.deepEqual(H.byClass(root, 'legal-h').map(e => H.norm(H.textOf(e)).split(' ').slice(0, 2).join(' ')), Array.from({ length: 13 }, (_, i) => `§ ${i + 1}`), '§ 1 bis § 13');
   /* Die Fassung 2026-11-12 ist noch nicht rechtlich freigegeben (Human Gate): Der Worker führt sie als Entwurf, die Produktion nimmt
      damit keine Aufträge an (config.ts). Der Aktivierungs-Commit setzt nach der Freigabe TERMS_VERSION und PRIVACY_VERSION auf genau
-     die Fassung der Seiten. Die Startseite trägt keine AGB-Version mehr (die Bestätigungsseite zeigt sie). */
-  const fassung = /Stand: [^·]+ · Version (\d{4}-\d{2}-\d{2})/.exec(main)[1];
-  assert.equal(/^TERMS_VERSION = "([^"]+)"$/m.exec(read('worker/wrangler.toml'))[1], `ENTWURF-${fassung}`);
-  assert.equal(/^PRIVACY_VERSION = "([^"]+)"$/m.exec(read('worker/wrangler.toml'))[1], `ENTWURF-${fassung}`);
+     die Fassung der jeweiligen Seite. Die Startseite trägt keine AGB-Version mehr (die Bestätigungsseite zeigt sie). */
+  const fassungVon = t => /Stand: [^·]+ · Version (\d{4}-\d{2}-\d{2})/.exec(t)[1];
+  const privacyMain = H.norm(H.textOf(H.byTag(H.parse(read('public/datenschutz.html')).root, 'main')[0]));
+  assert.equal(/^TERMS_VERSION = "([^"]+)"$/m.exec(read('worker/wrangler.toml'))[1], `ENTWURF-${fassungVon(main)}`);
+  assert.equal(/^PRIVACY_VERSION = "([^"]+)"$/m.exec(read('worker/wrangler.toml'))[1], `ENTWURF-${fassungVon(privacyMain)}`);
   assert.ok(!read('public/index.html').includes('agb_version'), 'Startseite ohne AGB-Version');
   assert.ok(read('worker/src/config.ts').includes("(production && /^entwurf/i.test(termsVersion))) missing.push('TERMS_VERSION');"), 'Produktion lehnt AGB-Entwürfe ab');
 });
@@ -529,8 +530,14 @@ test('Eigenständige Website 360°Pixelkiez: Name in Titel, Logo und Footer; Imp
   /* Entscheidung des Auftraggebers 04.11.2026: keine Umsatzsteuer-ID (noch nicht erteilt), keine Platzhalter */
   assert.ok(!/Umsatzsteuer|USt-?Id|Wirtschafts-Identifikationsnummer|Telefon|\[/.test(imprint), 'Impressum ohne USt-ID, W-IdNr., Telefon-Platzhalter');
   const privacy = H.norm(H.textOf(H.byTag(H.parse(read('public/datenschutz.html')).root, 'main')[0]));
-  /* Fassung 2026-11-12 (Bestätigungsseite mit einem Kästchen; zur rechtlichen Freigabe): ohne Entwurfsvermerk im Text, ohne Platzhalter */
-  assert.ok(privacy.includes('Version 2026-11-12') && !/ENTWURF|in Vorbereitung|\[/.test(privacy), 'Datenschutzerklärung: Fassung 2026-11-12 ohne Entwurfsvermerk und Platzhalter');
+  /* Fassung 2026-11-13 (Bestätigungsseite mit einem Kästchen; zur rechtlichen Freigabe): ohne Entwurfsvermerk im Text, ohne Platzhalter */
+  assert.ok(privacy.includes('Version 2026-11-13') && !/ENTWURF|in Vorbereitung|\[/.test(privacy), 'Datenschutzerklärung: Fassung 2026-11-13 ohne Entwurfsvermerk und Platzhalter');
+  /* Fassung 2026-11-13: keine Aussage über nicht vorhandene Technik. Automatisch löscht nur der Cron die Datenbank (orders.ts purgeOrders);
+     Benachrichtigung und Bericht im Postfach werden von Hand gelöscht. Es gibt keinen Newsletter und keine Verteilerliste. */
+  assert.ok(privacy.includes('Unsere interne Benachrichtigung über die Anfrage (Abschnitt 9) und den Bericht in unserem Postfach (Abschnitte 10 und 11) löschen wir nicht automatisch, sondern von Hand'), 'Postfach: Löschung von Hand');
+  assert.ok(privacy.includes('Derzeit versenden wir keine werblichen E-Mails und keinen Newsletter; eine Verteilerliste besteht nicht.'), 'kein Newsletter, keine Verteilerliste');
+  assert.ok(!/Verteilerfunktion|intern, Newsletter|inkl\. Bericht und Nachweis/.test(privacy), 'keine Reste: Newsletter-Verteiler, Bericht als automatisch gelöschte Anfragedaten');
+  assert.deepEqual(privacy.match(/\(automatisch\)/g), ['(automatisch)'], 'genau eine automatische Löschfrist (Datenbank)');
   /* Abschnitt 8 beschreibt den tatsächlichen Ablauf: Website-Adresse schon vor der Google-Anmeldung in der Sitzung, nicht an Google;
      keine Werbeeinwilligung bei der Anfrage (Abschnitte 12 und 18) */
   for (const s of ['Wenn Sie auf „Analysieren“ klicken, prüfen wir die eingegebene Website-Adresse und speichern sie in Ihrer serverseitigen Sitzung',
@@ -791,9 +798,9 @@ test('Release-Grenze API (privater Worker): keine Route, keine workers.dev-Adres
   assert.match(active, /^BASE_URL = "https:\/\/360\.pixelkiez\.de"$/m);
   assert.match(active, /^MAIL_API_URL = "https:\/\/api\.resend\.com\/emails"$/m);
   assert.match(active, /^MAIL_FROM = "anfrage@360\.pixelkiez\.de"$/m, 'freigegebener Absender auf der verifizierten Versanddomain');
-  /* Rechtstexte 2026-11-12 (Bestätigungsseite mit einem Kästchen) warten auf die Freigabe: bis zum Aktivierungs-Commit als Entwurf,
+  /* Rechtstexte (AGB 2026-11-12, Datenschutzerklärung 2026-11-13; Bestätigungsseite mit einem Kästchen) warten auf die Freigabe: bis zum Aktivierungs-Commit als Entwurf,
      die Produktion nimmt damit keine Aufträge an (fail closed) */
-  assert.match(active, /^PRIVACY_VERSION = "ENTWURF-2026-11-12"$/m, 'Datenschutzerklärung 2026-11-12 noch nicht freigegeben');
+  assert.match(active, /^PRIVACY_VERSION = "ENTWURF-2026-11-13"$/m, 'Datenschutzerklärung 2026-11-13 noch nicht freigegeben');
   assert.match(active, /^TERMS_VERSION = "ENTWURF-2026-11-12"$/m, 'AGB 2026-11-12 noch nicht freigegeben');
   assert.match(active, /^MAIL_NOTIFY_TO = "360@pixelkiez\.de"$/m);
   /* Entscheidung des Auftraggebers 04.11.2026: Anfragedaten vier Monate nach Eingang löschen (Datenschutzerklärung Abschnitte 8 und 16) */

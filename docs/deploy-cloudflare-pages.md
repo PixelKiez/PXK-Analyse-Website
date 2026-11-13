@@ -114,7 +114,9 @@ jede unbekannte Adresse mit der Startseite beantworten).
 
 Fehlt ein Wert oder ist er ungültig, antwortet `/api/*` mit 503; das Log nennt nur den Schlüsselnamen. In Produktion
 erzwingt der Worker: echte Google-Endpunkte, `BASE_URL` exakt `https://360.pixelkiez.de`, Mail-API `api.resend.com/emails`,
-Absender aus `360.pixelkiez.de`, `PRIVACY_VERSION` nicht „ENTWURF…“. Kontozugriff: 2FA, API-Tokens nur mit den
+Absender aus `360.pixelkiez.de`, `PRIVACY_VERSION` nicht „ENTWURF…“. Im geschützten Testbetrieb (`ENV = "staging"`, Abschnitt 12)
+gelten dieselben Grenzen, nur mit eigener HTTPS-Adresse (nie `360.pixelkiez.de`), ENTWURF-Fassungen erlaubt und zwingend
+`ACCESS_MODE = "testnutzer"`. `ENV = "local"` ist nur für Tests auf dem eigenen Rechner. Kontozugriff: 2FA, API-Tokens nur mit den
 nötigen Rechten (Pages, Workers Scripts, D1) und kurzer Laufzeit.
 
 ## 4. DNS bei Hostinger (nur die neue Subdomain)
@@ -262,8 +264,12 @@ eingebundenen Videos.
 - Backup: D1 Time Travel; vor jeder Schemaänderung zusätzlich `npx wrangler d1 export pxwa --remote --output pxwa-<datum>.sql`
   (enthält personenbezogene Daten: verschlüsselt ablegen, nie ins Repository).
 - Aufbewahrung (Entscheidung des Auftraggebers 04.11.2026): `ORDER_RETENTION_DAYS = "120"` – der Cron löscht jeden Auftrag samt
-  Benachrichtigung vier Monate nach Eingang, unabhängig vom Status (Datenschutzerklärung Abschnitte 8 und 16). Bericht und Mails
-  dazu im Postfach 360@pixelkiez.de nach derselben Frist löschen, soweit keine Aufbewahrungspflicht besteht. Werbeeinwilligungen
+  Benachrichtigung vier Monate nach Eingang, unabhängig vom Status (Datenschutzerklärung Abschnitte 8 und 16). Automatisch ist nur
+  diese D1-Löschung, und nur solange die Konfiguration gültig ist: Im fail-closed-Zustand (z. B. ENTWURF-Version, fehlendes Secret)
+  bricht `loadConfig` auch den Cron ab, die Löschung pausiert. Bericht und Mails dazu im Postfach 360@pixelkiez.de (interne
+  Benachrichtigung „Neue Analyse-Anfrage PXA-…“, Berichtsversand) werden **von Hand** nach derselben Frist gelöscht, soweit keine
+  Aufbewahrungspflicht besteht (Fassung 2026-11-13 der Datenschutzerklärung; ob § 147 AO für den Berichtsversand gilt, ist
+  rechtlich offen). Vorschlag für den Betrieb: monatlich alle Mails mit Referenz `PXA-…` älter als vier Monate prüfen. Werbeeinwilligungen
   bleiben bis zum Widerruf; Widerruf eintragen:
   `npx wrangler d1 execute pxwa --remote --command "UPDATE marketing_consents SET revoked_at = datetime('now') WHERE email = '…' AND revoked_at IS NULL"`.
 - Betriebsprotokoll: Workers Logs ohne Aufrufprotokolle (`[observability.logs] invocation_logs = false`), nur eigene Meldungen
@@ -331,7 +337,7 @@ Tabellen `orders`, `notifications`, `sessions`, `rate_limits`, `marketing_consen
 
 0. **Aktivierungs-Commit** (nach Freigabe der Rechtstexte; `MAIL_FROM` = `anfrage@360.pixelkiez.de` seit `5f94a07`):
    `TERMS_VERSION`/`PRIVACY_VERSION` in `worker/wrangler.toml` ohne „ENTWURF“ (seit der Bestätigungsseite mit einem Kästchen:
-   genau die Fassung `2026-11-12` aus `public/agb.html` und `public/datenschutz.html`; das Feld `agb_version` steht nur noch auf der
+   genau die Fassungen aus `public/agb.html` (derzeit `2026-11-12`) und `public/datenschutz.html` (derzeit `2026-11-13`); das Feld `agb_version` steht nur noch auf der
    Bestätigungsseite des Workers), ggf. korrigierte Rechtstexte mit neuer Version. `ACCESS_MODE` bleibt `"testnutzer"`. Danach CI am
    exakten SHA, `npm ci`, `npm run typecheck`, `npm test`, `npm run test:release` im frischen Klon.
 1. **D1-Migration** (in `worker/`): `npx wrangler d1 time-travel info pxwa` (Bookmark notieren),
@@ -373,3 +379,113 @@ Tabellen `orders`, `notifications`, `sessions`, `rate_limits`, `marketing_consen
 - **Google:** „Zurück zum Testen“ stoppt öffentliche Anmeldungen sofort.
 - **D1:** Vor dem ersten echten Auftrag: `npx wrangler d1 time-travel restore pxwa --bookmark <bookmark aus Schritt 1>`.
   Danach nie destruktiv; vorher exportieren (Abschnitt 8).
+
+## 12. Geschützter Testbetrieb (Staging) – vorbereitet, nicht angelegt (Stand 13.11.2026)
+
+Zweck: die vollständige Nutzerreise des Kandidaten (Hero → Bestätigung → ein Kästchen → echte Google-Anmeldung → Auftrag →
+Eingangsbestätigung) auf echtem Cloudflare prüfen, **ohne** Produktions-Worker, Produktions-D1, Produktions-Google-Client oder
+Kundendaten zu berühren. Jede Zeile in 12.4 braucht ihre eigene Freigabe; keine Freigabe gilt für die nächste.
+
+### 12.1 Stufen
+
+| Stufe | Was | Neue Ressourcen | Gate |
+|---|---|---|---|
+| 1 | Echte Google-Anmeldung lokal gegen den Kandidaten: `tests/local-google-oidc.mjs` (`localhost:8787`, flüchtige D1, Mail-Mock, nur Google-Token/JWKS nach außen; Callback ist im Testing-Client bereits eingetragen, Lauf vom 09.11.2026) | keine | S5 (lokal) |
+| 2 | Cloud-Staging wie 12.2 | Pages-Projekt, Worker, D1, Access, Google-Client, Resend-Key, ggf. R2-Bucket | S2 → S3 → S4 → S5 |
+
+Stufe 1 belegt den Google-Pfad am Code, nicht Pages, Service Binding und D1 in der Cloud. Ein Pages-Vorschau-Deployment ohne
+Binding ist nur eine UI-Vorschau (`/api/*` 503) und kein Integrationstest.
+
+### 12.2 Architektur (getrennt von Produktion)
+
+```
+Browser ──► Cloudflare Access (nur freigegebene E-Mail-Adressen) ──► Pages-Projekt „pxwa-staging“ (https://pxwa-staging.pages.dev)
+                                                                      ├─ statisch: public/ des freigegebenen SHA
+                                                                      ├─ /media/* ──► R2 „360pixelkiez-staging“ (Kopie der 5 Objekte) – oder kein Binding (503)
+                                                                      └─ /api/* ──► Service Binding API ──► Worker „pxwa-api-staging“
+                                                                                                              ├─ D1 „pxwa-staging“ (EU, nur synthetische Daten)
+                                                                                                              ├─ Google-Client „360 Pixelkiez Staging“ (Testing, eigenes Projekt)
+                                                                                                              └─ Resend (eigener Key, nur Sending access, nur an das Test-Postfach)
+```
+
+- Worker: `ENV = "staging"` (Code seit diesem Stand): echte Google-Endpunkte, nur `api.resend.com/emails`, Absender aus
+  `360.pixelkiez.de`, eigene HTTPS-Adresse (nie `360.pixelkiez.de`), `ACCESS_MODE = "testnutzer"` Pflicht, Rechtstexte dürfen
+  ENTWURF sein. `workers_dev = false`, `preview_urls = false`, keine Route.
+- Kein Bezug zur Produktion: andere Namen, andere D1, anderes `SECRET`, anderer Google-Client, anderer Resend-Key. Das
+  Pages-Projekt `pxwa` (Produktion und seine Vorschau) bleibt unverändert; dessen Vorschau bekommt **kein** Binding.
+- `noindex`: `public/_headers` setzt `X-Robots-Tag: noindex` für jedes `*.pages.dev`-Projekt; Worker-Seiten tragen `noindex`.
+  Zusätzlich sperrt Access Crawler aus.
+- Testdaten: nur synthetische Website-Adressen (z. B. eigene Test-Domain) und das freigegebene Testkonto. Keine Kundendaten.
+
+### 12.3 Konfiguration (Vorlage; kommt nach S2 mit echten IDs als eigener Commit in `worker/wrangler.toml`)
+
+```toml
+[env.staging]
+name = "pxwa-api-staging"
+workers_dev = false
+preview_urls = false
+[env.staging.triggers]
+crons = ["*/5 * * * *"]
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "pxwa-staging"
+database_id = "<aus S2>"
+migrations_dir = "migrations"
+[env.staging.vars]
+ENV = "staging"
+BASE_URL = "https://pxwa-staging.pages.dev"          # tatsächlich vergebenen Namen eintragen
+GOOGLE_CLIENT_ID = "<Staging-Client aus S2>"
+PRIVACY_VERSION = "ENTWURF-2026-11-13"
+TERMS_VERSION = "ENTWURF-2026-11-12"
+MAIL_API_URL = "https://api.resend.com/emails"
+MAIL_FROM = "anfrage@360.pixelkiez.de"
+ORDER_RETENTION_DAYS = "7"
+ACCESS_MODE = "testnutzer"
+```
+
+Secrets (nur Namen; Werte per stdin, nie ins Repository): `GOOGLE_CLIENT_SECRET` (Staging-Client), `SECRET` (neu,
+`openssl rand -hex 32`), `MAIL_API_TOKEN` (eigener Resend-Key; ohne gültigen Key schlägt die Zustellung dauerhaft fehl –
+das ist zugleich der Negativtest „fehlgeschlagene Mailzustellung“), `ACCESS_ALLOWLIST` (Testkonto), `MAIL_NOTIFY_TO`
+(Test-Postfach; als Secret, damit keine private Adresse im öffentlichen Repository steht).
+
+Dry-Run ohne Cloudflare-Zugriff (am 13.11.2026 mit Platzhalter-IDs aus einer Vorlage außerhalb des Repositorys: Worker
+`ENV = "staging"` Exit 0, Produktionskonfiguration Exit 0, Pages Functions Exit 0):
+`(cd worker && npx wrangler deploy --env staging --dry-run --outdir /tmp/pxwa-staging-dry)` und
+`npx wrangler pages functions build --outdir /tmp/pxwa-fn`.
+
+### 12.4 Ablauf mit Gates (je eigene Freigabe)
+
+1. **S2 – Ressourcen anlegen** (keine Kosten im Free-Plan erwartet; vorher im Dashboard bestätigen):
+   `npx wrangler d1 create pxwa-staging --jurisdiction eu`; `npx wrangler pages project create pxwa-staging --production-branch main`;
+   Zero Trust → Access-Anwendung für `pxwa-staging.pages.dev` und `*.pxwa-staging.pages.dev` (Richtlinie: nur das freigegebene
+   E-Mail-Konto; Vorgehen laut Cloudflare „Known issues: Enable Access on your *.pages.dev domain“); Google Cloud: eigenes Projekt
+   mit Web-Client „360 Pixelkiez Staging“, Testing, Testnutzer = Testkonto, Weiterleitungs-URI exakt
+   `https://pxwa-staging.pages.dev/api/auth/callback` (ob Google `pages.dev` dort annimmt, beim Eintragen prüfen; sonst Stufe 1
+   oder eine Subdomain von `pixelkiez.de` per Hostinger-CNAME als eigene Entscheidung); Resend: Key „pxwa-staging“ mit
+   Sending access nur für `360.pixelkiez.de`; optional R2-Bucket `360pixelkiez-staging` mit Kopien der fünf Objekte.
+   Readback: IDs notieren; Produktions-Ressourcen unverändert (Pages `pxwa` Produktion, Worker `pxwa-api` aktive Version, D1 `pxwa`
+   Zeilenzahlen).
+2. **Konfigurations-Commit**: Block aus 12.3 mit echten IDs, CI am exakten SHA.
+3. **S3 – Worker** aus frischem Klon des SHA (in `worker/`): `npx wrangler d1 migrations apply pxwa-staging --env staging --remote`,
+   `npx wrangler deploy --env staging --dry-run --outdir /tmp/pxwa-staging-dry`, dann
+   `npx wrangler deploy --env staging --tag <sha> --message "PXK-155 Staging <sha>"`, danach die Secrets aus 12.3 mit
+   `npx wrangler secret put <NAME> --env staging`. Readback: `npx wrangler deployments list --env staging`, `secret list --env staging`
+   (nur Namen), keine Route, `workers.dev` aus.
+4. **S4 – Pages**: Binding `API` → `pxwa-api-staging` (und ggf. `MEDIA` → `360pixelkiez-staging`) in den Projekteinstellungen von
+   `pxwa-staging` setzen; Upload wie Produktion aus `git archive <sha> public functions` **ohne** `wrangler.toml`:
+   `npx wrangler pages deploy public --project-name pxwa-staging --branch main --commit-hash <sha>`.
+5. **Smoke-Tests** (nach S4, ohne Google): ohne Access-Anmeldung `curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n'
+   https://pxwa-staging.pages.dev/` → Weiterleitung zur Access-Anmeldung, nie 200; mit Access im Browser: `/` 200 mit
+   `X-Robots-Tag: noindex`, `/api/anfrage` 200 vom Worker (CSP mit `https://accounts.google.com`, `Cache-Control: no-store`),
+   `/wrangler.toml`, `/worker/wrangler.toml`, `/package.json`, `/.git/HEAD`, `/vision.html` → 404; Produktion unverändert
+   (Pages-Produktions-Deployment, aktive Worker-Version `pxwa-api`, D1 `pxwa` Zeilenzahlen wie vorher).
+6. **S5 – echter Ablauf** mit dem Testkonto und einer eigenen Test-Website: ohne Häkchen 422 und kein Auftrag; mit Häkchen →
+   Google → „Vielen Dank für Ihre Anfrage.“ mit `PXA-…`; D1 `pxwa-staging`: 1 Auftrag, `marketing_consent = 0`; Benachrichtigung
+   `sent` (gültiger Key, genau eine Mail im Test-Postfach) bzw. `failed` mit `permanent:401` (ohne Key); zweiter Rücksprung und
+   dieselbe Website erneut: kein zweiter Auftrag; Abbruch bei Google: kein Auftrag; anderes Google-Konto: 403 ohne Auftrag.
+
+### 12.5 Rückbau (nur Staging; Produktion bleibt unberührt)
+
+Pages-Projekt `pxwa-staging` löschen oder Binding entfernen; `npx wrangler delete --name pxwa-api-staging`;
+`npx wrangler d1 delete pxwa-staging` (nur synthetische Daten); Access-Anwendung, Staging-Google-Client und Resend-Key
+„pxwa-staging“ löschen bzw. widerrufen.

@@ -26,12 +26,13 @@ ENV = "production"
 BASE_URL = "https://360.pixelkiez.de"
 GOOGLE_CLIENT_ID = "992953187599-gabq9k5shdu02qd0r4ldqa3dh7ib0c1o.apps.googleusercontent.com"
 # Version der Datenschutzerklärung, die mit jedem Auftrag gespeichert wird. Mit "ENTWURF-…" nimmt die Produktion keine Aufträge an.
-# Fassung 2026-11-12 (Bestätigungsseite mit einem Kästchen, Website-Adresse vor der Google-Anmeldung) ist noch nicht freigegeben.
-PRIVACY_VERSION = "ENTWURF-2026-11-12"
+# Fassung 2026-11-13 (wie 2026-11-12, dazu Abschnitte 8, 11, 12, 14, 16 an den tatsächlichen Betrieb angeglichen: nur die
+# Datenbank löscht automatisch, Postfach von Hand; kein Newsletter, keine Verteilerliste) ist noch nicht freigegeben.
+PRIVACY_VERSION = "ENTWURF-2026-11-13"
 # Version der AGB, die die Bestätigungsseite zeigt (Feld agb_version) und jeder Auftrag speichert. Mit "ENTWURF-…" nimmt die
 # Produktion keine Aufträge an. Fassung 2026-11-12 (§§ 3, 4, 6: ein Kästchen) wartet auf die rechtliche Freigabe; danach im
-# Aktivierungs-Commit PRIVACY_VERSION und TERMS_VERSION auf "2026-11-12" setzen. Zuletzt freigegeben: AGB 2026-11-04,
-# Datenschutzerklärung 2026-11-11.
+# Aktivierungs-Commit TERMS_VERSION und PRIVACY_VERSION auf die freigegebenen Fassungen der Seiten setzen (derzeit AGB
+# "2026-11-12", Datenschutzerklärung "2026-11-13"). Zuletzt freigegeben: AGB 2026-11-04, Datenschutzerklärung 2026-11-11.
 TERMS_VERSION = "ENTWURF-2026-11-12"
 # Einzige freigegebene Mail-API (Resend). Der API-Key kommt als Secret MAIL_API_TOKEN.
 MAIL_API_URL = "https://api.resend.com/emails"

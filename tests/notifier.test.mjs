@@ -191,6 +191,56 @@ test('Produktion: falscher Mail-Anbieter oder Pfad, fremder Absender, Datenschut
   }
 });
 
+/* Geschützter Testbetrieb (PXK-155, Gates S2–S5): eigene HTTPS-Basis-URL (nie 360.pixelkiez.de), Rechtstexte als ENTWURF, nur Testkonten;
+   sonst dieselben festen Grenzen wie die Produktion. Interner Empfänger frei (Test-Postfach), Kunden bekommen nie eine Mail. */
+const STAGING_BASE = 'https://pxwa-staging.pages.dev';
+const STAGING = {
+  ...PROD, ENV: 'staging', BASE_URL: STAGING_BASE, PRIVACY_VERSION: 'ENTWURF-2026-11-13', TERMS_VERSION: 'ENTWURF-2026-11-12',
+  ACCESS_MODE: 'testnutzer', ACCESS_ALLOWLIST: 'tester@beispiel-test.de', MAIL_NOTIFY_TO: 'test-postfach@beispiel-test.de',
+};
+
+test('Testbetrieb (ENV=staging): eigene HTTPS-Adresse mit echtem Google-Callback, AGB und Datenschutz als ENTWURF, nur Testkonten; jede Lockerung der Produktionsgrenzen sperrt die API (fail closed)', { skip }, async () => {
+  const w = await startWorker({ base: STAGING_BASE, env: STAGING });
+  try {
+    const c = new Client(w);
+    const { address, start } = await analyze(c, { agbVersion: STAGING.TERMS_VERSION });
+    assert.equal(start.status, 303);
+    const auth = new URL(start.location);
+    assert.equal(auth.origin + auth.pathname, 'https://accounts.google.com/o/oauth2/v2/auth', 'echte Google-Anmeldung');
+    assert.equal(auth.searchParams.get('redirect_uri'), `${STAGING_BASE}/api/auth/callback`);
+    assert.match(address.headers.getSetCookie()[0], /^__Host-pxwa=[A-Za-z0-9_-]{43}; Path=\/; Max-Age=3600; HttpOnly; SameSite=Lax; Secure$/);
+    assert.equal((await w.cron()).outcome, 'ok');
+  } finally {
+    await w.stop();
+  }
+  const variants = [
+    ['Produktionsadresse im Testbetrieb', { BASE_URL: PRODUCTION_BASE }, /BASE_URL/],
+    ['http im Testbetrieb', { BASE_URL: 'http://pxwa-staging.pages.dev' }, /BASE_URL/],
+    ['Mock-Google im Testbetrieb', { GOOGLE_TOKEN_ENDPOINT: 'http://127.0.0.1:9/token', GOOGLE_JWKS_URI: 'http://127.0.0.1:9/certs' }, /GOOGLE_TOKEN_ENDPOINT, GOOGLE_JWKS_URI/],
+    ['fremde Anmeldeseite', { GOOGLE_AUTH_ENDPOINT: 'https://anmeldung.beispiel-test.de/auth' }, /GOOGLE_AUTH_ENDPOINT/],
+    ['Mail-API nicht Resend', { MAIL_API_URL: 'https://api.mail-anbieter.example.net/emails' }, /MAIL_API_URL/],
+    ['Absender außerhalb von 360.pixelkiez.de', { MAIL_FROM: 'analyse@pixelkiez.de' }, /MAIL_FROM/],
+    ['öffentlicher Zugang im Testbetrieb', { ACCESS_MODE: 'offen' }, /ACCESS_MODE/],
+    ['Zugang nicht festgelegt', { ACCESS_MODE: undefined }, /ACCESS_MODE/],
+    ['ohne Testkonten', { ACCESS_ALLOWLIST: undefined }, /ACCESS_ALLOWLIST/],
+    ['unbekannter Betriebsmodus', { ENV: 'Staging' }, /ENV/],
+  ];
+  for (const [name, env, key] of variants) {
+    mail.reset();
+    const v = await startWorker({ base: env.BASE_URL ?? STAGING_BASE, env: { ...STAGING, ...env } });
+    try {
+      const r = await new Client(v).req('POST', '/api/anfrage', { form: startForm({ agbVersion: STAGING.TERMS_VERSION }) });
+      assert.equal(r.status, 503, name);
+      assert.equal(r.location, null, `${name}: keine Weiterleitung`);
+      assert.equal((await v.cron()).outcome, 'exception', `${name}: Cron versendet nichts`);
+      await waitFor(() => key.test(v.logs()), { what: `Log ${name}` });
+      assert.equal(mail.state.attempts, 0, `${name}: kein Aufruf der Mail-API`);
+    } finally {
+      await v.stop();
+    }
+  }
+});
+
 test('Produktion: interner Empfänger ausschließlich 360@pixelkiez.de – jede andere Adresse, auch die frühere kontakt@pixelkiez.de, sperrt die API (503, kein Cron-Versand, kein Aufruf von Resend)', { skip }, async () => {
   const variants = [
     ['frühere Adresse (kein Rückfall)', 'kontakt@pixelkiez.de'], ['anderes Postfach', 'info@pixelkiez.de'], ['andere Domain', '360@pixelkiez.com'],

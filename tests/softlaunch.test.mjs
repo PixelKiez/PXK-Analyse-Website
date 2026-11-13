@@ -133,8 +133,8 @@ test('Indexierung: reguläre Seiten freigegeben, Fehlerseite und Vorschau ausges
   assert.ok(FILES.includes('sitemap.xml'), 'Sitemap vorhanden');
 });
 
-test('Rechtstexte: Impressum 2026-11-04, AGB und Datenschutzerklärung 2026-11-12 (ein Kästchen, zur Freigabe) ohne Entwurfsvermerk und ohne offene Platzhalter, keine behauptete Freigabe', () => {
-  for (const [p, stand] of [['impressum.html', '4. November 2026'], ['datenschutz.html', '12. November 2026'], ['agb.html', '12. November 2026']]) {
+test('Rechtstexte: Impressum 2026-11-04, AGB 2026-11-12 und Datenschutzerklärung 2026-11-13 (ein Kästchen, zur Freigabe) ohne Entwurfsvermerk und ohne offene Platzhalter, keine behauptete Freigabe', () => {
+  for (const [p, stand] of [['impressum.html', '4. November 2026'], ['datenschutz.html', '13. November 2026'], ['agb.html', '12. November 2026']]) {
     const t = text(read(p));
     assert.ok(t.includes(`Stand: ${stand}`) && !/ENTWURF|\[[^\]]*\]/.test(t), `${p}: veröffentlichte Fassung ohne Platzhalter`);
   }
