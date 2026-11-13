@@ -301,7 +301,7 @@ test('Hero-Schutz: gegenüber dem Stand vor BE-02 nur die freigegebenen Zeilen n
   assert.match(now, /<span>02<\/span><h3>AGB akzeptieren und anmelden<\/h3>/);
 });
 
-test('AGB-Seite: Fassung 2026-11-12 (ein Kästchen, nur Unternehmer, keine Werbeeinwilligung bei der Anfrage), ohne Platzhalter; Worker bis zur Freigabe fail-closed', () => {
+test('AGB-Seite: Fassung 2026-11-12 (ein Kästchen, nur Unternehmer, keine Werbeeinwilligung bei der Anfrage), ohne Platzhalter; Worker führt genau die freigegebenen Fassungen', () => {
   /* PO-Entscheidung 12.11.2026: Bestätigungsseite mit genau einem Kästchen. §§ 3, 4 und 6 Abs. 2 gegenüber der Fassung 2026-11-04 angepasst;
      nur Unternehmer (§ 14 BGB) bleibt, daher weiter ohne Widerrufsbelehrung für Verbraucher */
   const { root } = H.parse(read('public/agb.html'));
@@ -312,13 +312,13 @@ test('AGB-Seite: Fassung 2026-11-12 (ein Kästchen, nur Unternehmer, keine Werbe
     'Bei der Anfrage wird keine Einwilligung in werbliche E-Mails (§ 6) abgefragt', 'eine solche Einwilligung wird aus ihr auch nicht abgeleitet', 'keine Rechtsberatung', '§ 36 VSBG']) assert.ok(main.includes(s), `AGB: „${s}“`);
   assert.ok(!/drei Kästchen|eigenes Kästchen|Analyse anfragen“;|Kästchentext bei der Anfrage/.test(main), 'keine Reste des Ablaufs mit drei Kästchen');
   assert.deepEqual(H.byClass(root, 'legal-h').map(e => H.norm(H.textOf(e)).split(' ').slice(0, 2).join(' ')), Array.from({ length: 13 }, (_, i) => `§ ${i + 1}`), '§ 1 bis § 13');
-  /* Die Fassung 2026-11-12 ist noch nicht rechtlich freigegeben (Human Gate): Der Worker führt sie als Entwurf, die Produktion nimmt
-     damit keine Aufträge an (config.ts). Der Aktivierungs-Commit setzt nach der Freigabe TERMS_VERSION und PRIVACY_VERSION auf genau
-     die Fassung der jeweiligen Seite. Die Startseite trägt keine AGB-Version mehr (die Bestätigungsseite zeigt sie). */
+  /* Wortlaut AGB 2026-11-12 und Datenschutzerklärung 2026-11-13 vom Auftraggeber am 13.11.2026 freigegeben (Human Gate P1, keine
+     anwaltliche Prüfung). Der Worker führt genau die Fassung der jeweiligen Seite; eine neue Fassung läuft wieder erst als ENTWURF
+     (Produktion fail closed, config.ts). Die Startseite trägt keine AGB-Version mehr (die Bestätigungsseite zeigt sie). */
   const fassungVon = t => /Stand: [^·]+ · Version (\d{4}-\d{2}-\d{2})/.exec(t)[1];
   const privacyMain = H.norm(H.textOf(H.byTag(H.parse(read('public/datenschutz.html')).root, 'main')[0]));
-  assert.equal(/^TERMS_VERSION = "([^"]+)"$/m.exec(read('worker/wrangler.toml'))[1], `ENTWURF-${fassungVon(main)}`);
-  assert.equal(/^PRIVACY_VERSION = "([^"]+)"$/m.exec(read('worker/wrangler.toml'))[1], `ENTWURF-${fassungVon(privacyMain)}`);
+  assert.equal(/^TERMS_VERSION = "([^"]+)"$/m.exec(read('worker/wrangler.toml'))[1], fassungVon(main));
+  assert.equal(/^PRIVACY_VERSION = "([^"]+)"$/m.exec(read('worker/wrangler.toml'))[1], fassungVon(privacyMain));
   assert.ok(!read('public/index.html').includes('agb_version'), 'Startseite ohne AGB-Version');
   assert.ok(read('worker/src/config.ts').includes("(production && /^entwurf/i.test(termsVersion))) missing.push('TERMS_VERSION');"), 'Produktion lehnt AGB-Entwürfe ab');
 });
@@ -798,10 +798,10 @@ test('Release-Grenze API (privater Worker): keine Route, keine workers.dev-Adres
   assert.match(active, /^BASE_URL = "https:\/\/360\.pixelkiez\.de"$/m);
   assert.match(active, /^MAIL_API_URL = "https:\/\/api\.resend\.com\/emails"$/m);
   assert.match(active, /^MAIL_FROM = "anfrage@360\.pixelkiez\.de"$/m, 'freigegebener Absender auf der verifizierten Versanddomain');
-  /* Rechtstexte (AGB 2026-11-12, Datenschutzerklärung 2026-11-13; Bestätigungsseite mit einem Kästchen) warten auf die Freigabe: bis zum Aktivierungs-Commit als Entwurf,
-     die Produktion nimmt damit keine Aufträge an (fail closed) */
-  assert.match(active, /^PRIVACY_VERSION = "ENTWURF-2026-11-13"$/m, 'Datenschutzerklärung 2026-11-13 noch nicht freigegeben');
-  assert.match(active, /^TERMS_VERSION = "ENTWURF-2026-11-12"$/m, 'AGB 2026-11-12 noch nicht freigegeben');
+  /* Rechtstexte (AGB 2026-11-12, Datenschutzerklärung 2026-11-13; Bestätigungsseite mit einem Kästchen): Wortlaut vom Auftraggeber am
+     13.11.2026 freigegeben, Aktivierungs-Commit */
+  assert.match(active, /^PRIVACY_VERSION = "2026-11-13"$/m, 'Datenschutzerklärung 2026-11-13 freigegeben');
+  assert.match(active, /^TERMS_VERSION = "2026-11-12"$/m, 'AGB 2026-11-12 freigegeben');
   assert.match(active, /^MAIL_NOTIFY_TO = "360@pixelkiez\.de"$/m);
   /* Entscheidung des Auftraggebers 04.11.2026: Anfragedaten vier Monate nach Eingang löschen (Datenschutzerklärung Abschnitte 8 und 16) */
   assert.match(active, /^ORDER_RETENTION_DAYS = "120"$/m, 'Löschfrist vier Monate');
