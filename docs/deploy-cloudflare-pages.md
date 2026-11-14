@@ -365,7 +365,8 @@ Tabellen `orders`, `notifications`, `sessions`, `rate_limits`, `marketing_consen
    Danach Testdaten löschen (Abschnitt 9).
 4. **Google**: Brand Verification einreichen und abwarten, dann „App veröffentlichen“. Readback: Audience „In Produktion“.
 5. **Öffentliche Aktivierung**: eigener Commit `ACCESS_MODE = "offen"` (CI wie 0), Worker aus genau diesem SHA deployen
-   (`ACCESS_ALLOWLIST` danach mit `npx wrangler secret delete ACCESS_ALLOWLIST` entfernen), dann Pages aus demselben SHA
+   (`ACCESS_ALLOWLIST` bleibt gesetzt: im Modus „offen“ ignoriert, hält den Rollback auf die Testnutzer-Version ohne weiteren
+   Schritt bereit), dann Pages aus demselben SHA
    (wie 3, aber `public/` und `functions/` des Kandidaten). Readback:
    22 Seiten bytegleich zum Tree, Hero mit Adressfeld und „Analysieren“ (ohne Kästchen), Bestätigungsseite mit genau einem
    Kästchen, CSP `form-action 'self' https://accounts.google.com`,
