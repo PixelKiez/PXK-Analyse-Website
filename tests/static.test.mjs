@@ -807,8 +807,8 @@ test('Release-Grenze API (privater Worker): keine Route, keine workers.dev-Adres
   assert.match(active, /^MAIL_NOTIFY_TO = "360@pixelkiez\.de"$/m);
   /* Entscheidung des Auftraggebers 04.11.2026: Anfragedaten vier Monate nach Eingang löschen (Datenschutzerklärung Abschnitte 8 und 16) */
   assert.match(active, /^ORDER_RETENTION_DAYS = "120"$/m, 'Löschfrist vier Monate');
-  /* PXK-155: bis zur eigenen Release-Freigabe nur freigeschaltete Testkonten (Liste als Secret, nie im Repository) */
-  assert.match(active, /^ACCESS_MODE = "testnutzer"$/m, 'kontrollierter Test, kein öffentlicher Auftragseingang');
+  /* PXK-155 Gate P7: öffentlicher Auftragseingang (eigene Release-Freigabe); Testkonten-Liste nur als Secret, nie im Repository */
+  assert.match(active, /^ACCESS_MODE = "offen"$/m, 'öffentlicher Betrieb nach Freigabe P7');
   /* Betriebsprotokoll nur mit eigenen Meldungen, ohne automatische Aufrufprotokolle (Datenschutzerklärung Abschnitt 5) */
   assert.match(active, /^\[observability\.logs\]\ninvocation_logs = false$/m, 'keine Aufrufprotokolle mit Anfrage-Metadaten');
   const config = read('worker/src/config.ts');
