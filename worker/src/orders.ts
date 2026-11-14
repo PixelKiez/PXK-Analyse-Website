@@ -6,7 +6,7 @@ import { DECLARATIONS } from './view';
 /* Nimmt Aufträge an. Auftrag und ausstehende interne Benachrichtigung werden in EINER Transaktion (D1-Batch)
    gespeichert (Outbox): Erst danach gilt der Auftrag als angenommen. Fällt der Mailversand danach aus,
    bleibt der Auftrag erhalten und die Benachrichtigung wird später erneut versucht.
-   D1 führt Schreibzugriffe nacheinander aus; Duplikat- und Tageslimit stehen deshalb als Bedingung im INSERT selbst,
+   D1 führt Schreibzugriffe nacheinander aus; Tageslimit und Tagesgrenze stehen deshalb als Bedingung im INSERT selbst,
    parallele Anmeldungen können sie nicht umgehen. Jeder Auftrag speichert die akzeptierte AGB-Version und den
    serverseitigen Zeitpunkt der Zustimmung (Migration 0002) sowie die Unternehmer-Bestätigung und den Wortlaut des bestätigten
    Kästchens (Migration 0003). Seit der Bestätigungsseite mit genau einem Kästchen (PO-Entscheidung 12.11.2026) wird keine
@@ -21,9 +21,10 @@ export interface AcceptedTerms {
 /* Gespeicherter Wortlaut: genau das eine Pflichtkästchen der Bestätigungsseite */
 export const declarationsText = (): string => DECLARATIONS.confirmation;
 
-/* limit: Tageslimit des Google-Kontos; capacity: Tagesgrenze aller Aufträge zusammen erreicht */
+/* limit: Tageslimit des Google-Kontos; capacity: Tagesgrenze aller Aufträge zusammen erreicht. Keine Duplikatsperre (PO-Entscheidung
+   14.11.2026): Dieselbe Website darf erneut angefragt werden; nur dieselbe Absendung (Idempotenzschlüssel) legt nichts Neues an. */
 export type OrderResult =
-  | { result: 'created' | 'idempotent' | 'duplicate'; reference: string; orderId: number }
+  | { result: 'created' | 'idempotent'; reference: string; orderId: number }
   | { result: 'limit'; reference: null; orderId: null }
   | { result: 'capacity'; reference: null; orderId: null };
 
@@ -34,12 +35,11 @@ interface Row {
 }
 
 export class OrderService {
-  constructor(private db: Db, private duplicateDays: number, private maxPerDay: number, private maxTotalPerDay: number) {}
+  constructor(private db: Db, private maxPerDay: number, private maxTotalPerDay: number) {}
 
   async submit(sub: string, email: string, websiteUrl: string, idempotencyKey: string, privacyVersion: string, terms: AcceptedTerms, now: number): Promise<OrderResult> {
     const same = await this.byKey(idempotencyKey, sub);
     if (same !== null) return same;
-    const dupSince = utcText(now - this.duplicateDays * 86400);
     const daySince = utcText(now - 86400);
     for (let attempt = 0; ; attempt++) {
       const reference = newReference();
@@ -47,13 +47,12 @@ export class OrderService {
         const [inserted] = await this.db.batch<{ id: number }>([
           [`INSERT INTO orders (reference, idempotency_key, google_sub, email, website_url, privacy_version, terms_version, terms_accepted_at, status, created_at,
               business_confirmed, marketing_consent, declarations)
-            SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?11, ?12, 'received', ?7, 1, 0, ?13
+            SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?10, ?11, 'received', ?7, 1, 0, ?12
             WHERE NOT EXISTS (SELECT 1 FROM orders WHERE idempotency_key = ?2)
-              AND NOT EXISTS (SELECT 1 FROM orders WHERE google_sub = ?3 AND website_url = ?5 AND created_at >= ?8)
-              AND (SELECT COUNT(*) FROM orders WHERE google_sub = ?3 AND created_at >= ?9) < ?10
-              AND (SELECT COUNT(*) FROM orders WHERE created_at >= ?9) < ?14
+              AND (SELECT COUNT(*) FROM orders WHERE google_sub = ?3 AND created_at >= ?8) < ?9
+              AND (SELECT COUNT(*) FROM orders WHERE created_at >= ?8) < ?13
             RETURNING id`,
-          [reference, idempotencyKey, sub, email, websiteUrl, privacyVersion, utcText(now), dupSince, daySince, this.maxPerDay, terms.version, utcText(terms.at),
+          [reference, idempotencyKey, sub, email, websiteUrl, privacyVersion, utcText(now), daySince, this.maxPerDay, terms.version, utcText(terms.at),
             declarationsText(), this.maxTotalPerDay]],
           [`INSERT INTO notifications (order_id, status, attempts, next_attempt_at, created_at)
             SELECT id, 'pending', 0, ?2, ?2 FROM orders WHERE reference = ?1`, [reference, utcText(now)]],
@@ -67,12 +66,9 @@ export class OrderService {
         throw e;
       }
     }
-    /* Nicht angelegt: gleiche Absendung (parallel), Duplikat, Tageslimit des Kontos oder Tagesgrenze insgesamt */
+    /* Nicht angelegt: gleiche Absendung (parallel), Tageslimit des Kontos oder Tagesgrenze insgesamt */
     const raced = await this.byKey(idempotencyKey, sub);
     if (raced !== null) return raced;
-    const dup = await this.db.first<Row>(
-      'SELECT id, reference FROM orders WHERE google_sub = ?1 AND website_url = ?2 AND created_at >= ?3 ORDER BY id DESC LIMIT 1', [sub, websiteUrl, dupSince]);
-    if (dup !== null) return { result: 'duplicate', reference: dup.reference, orderId: dup.id };
     const own = await this.db.first<{ n: number }>('SELECT COUNT(*) AS n FROM orders WHERE google_sub = ?1 AND created_at >= ?2', [sub, daySince]);
     if ((own?.n ?? 0) >= this.maxPerDay) return { result: 'limit', reference: null, orderId: null };
     return { result: 'capacity', reference: null, orderId: null };

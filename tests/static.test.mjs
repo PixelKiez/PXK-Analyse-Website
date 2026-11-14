@@ -341,9 +341,11 @@ test('Wahrheitsgemäße Aussagen: kein Premium/Checkout/Abo/Dashboard/Score, kei
   assert.ok(claimProblems([['Probe', 'Ihr Pixelkiez Score.']]).length >= 1, 'Angebotsseiten: Score bleibt verboten');
   assert.deepEqual(claimProblems([['view.ts', viewText()]]), []);
   for (const s of ['Kostenlos · 0 € · kein Abonnement', 'Analyse anfragen', 'Mit Google anmelden', 'Wir senden die PDF an die angemeldete Google E-Mail-Adresse.', 'Adresse ändern', 'Vielen Dank für Ihre Anfrage.',
-    'Ihre Anfrage ist bei uns eingegangen. Wir melden uns per E-Mail bei Ihnen.', 'Diese Website ist bereits angefragt.']) {
+    'Ihre Anfrage ist bei uns eingegangen. Wir melden uns per E-Mail bei Ihnen.']) {
     assert.ok(viewText().includes(s), `view.ts enthält "${s}"`);
   }
+  /* PO-Entscheidung 14.11.2026: keine Duplikatsperre, dieselbe Website darf erneut angefragt werden */
+  assert.ok(!/bereits angefragt/i.test(viewText()), 'view.ts ohne Duplikat-Zustand');
   /* Eingangsbestätigung: keine zugesagte Lieferfrist, keine Behauptung einer Vertragsannahme */
   assert.ok(!/angenommen|Vertrag|Lieferfrist|Werktag|innerhalb von/i.test(viewText()), 'view.ts: keine Frist, keine behauptete Annahme');
   /* Negativprobe: der alte Stand mit Free/Premium wird erkannt */

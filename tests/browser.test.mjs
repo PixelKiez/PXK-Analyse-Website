@@ -1001,21 +1001,20 @@ test('Accessibility-Snapshot (axe-core): keine schweren Verstöße auf Startseit
   if (!SOFT_LAUNCH) await resetData();
   const report = {};
   /* Soft-Launch: ohne Formular und ohne Worker nur die 22 Seiten der Website */
-  for (const path of SOFT_LAUNCH ? SEITEN.slice(0, -1) : ['/index.html', 'hero-fehler', '/impressum.html', '/datenschutz.html', '/agb.html', '/wissen/index.html', '/wissen/seo-geo-ai-visibility.html', '/wissen/wie-ki-websites-liest.html', '/wissen/wie-websites-ausgeliefert-werden.html', '/wissen/answerability.html', '/wissen/entity-trust.html', '/wissen/agent-readiness.html', '/analyse/index.html', '/analyse/auffindbarkeit-seo.html', '/analyse/performance-technik.html', '/analyse/nutzerfuehrung-conversion.html', '/analyse/vertrauen-datenschutz.html', '/analyse/barrierefreiheit.html', '/analyse/ki-verstaendlichkeit.html', '/analyse/methodik.html', '/analyse/warum-website-analyse.html', '/analyse/ki-crawler-agenten.html', '/api/anfrage', 'adresse-fehler', 'bestaetigung', 'bestaetigung-fehler', 'angenommen', 'duplikat']) {
+  for (const path of SOFT_LAUNCH ? SEITEN.slice(0, -1) : ['/index.html', 'hero-fehler', '/impressum.html', '/datenschutz.html', '/agb.html', '/wissen/index.html', '/wissen/seo-geo-ai-visibility.html', '/wissen/wie-ki-websites-liest.html', '/wissen/wie-websites-ausgeliefert-werden.html', '/wissen/answerability.html', '/wissen/entity-trust.html', '/wissen/agent-readiness.html', '/analyse/index.html', '/analyse/auffindbarkeit-seo.html', '/analyse/performance-technik.html', '/analyse/nutzerfuehrung-conversion.html', '/analyse/vertrauen-datenschutz.html', '/analyse/barrierefreiheit.html', '/analyse/ki-verstaendlichkeit.html', '/analyse/methodik.html', '/analyse/warum-website-analyse.html', '/analyse/ki-crawler-agenten.html', '/api/anfrage', 'adresse-fehler', 'bestaetigung', 'bestaetigung-fehler', 'angenommen']) {
     /* axe wird als Inline-Skript injiziert; die CSP der Seite würde das (korrekt) blockieren */
     const o = await open(path.startsWith('/') ? path : path === 'adresse-fehler' ? '/api/anfrage' : '/index.html', { bypassCSP: true });
     if (path === 'hero-fehler') await o.page.click('.url-field .btn');
     /* Fehlerseite des Workers zur Adresse (ohne JavaScript-Vorprüfung) */
     if (path === 'adresse-fehler') await Promise.all([o.page.waitForSelector('#url-error'), o.page.click('.url-field .btn')]);
-    if (['bestaetigung', 'bestaetigung-fehler', 'angenommen', 'duplikat'].includes(path)) {
+    if (['bestaetigung', 'bestaetigung-fehler', 'angenommen'].includes(path)) {
       await o.page.fill('#url', 'musterfirma.de');
       await Promise.all([o.page.waitForSelector('#bestaetigung'), o.page.click('.url-field .btn')]);
     }
     if (path === 'bestaetigung-fehler') await Promise.all([o.page.waitForSelector('#bestaetigung-error'), o.page.click('.anfrage-form .btn')]);
-    if (path === 'angenommen' || path === 'duplikat') {
+    if (path === 'angenommen') {
       await o.page.check('#bestaetigung');
       await Promise.all([o.page.waitForSelector('#reference'), o.page.click('.anfrage-form .btn')]);
-      if (path === 'duplikat') assert.equal(await o.page.textContent('h1'), 'Diese Website ist bereits angefragt.');
     }
     await o.page.addScriptTag({ path: AXE });
     const v = await o.page.evaluate(async () => (await window.axe.run(document, { resultTypes: ['violations'] })).violations.map(x => ({ id: x.id, impact: x.impact, n: x.nodes.length })));

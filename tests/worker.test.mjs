@@ -546,7 +546,7 @@ test('Ungültige oder private Website-URL (im Hero und auf der Bestätigungsseit
 
 /* ---------- Doppelklick, Replay, parallele Rückkehr ---------- */
 
-test('Doppelklick, Replay und parallele Rückkehr: keine doppelten Aufträge oder Mails; erneute Anfrage derselben Website ergibt die vorhandene Referenz', { skip }, async () => {
+test('Doppelklick, Replay und parallele Rückkehr: keine doppelten Aufträge oder Mails aus demselben Vorgang; eine erneute Anfrage derselben Website ist eine neue Anfrage (keine Duplikatsperre)', { skip }, async () => {
   await reset();
   /* Doppelklick auf „Analysieren“ in einer Session: nur der zuletzt gespeicherte Flow ist gültig */
   const c = new Client(app);
@@ -573,34 +573,33 @@ test('Doppelklick, Replay und parallele Rückkehr: keine doppelten Aufträge ode
   const same = await Promise.all(codes.map(code => c2.req('GET', `/api/auth/callback?code=${encodeURIComponent(code)}&state=${p.get('state')}`)));
   assert.deepEqual(same.map(r => r.status).sort(), [303, 400]);
   assert.equal((await orders()).length, 2);
-  /* Zwei Browser, gleiches Google-Konto, gleiche Website, gleichzeitig: ein Auftrag, eine Mail, zweimal dieselbe Referenz */
+  /* Zwei Browser, gleiches Google-Konto, gleiche Website, gleichzeitig: zwei eigenständige Vorgänge, je eigene Referenz und Mail */
   const [x, y] = [new Client(app, { ip: '198.51.100.32' }), new Client(app, { ip: '198.51.100.33' })];
   const [fx, fy] = [await begin(x, google, { website: 'firma-zwei-browser.de' }), await begin(y, google, { website: 'https://firma-zwei-browser.de/' })];
   const both = await Promise.all([x.req('GET', fx.callbackPath), y.req('GET', fy.callbackPath)]);
   assert.deepEqual(both.map(r => r.status), [303, 303]);
   const shown = await Promise.all([x, y].map(k => k.req('GET', '/api/anfrage')));
-  assert.equal(referenceOf(shown[0].text), referenceOf(shown[1].text), 'gleiche Referenz');
-  assert.equal(shown.filter(s => /Diese Website ist bereits angefragt\./.test(s.text)).length, 1, 'eine Annahme, ein Duplikat');
+  assert.ok(shown.every(s => isAccepted(s.text)), 'zwei Eingangsbestätigungen');
+  assert.notEqual(referenceOf(shown[0].text), referenceOf(shown[1].text), 'je Vorgang eine eigene Referenz');
   await settled();
-  assert.deepEqual(await counts(), { orders: 3, outbox: 3, mails: 3 });
-  /* Später erneut dieselbe Website: keine zweite Anfrage, keine zweite Benachrichtigung; eigener, wahrheitsgemäßer Zustand */
+  assert.deepEqual(await counts(), { orders: 4, outbox: 4, mails: 4 });
+  /* Später erneut dieselbe Website (PO-Entscheidung 14.11.2026, keine Duplikatsperre): neue Anfrage, neue Referenz, eine weitere Mail */
   const again = new Client(app, { ip: '198.51.100.34' });
   assert.equal((await login(again, google, { website: 'firma-parallel.de' })).callback.status, 303);
-  const dup = await again.req('GET', '/api/anfrage');
-  assert.match(dup.text, /<title>Bereits angefragt \| 360°Pixelkiez<\/title>/);
-  assert.match(dup.text, /<h1 class="anfrage-titel">Diese Website ist bereits angefragt\.<\/h1>/);
-  assert.match(dup.text, /Wir haben keine zweite angelegt; es gilt die bisherige Referenz\./);
-  assert.match(dup.text, /<svg class="anfrage-zeichen anfrage-zeichen--info"/, 'kein Erfolgshaken beim Duplikat');
-  assert.ok(!isAccepted(dup.text) && !/Vielen Dank/.test(dup.text), 'keine Eingangsmeldung für eine neue Anfrage');
-  assert.equal(referenceOf(dup.text), (await orders()).find(o => o.website_url === 'https://firma-parallel.de').reference);
-  await sleep(100);
-  assert.deepEqual(await counts(), { orders: 3, outbox: 3, mails: 3 }, 'Duplikat: keine zweite Benachrichtigung');
-  /* Anderes Konto darf dieselbe Website anfragen */
+  const next = await again.req('GET', '/api/anfrage');
+  assert.ok(isAccepted(next.text), 'Eingangsbestätigung für die neue Anfrage');
+  assert.ok(!/bereits angefragt/i.test(next.text));
+  const parallel = (await orders()).filter(o => o.website_url === 'https://firma-parallel.de');
+  assert.equal(parallel.length, 2, 'zwei Aufträge für dieselbe Website');
+  assert.equal(referenceOf(next.text), parallel[1].reference);
+  await settled();
+  assert.deepEqual(await counts(), { orders: 5, outbox: 5, mails: 5 });
+  /* Anderes Konto darf dieselbe Website ebenfalls anfragen */
   const other = new Client(app, { ip: '198.51.100.35' });
   assert.equal((await login(other, google, { website: 'firma-parallel.de', claims: { sub: '100000000000000000002', email: 'zweite@beispiel-kunde.de' } })).callback.status, 303);
   await settled();
-  assert.deepEqual(await counts(), { orders: 4, outbox: 4, mails: 4 });
-  assert.equal(new Set(mail.state.accepted.map(m => m.idempotencyKey)).size, 4, 'je Auftrag genau eine Mail');
+  assert.deepEqual(await counts(), { orders: 6, outbox: 6, mails: 6 });
+  assert.equal(new Set(mail.state.accepted.map(m => m.idempotencyKey)).size, 6, 'je Auftrag genau eine Mail');
 });
 
 test('Tageslimit je Google-Konto: höchstens fünf Aufträge in 24 Stunden', { skip }, async () => {

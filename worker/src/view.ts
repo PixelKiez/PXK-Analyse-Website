@@ -12,9 +12,8 @@ export const DECLARATIONS = {
 } as const;
 
 const HINWEIS = '<p class="anfrage-hinweis">Kostenlos · 0 € · kein Abonnement</p>';
-/* Zeichen der Eingangsbestätigung: grüner Haken (zeichnet sich nur bei erlaubter Bewegung, anfrage.css), beim Duplikat ein ruhiges „i“ */
+/* Zeichen der Eingangsbestätigung: grüner Haken (zeichnet sich nur bei erlaubter Bewegung, anfrage.css) */
 const HAKEN = '<svg class="anfrage-zeichen" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><circle class="anfrage-zeichen-kreis" cx="32" cy="32" r="30"/><path class="anfrage-zeichen-strich" d="M20 33.5l8 8L44.5 24" pathLength="1"/></svg>';
-const INFO = '<svg class="anfrage-zeichen anfrage-zeichen--info" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><circle class="anfrage-zeichen-kreis" cx="32" cy="32" r="30"/><path class="anfrage-zeichen-strich" d="M32 29v15M32 20.5v.01"/></svg>';
 
 export class View {
   constructor(private base = '') {}
@@ -63,20 +62,17 @@ export class View {
     return this.page('Analyse anfragen', body);
   }
 
-  /* Nach tatsächlich gespeicherter Anfrage (created) bzw. ehrlicher eigener Zustand, wenn sie schon vorliegt (duplicate). Keine
+  /* Nach tatsächlich gespeicherter Anfrage (auch bei erneuter Absendung desselben Vorgangs mit derselben Referenz). Keine
      zugesagte Lieferfrist und keine Aussage, der Vertrag sei angenommen (AGB § 3 Abs. 3 und 4). */
-  accepted(reference: string, url: string, email: string, kind: 'created' | 'duplicate'): string {
-    const head = kind === 'duplicate'
-      ? `${INFO}<h1 class="anfrage-titel">Diese Website ist bereits angefragt.</h1>`
-        + '<p class="anfrage-text">Mit Ihrem Google-Konto liegt für diese Website schon eine Anfrage vor. Wir haben keine zweite angelegt; es gilt die bisherige Referenz. Wir melden uns per E-Mail bei Ihnen.</p>'
-      : `${HAKEN}<h1 class="anfrage-titel">Vielen Dank für Ihre Anfrage.</h1>`
-        + '<p class="anfrage-text">Ihre Anfrage ist bei uns eingegangen. Wir melden uns per E-Mail bei Ihnen.</p>';
+  accepted(reference: string, url: string, email: string): string {
+    const head = `${HAKEN}<h1 class="anfrage-titel">Vielen Dank für Ihre Anfrage.</h1>`
+      + '<p class="anfrage-text">Ihre Anfrage ist bei uns eingegangen. Wir melden uns per E-Mail bei Ihnen.</p>';
     const body = '<div class="anfrage-fertig">' + head + '<dl class="anfrage-daten">'
       + `<div><dt>Website</dt><dd class="mono">${h(displayWebsite(url))}</dd></div>`
       + `<div><dt>E-Mail</dt><dd>${h(email)}</dd></div>`
       + `<div><dt>Referenz</dt><dd class="mono" id="reference">${h(reference)}</dd></div></dl>`
       + `<a class="btn btn--ghost btn--sm" href="${h(this.base)}/index.html">Zur Startseite</a></div>`;
-    return this.page(kind === 'duplicate' ? 'Bereits angefragt' : 'Anfrage eingegangen', body);
+    return this.page('Anfrage eingegangen', body);
   }
 
   error(title: string, message: string, action = 'Zur Startseite', href = '/index.html'): string {

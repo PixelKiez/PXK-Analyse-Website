@@ -44,7 +44,6 @@ export const LIMITS = {
   orderPerIp: [10, 3600],        // angelegte Aufträge je IP: 10 pro Stunde
   ordersPerAccountDay: 5,
   ordersPerDay: 50,              // alle Aufträge zusammen in 24 Stunden (je Auftrag eine interne Mail): bremst Massenanfragen aus vielen Konten und IPs
-  duplicateDays: 30,             // gleiche Website + gleiches Google-Konto gilt so lange als Duplikat
   stateTtl: 600,
   consentTtl: 600,               // Bestätigung (AGB-Zustimmung) gilt 10 Minuten für die Google-Anmeldung
   sessionTtl: 3600,              // Session (Cookie und D1-Zeile) läuft nach einer Stunde ab

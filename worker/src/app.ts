@@ -105,7 +105,7 @@ class App {
   /* GET: Eingangsbestätigung, sonst Bestätigungsseite zur eingegebenen Website, sonst Adresseingabe (z. B. Sitzung abgelaufen) */
   private show(session: Session | null): Response {
     const done = session?.data.done;
-    if (done) return this.respond(200, this.view.accepted(done.reference, done.url, done.email, done.kind));
+    if (done) return this.respond(200, this.view.accepted(done.reference, done.url, done.email));
     const pending = session?.data.pending;
     if (!pending) return this.respond(200, this.view.address());
     return this.respond(200, this.view.confirm(this.config.termsVersion, pending.url, null,
@@ -237,7 +237,7 @@ class App {
     if (!(await this.limiter().allow('order', clientIp(this.request), LIMITS.orderPerIp, this.now))) {
       return this.respond(429, this.view.error('Zu viele Versuche', 'Bitte warten Sie und versuchen Sie es später erneut.'));
     }
-    const orders = new OrderService(this.db, LIMITS.duplicateDays, LIMITS.ordersPerAccountDay, LIMITS.ordersPerDay);
+    const orders = new OrderService(this.db, LIMITS.ordersPerAccountDay, LIMITS.ordersPerDay);
     const r = await orders.submit(user.sub, user.email, consent.url, flow.idem, this.config.privacyVersion, { version: consent.version, at: consent.at }, this.now);
     if (r.result === 'limit') {
       return this.respond(429, this.view.error('Tageslimit erreicht', 'Mit diesem Google-Konto sind heute bereits mehrere Anfragen eingegangen. Bitte versuchen Sie es morgen erneut.'));
@@ -255,7 +255,7 @@ class App {
       }));
     }
     /* Neue Session-ID nach der Anmeldung (Schutz vor Session-Fixation); sie trägt nur noch die Eingangsbestätigung */
-    const done = { reference: r.reference, url: consent.url, email: user.email, kind: r.result === 'duplicate' ? 'duplicate' as const : 'created' as const };
+    const done = { reference: r.reference, url: consent.url, email: user.email };
     const fresh = await this.sessions.rotate(session, { done }, this.now);
     this.setSessionCookie(fresh);
     return this.redirect(this.config.baseUrl + '/api/anfrage');

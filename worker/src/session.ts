@@ -32,7 +32,7 @@ export interface SessionData {
   oidc?: OidcFlow;
   /* Mit „Analysieren“ eingegebene Website (normalisiert) für die Bestätigungsseite; login: Google-Anmeldung wurde gestartet */
   pending?: { url: string; at: number; login?: true };
-  done?: { reference: string; url: string; email: string; kind: 'created' | 'duplicate' };
+  done?: { reference: string; url: string; email: string };
 }
 
 export interface Session {

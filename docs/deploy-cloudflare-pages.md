@@ -361,7 +361,8 @@ Tabellen `orders`, `notifications`, `sessions`, `rate_limits`, `marketing_consen
    Kontrollierter Test mit dem Google-Testkonto: Website eingeben, „Analysieren“, auf der Bestätigungsseite das eine Kästchen,
    „Mit Google anmelden“ → „Vielen Dank für Ihre Anfrage.“ mit Referenz `PXA-…`; D1: genau 1 Auftrag, `marketing_consent = 0`,
    `notifications.status = 'sent'`; genau 1 Mail in `360@pixelkiez.de` (Absender, Message-ID, SPF/DKIM notieren); zweiter
-   Rücksprung und erneute Anfrage derselben Website erzeugen keinen zweiten Auftrag; ohne Kästchen 422 und kein Auftrag.
+   Rücksprung erzeugt keinen zweiten Auftrag (eine erneute Anfrage derselben Website ist seit 14.11.2026 eine neue Anfrage,
+   keine Duplikatsperre; es gelten 5 je Konto und 50 insgesamt in 24 Stunden); ohne Kästchen 422 und kein Auftrag.
    Danach Testdaten löschen (Abschnitt 9).
 4. **Google**: Brand Verification einreichen und abwarten, dann „App veröffentlichen“. Readback: Audience „In Produktion“.
 5. **Öffentliche Aktivierung**: eigener Commit `ACCESS_MODE = "offen"` (CI wie 0), Worker aus genau diesem SHA deployen
